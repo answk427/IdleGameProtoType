@@ -33,6 +33,7 @@ public class MonsterIdleState : IState
     private void HandleScrollChanged(bool isScrolling)
     {
         //배경이 스크롤 될 때 몬스터는 플레이어에게 접근해야 하므로 Run 상태로 변경
+        Debug.Log($"[{monster.gameObject.name}] HandleScrollChanged 호출됨! isScrolling: {isScrolling}");
         if (isScrolling && monster.IsAlive)
         {
             monster.fsm.ChangeState(new MonsterRunState(monster));

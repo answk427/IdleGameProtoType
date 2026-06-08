@@ -13,6 +13,11 @@ public class StageConfig : ScriptableObject
     [SerializeField] private int bossHp = 100;
     [SerializeField] private int bossGoldReward = 25;
 
+    [SerializeField] private GameObject bossPrefab;
+
+    [Header("Environment")]
+    public Texture2D StageBackgroundTexture;
+
     public int StageNumber => stageNumber;
     public GameObject MonsterPrefab => monsterPrefab;
     public int MonstersPerEncounter => Mathf.Max(monstersPerEncounter, 1);
@@ -22,4 +27,7 @@ public class StageConfig : ScriptableObject
     public float MonsterSpacing => Mathf.Max(monsterSpacing, 0.1f);
     public int BossHp => Mathf.Max(bossHp, 1);
     public int BossGoldReward => Mathf.Max(bossGoldReward, 0);
+
+    public GameObject BossPrefab => bossPrefab;
+
 }

@@ -29,7 +29,7 @@ public class StageManager : MonoBehaviour
     public bool RecordEncounterCompleted()
     {
         encounterProgress++;
-
+        Debug.Log($"currentProgress:{encounterProgress}, completeProgress:{CurrentStage.EncountersToComplete}");
         if (encounterProgress < CurrentStage.EncountersToComplete)
         {
             return false;

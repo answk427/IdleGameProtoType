@@ -36,8 +36,21 @@ public class UVScroller : MonoBehaviour
         mat.mainTextureOffset = offset;
     }
 
+    // GameManager가 다음 스테이지로 넘어갈 때 호출
+    public void ChangeTexture(Texture2D newTexture)
+    {
+        if (mat != null && newTexture != null)
+        {
+            mat.mainTexture = newTexture;
+            offset.x = 0f;
+            mat.mainTextureOffset = offset;
+        }
+    }
+
     private void UpdateScrollState(bool isScrolling)
     {
         IsActiveScroll = isScrolling;
     }
+
+
 }

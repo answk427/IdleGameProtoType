@@ -13,11 +13,13 @@ MonoBehaviour:
   m_Name: StageConfig_1
   m_EditorClassIdentifier: Assembly-CSharp::StageConfig
   stageNumber: 1
-  monsterPrefab: {fileID: 0}
-  monstersPerEncounter: 3
-  encountersToComplete: 10
+  monsterPrefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
+  monstersPerEncounter: 2
+  encountersToComplete: 1
   monsterHp: 10
   monsterGoldReward: 1
   monsterSpacing: 1.2
-  bossHp: 100
+  bossHp: 1
   bossGoldReward: 25
+  bossPrefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
+  StageBackgroundTexture: {fileID: 2800000, guid: 8d41f9d58b934474d8b205ab9d9d0e66, type: 3}

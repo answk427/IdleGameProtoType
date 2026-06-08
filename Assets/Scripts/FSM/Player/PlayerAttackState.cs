@@ -1,42 +1,37 @@
+using Unity.VisualScripting.Antlr3.Runtime.Misc;
 using UnityEngine;
 
-public class PlayerAttackState : IState
+public class PlayerAttackState : PlayerCombatState
 {
-    private PlayerController playerController;
-    private Monster target;
     private float timer;
 
-    public PlayerAttackState(PlayerController playerController, Monster monster)
+    public PlayerAttackState(PlayerController playerController, Monster monster) : base(playerController, monster)
     {
-        this.playerController = playerController;
-        this.target = monster;
     }
 
-    public void Enter()
+    public override void Enter()
     {
+        Debug.Log("PlayerAttackState Enter()");
+        base.Enter();
+
         //시작하자마자 바로 때리게 세팅
-        timer = playerController.AttackInterval;
+        timer = player.AttackInterval;
 
         GameManager.Instance.IsScrolling = false;
     }
 
-    public void Execute()
+    protected override void DoAction()
     {
-        if (target == null || !target.IsAlive)
-        {
-            return;
-        }
-
         timer += Time.deltaTime;
-        if (timer >= playerController.AttackInterval)
+        if (timer >= player.AttackInterval)
         {
-            playerController.Attack(target);
+            player.Attack(target);
             timer = 0f;
         }
     }
 
-    public void Exit()
+    protected override void OnHitImpact()
     {
-        
+        target.TakeDamage(player.GetCalculatedDamage());
     }
 }

@@ -16,6 +16,7 @@ public class Monster : MonoBehaviour
 
     public bool IsAlive => isAlive;
     public int GoldReward => goldReward;
+    public GameObject OriginPrefab { get; set; }
 
     private void Awake()
     {
@@ -33,7 +34,21 @@ public class Monster : MonoBehaviour
     private void Start()
     {
         Debug.Log("Monster Start");
+    }
+
+    private void OnEnable()
+    {
+        Debug.Log("Monster OnEnable");
+        isAlive = true;
         fsm.ChangeState(new MonsterIdleState(this));
+    }
+
+    private void OnDisable()
+    {
+        if (fsm != null)
+        {
+            fsm.ChangeState(null);
+        }
     }
 
     private void Update()
@@ -69,9 +84,11 @@ public class Monster : MonoBehaviour
 
     private void Die()
     {
+        Debug.Log("Monster Die");
         isAlive = false;
+        fsm?.ChangeState(null);
+        GameManager.Instance.AddGold(goldReward);
         PlayTrigger("Death");
-        Destroy(gameObject, destroyDelay);
     }
 
     private void PlayTrigger(string triggerName)
