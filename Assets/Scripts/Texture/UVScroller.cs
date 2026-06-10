@@ -36,6 +36,11 @@ public class UVScroller : MonoBehaviour
         mat.mainTextureOffset = offset;
     }
 
+    private void OnDestroy()
+    {
+        GameManager.Instance.OnScrollStateChanged -= UpdateScrollState;
+    }
+
     // GameManager가 다음 스테이지로 넘어갈 때 호출
     public void ChangeTexture(Texture2D newTexture)
     {

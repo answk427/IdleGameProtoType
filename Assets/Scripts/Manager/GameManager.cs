@@ -99,7 +99,7 @@ public class GameManager : MonoBehaviour
             if (stageManager.RecordEncounterCompleted())
             {
                 // 보스전 진입 UI 띄움
-                UIManager.Instance.ShowBossChallengeButton();
+                UIManager.Instance.ShowUI<BossChallengeButton>();
                 Debug.Log($"Stage {CurrentStageNumber} loop complete. Boss is available.");
             }
 
@@ -194,8 +194,19 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator TransitionToStage(bool canNext)
     {
-        // 1. 화면 암전 (Fade Out)
-        yield return StartCoroutine(UIManager.Instance.FadeOut(0.5f));
+        yield return StartCoroutine(FadeController.Instance.FadeTransition(0.5f, () =>
+        {
+            TransitionToStageInternal(canNext);
+        }));
+
+
+        // 일반 몹 사냥 무한 루프 재가동!
+        currentSpawnLoop = StartCoroutine(ContinuousSpawnLoop());
+    }
+    private void TransitionToStageInternal(bool canNext)
+    {
+        // 1. 필드에 남아있는 몬스터 디스폰
+        monsterSpawner.ClearEncounter();
 
         if (canNext)
         {
@@ -224,7 +235,6 @@ public class GameManager : MonoBehaviour
 
         // 3. 배경 텍스처 교체
         StageConfig currentStage = stageManager.CurrentStage;
-        
         if (background != null)
         {
             background.ChangeTexture(currentStage.StageBackgroundTexture);
@@ -235,14 +245,8 @@ public class GameManager : MonoBehaviour
         //player.transform.position = defaultPlayerPosition; // 위치도 처음 자리로 리셋
 
         // 5. 진행도(보스 게이지) 리셋
-        stageManager.Initialize(); // (선택: 실패 시 게이지를 0으로 만들고 싶다면)
+        stageManager.Initialize();
 
         // --- 세팅 끝! ---
-
-        // 6. 화면 밝히기 (Fade In)
-        yield return StartCoroutine(UIManager.Instance.FadeIn(0.5f));
-
-        // 7. 일반 몹 사냥 무한 루프 재가동!
-        currentSpawnLoop = StartCoroutine(ContinuousSpawnLoop());
     }
 }

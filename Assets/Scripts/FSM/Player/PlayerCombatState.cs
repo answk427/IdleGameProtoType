@@ -3,12 +3,12 @@ using UnityEngine;
 public abstract class PlayerCombatState : IState
 {
     protected PlayerController player;
-    protected Monster target;
+    protected IDamageable target;
 
     //애니메이션이 완전히 끝났는지 확인
     private bool isAnimationFinished = false;
 
-    public PlayerCombatState(PlayerController player, Monster target)
+    public PlayerCombatState(PlayerController player, IDamageable target)
     {
         this.player = player;
         this.target = target;
@@ -25,14 +25,14 @@ public abstract class PlayerCombatState : IState
 
     public void Execute()
     {
-        // 몬스터가 죽었고 공격 애니메이션까지 끝났다면 달림
+        // 대상이 사라졌고 공격 애니메이션까지 끝났다면 달림
         if ((target == null || !target.IsAlive) && isAnimationFinished)
         {
             player.fsm.ChangeState(new PlayerRunState(player));
             return;
         }
 
-        // 몬스터가 아직 살아있을 때만 자식들의 고유 행동(쿨타임 계산 등)을 실행
+        // 대상이 아직 살아있을 때만 자식들의 고유 행동(쿨타임 계산 등)을 실행
         if (target != null && target.IsAlive)
         {
             DoAction();

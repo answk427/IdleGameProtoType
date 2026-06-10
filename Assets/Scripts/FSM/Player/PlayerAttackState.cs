@@ -25,13 +25,13 @@ public class PlayerAttackState : PlayerCombatState
         timer += Time.deltaTime;
         if (timer >= player.AttackInterval)
         {
-            player.Attack(target);
+            player.Attack();
             timer = 0f;
         }
     }
 
     protected override void OnHitImpact()
     {
-        target.TakeDamage(player.GetCalculatedDamage());
+        target?.TakeDamage(player.GetCalculatedDamage());
     }
 }

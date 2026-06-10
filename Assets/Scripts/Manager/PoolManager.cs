@@ -27,30 +27,31 @@ public class PoolManager : MonoBehaviour
 
     private IObjectPool<GameObject> CreatePool(GameObject prefab)
     {
-        if (!poolDict.ContainsKey(prefab))
+        if (poolDict.ContainsKey(prefab))
         {
-            // 유니티 내장 풀 4대 지침 세팅
-            IObjectPool<GameObject> newPool = new ObjectPool<GameObject>(
-                createFunc: () => Instantiate(prefab),             // 1. 없을 땐 Instantiate
-                actionOnGet: (obj) => obj.SetActive(true),         // 2. 꺼낼 땐 켜기
-                actionOnRelease: (obj) => obj.SetActive(false),    // 3. 반납할 땐 끄기
-                actionOnDestroy: (obj) => Destroy(obj),            // 4. 용량 꽉 차면 진짜 파괴
-                collectionCheck: true,
-                defaultCapacity: 10,
-                maxSize: 100
-            );
-            poolDict.Add(prefab, newPool);
+            Debug.LogError($"[PoolManager] 이미 존재하는 풀입니다: {prefab.name}");
             return poolDict[prefab];
         }
-
-        return null;
+        // 유니티 내장 풀 4대 지침 세팅
+        IObjectPool<GameObject> newPool = new ObjectPool<GameObject>(
+            createFunc: () => Instantiate(prefab),             // 1. 없을 땐 Instantiate
+            actionOnGet: (obj) => obj.SetActive(true),         // 2. 꺼낼 땐 켜기
+            actionOnRelease: (obj) => obj.SetActive(false),    // 3. 반납할 땐 끄기
+            actionOnDestroy: (obj) => Destroy(obj),            // 4. 용량 꽉 차면 진짜 파괴
+            collectionCheck: true,
+            defaultCapacity: 10,
+            maxSize: 100
+        );
+        poolDict.Add(prefab, newPool);
+        
+        return poolDict[prefab];
     }
 
 
-    public GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent = null)
+    public GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent = null, bool worldPositionStays = true)
     {
         IObjectPool<GameObject> pool = GetPool(prefab);
-        if(pool == null)
+        if (pool == null)
         {
             pool = CreatePool(prefab);
         }
@@ -63,7 +64,13 @@ public class PoolManager : MonoBehaviour
         // UI 오브젝트 등 캔버스(부모) 설정이 필요할 때를 위한 옵션
         if (parent != null)
         {
-            obj.transform.SetParent(parent);
+            obj.transform.SetParent(parent, worldPositionStays);
+
+            if (obj.transform is RectTransform rect)
+            {
+                rect.localScale = Vector3.one;
+                rect.localRotation = Quaternion.identity;
+            }
         }
 
         return obj;
@@ -74,7 +81,7 @@ public class PoolManager : MonoBehaviour
         if (prefab == null || obj == null) return;
 
         IObjectPool<GameObject> pool = GetPool(prefab);
-        if(pool != null)
+        if (pool != null)
         {
             pool.Release(obj);
         }

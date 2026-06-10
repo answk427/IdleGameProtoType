@@ -1,6 +1,7 @@
+using System;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviour, IHasHp
 {
     [SerializeField] private PlayerStats stats = new PlayerStats();
     [SerializeField] private Animator animator;
@@ -8,8 +9,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private string attackTriggerName = "";
     [SerializeField] private float attackRange = 0.5f;
 
-    public event System.Action OnHitEvent;
-    public event System.Action OnAttackEndEvent;
+    public event Action OnHitEvent;
+    public event Action OnAttackEndEvent;
+    public event Action<float, float> OnHpChanged;
 
     public StateMachine fsm { get; private set; }
     public bool IsAlive { get; private set; }
@@ -45,13 +47,8 @@ public class PlayerController : MonoBehaviour
         SetRunAnimation(false);
     }
 
-    public void Attack(Monster target)
+    public void Attack()
     {
-        if (target == null || !target.IsAlive)
-        {
-            return;
-        }
-
         Debug.Log("Attack");
 
         PlayTrigger(attackTriggerName);

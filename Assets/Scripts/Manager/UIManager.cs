@@ -1,80 +1,77 @@
-using System.Collections;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI; // UI 사용을 위해 필수
+using static UnityEditor.Experimental.GraphView.GraphView;
 
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
 
-    [Header("UI Panels")]
-    [SerializeField] private BossChallengeButton bossChallengeButton;
+    private readonly Dictionary<Type, UIBase> uiDict = new();
 
-    [Header("Common Effects")]
-    [SerializeField] private CanvasGroup fadeCanvasGroup; //FadeOut, FadeIn용 CanvasGroup
+    // 그룹 제어용 Dictionary
+    private readonly Dictionary<UILayer, List<UIBase>> layerGroup = new()
+    {
+        { UILayer.Static,  new List<UIBase>() },
+        { UILayer.Dynamic, new List<UIBase>() },
+        { UILayer.Top,     new List<UIBase>() }
+    };
 
     private void Awake()
     {
+        // 씬 이동 시 겹침 방지
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
 
-        if (bossChallengeButton != null)
-        {
-            bossChallengeButton.Hide();
-        }
+        UIBase[] uis = GetComponentsInChildren<UIBase>(true);
 
-        if (fadeCanvasGroup != null)
+        foreach (UIBase ui in uis)
         {
-            fadeCanvasGroup.alpha = 0f;
-            fadeCanvasGroup.blocksRaycasts = false; // 뒤에 버튼 클릭 가능하게
+            Type type = ui.GetType();
+
+            if (uiDict.ContainsKey(type))
+            {
+                Debug.LogWarning($"[UIManager] 중복 등록 시도: {type.Name}");
+                continue;
+            }
+
+            uiDict.Add(type, ui);
+            layerGroup[ui.Layer].Add(ui);
+
+            ui.Hide();
         }
     }
 
-    public void ShowBossChallengeButton()
+    public void ShowUI<T>(Action<T> onShow = null) where T : UIBase
     {
-        if (bossChallengeButton != null)
+        if (uiDict.TryGetValue(typeof(T), out UIBase baseUI) && baseUI is T ui)
         {
-            bossChallengeButton.Show();
+            onShow?.Invoke(ui);
+            ui.Show();
+        }
+        else
+        {
+            Debug.LogError($"[UIManager] {typeof(T).Name} 패널을 찾을 수 없습니다!");
         }
     }
 
-    public IEnumerator FadeOut(float duration)
+    public void HideUI<T>() where T : UIBase
     {
-        if (fadeCanvasGroup == null) yield break;
-
-        // 터치 차단
-        fadeCanvasGroup.blocksRaycasts = true;
-
-        float elapsedTime = 0f;
-        while (elapsedTime < duration)
+        if (uiDict.TryGetValue(typeof(T), out UIBase baseUI))
         {
-            elapsedTime += Time.deltaTime;
-
-            // 시간에 따라 0에서 1로 부드럽게 증가
-            fadeCanvasGroup.alpha = Mathf.Clamp01(elapsedTime / duration);
-
-            yield return null; // 다음 프레임까지 대기
+            baseUI.Hide();
         }
-
-        fadeCanvasGroup.alpha = 1f; // 확실하게 1로 고정
     }
 
-    public IEnumerator FadeIn(float duration)
+    public void HideAllUI(UILayer layer)
     {
-        if (fadeCanvasGroup == null) yield break;
-
-        float elapsedTime = 0f;
-        while (elapsedTime < duration)
+        foreach (UIBase ui in layerGroup[layer])
         {
-            elapsedTime += Time.deltaTime;
-
-            // 시간에 따라 1에서 0으로 부드럽게 감소
-            fadeCanvasGroup.alpha = Mathf.Clamp01(1f - (elapsedTime / duration));
-
-            yield return null;
+            ui.Hide();
         }
-
-        fadeCanvasGroup.alpha = 0f; // 확실하게 0으로 고정
-
-        // 터치 허용
-        fadeCanvasGroup.blocksRaycasts = false;
     }
 }
