@@ -18,6 +18,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     public StateMachine fsm { get; private set; }
 
     private int currentHp;
+    private int attackDamage;
     private bool isAlive = true;
 
     public bool IsAlive => isAlive;
@@ -67,11 +68,15 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         fsm.Update();
     }
 
-    public void Initialize(int hp, int reward)
+    public void Initialize(MonsterData monsterData, float goldMultiplier, float hpMultiplier, float dmgMultiplier)
     {
-        maxHp = hp;
-        goldReward = reward;
-        currentHp = maxHp;
+        this.maxHp = Mathf.RoundToInt(monsterData.maxHp * hpMultiplier);
+        this.currentHp = this.maxHp;
+
+        this.attackDamage = Mathf.RoundToInt(monsterData.attackDamage * dmgMultiplier);
+
+        this.goldReward = Mathf.RoundToInt(monsterData.goldReward * goldMultiplier);
+        
         isAlive = true;
         OnHpChanged?.Invoke(currentHp, maxHp);
     }

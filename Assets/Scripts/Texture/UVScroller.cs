@@ -12,10 +12,20 @@ public class UVScroller : MonoBehaviour
 
     void Start()
     {
+        GlobalGameEvents.OnStageChanged += HandleStageChanged;
+        GameManager.Instance.OnScrollStateChanged += UpdateScrollState;
+
         // 내 Quad에 입혀진 매터리얼을 가져옴
         mat = GetComponent<Renderer>().material;
+    }
 
-        GameManager.Instance.OnScrollStateChanged += UpdateScrollState;
+    private void HandleStageChanged(StageData newStage)
+    {
+        if (!string.IsNullOrEmpty(newStage.bgTexturePath))
+        {
+            Texture2D newBg = Resources.Load<Texture2D>(newStage.bgTexturePath);
+            mat.mainTexture = newBg;
+        }
     }
 
     // Update 대신 LateUpdate 사용!
@@ -39,23 +49,11 @@ public class UVScroller : MonoBehaviour
     private void OnDestroy()
     {
         GameManager.Instance.OnScrollStateChanged -= UpdateScrollState;
-    }
-
-    // GameManager가 다음 스테이지로 넘어갈 때 호출
-    public void ChangeTexture(Texture2D newTexture)
-    {
-        if (mat != null && newTexture != null)
-        {
-            mat.mainTexture = newTexture;
-            offset.x = 0f;
-            mat.mainTextureOffset = offset;
-        }
+        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
     }
 
     private void UpdateScrollState(bool isScrolling)
     {
         IsActiveScroll = isScrolling;
     }
-
-
 }

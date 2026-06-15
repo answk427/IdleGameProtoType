@@ -31,10 +31,10 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private float postEncounterDelay = 0.5f;
 
-    public int CurrentStageNumber => stageManager != null ? stageManager.CurrentStage.StageNumber : 0;
+    public int CurrentStageNumber => stageManager != null ? stageManager.CurrentStage.ID : 0;
     public string CurrentState => currentState.ToString();
     public int EncounterProgress => stageManager != null ? stageManager.EncounterProgress : 0;
-    public int EncountersToComplete => stageManager != null ? stageManager.CurrentStage.EncountersToComplete : 0;
+    public int EncountersToComplete => stageManager != null ? stageManager.CurrentStage.encountersToComplete : 0;
     public int Gold => gold;
 
     public bool IsScrolling
@@ -52,11 +52,14 @@ public class GameManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        GlobalGameEvents.OnStageCleared += StartStageTransition;
     }
 
     private void Start()
     {
-        if (!ValidateReferences() || !stageManager.Initialize())
+        //TODO:현재 플레이어의 스테이지(임시)
+        int currStage = 1;
+        if (!ValidateReferences() || !stageManager.Initialize(currStage))
         {
             return;
         }
@@ -74,6 +77,14 @@ public class GameManager : MonoBehaviour
         {
             StopCoroutine(currentSpawnLoop);
         }
+
+        GlobalGameEvents.OnStageCleared -= StartStageTransition;
+    }
+
+    private void StartStageTransition()
+    {
+        if (currentSpawnLoop != null) StopCoroutine(currentSpawnLoop);
+        StartCoroutine(TransitionToStage(true));
     }
 
     private IEnumerator ContinuousSpawnLoop()
@@ -161,7 +172,7 @@ public class GameManager : MonoBehaviour
         // 1. 현재 필드에 있던 일반 몬스터들 싹 다 삭제 및 화면 밖으로 치움
         monsterSpawner.ClearEncounter();
 
-        // (선택) 보스 등장 연출을 위해 1초 정도 대기
+        // 보스 등장 연출을 위해 1초 정도 대기
         yield return new WaitForSeconds(1.0f);
 
         // 2. 보스 소환!
@@ -171,24 +182,6 @@ public class GameManager : MonoBehaviour
         while (!monsterSpawner.AllDie() && player.IsAlive)
         {
             yield return null;
-        }
-
-        Debug.Log("보스전 종료!");
-        yield return new WaitForSeconds(postEncounterDelay);
-
-        // 4. 다음 스테이지로 이동
-        // [승리] 플레이어가 살았다는 건 보스를 잡았다는 뜻!
-        if (player.IsAlive)
-        {
-            Debug.Log("보스 처치 성공! 다음 스테이지로!");
-
-            yield return StartCoroutine(TransitionToStage(true));
-        }
-        // [패배] 플레이어가 죽었음...
-        else
-        {
-            Debug.Log("보스전 실패... 현재 스테이지 일반 몹부터 재도전!");
-            yield return StartCoroutine(TransitionToStage(false));
         }
     }
 
@@ -211,42 +204,44 @@ public class GameManager : MonoBehaviour
         if (canNext)
         {
             // 2. 이전 스테이지 몬스터 Pool 비우기
-            if (stageManager.CurrentStage.MonsterPrefab != null)
+            int monsterId = stageManager.CurrentStage.normalMonsterId;
+            int bossId = stageManager.CurrentStage.bossMonsterId;
+
+            // 일반 몬스터 비우기
+            if(DataManager.Instance.MonsterDict.TryGetValue(monsterId, out MonsterData monsterData) &&
+                monsterSpawner.GetMonsterPrefab(monsterData.monsterName) is GameObject monsterPrefab)
             {
-                PoolManager.Instance.ClearPool(stageManager.CurrentStage.MonsterPrefab);
+                PoolManager.Instance.ClearPool(monsterPrefab);
             }
-            if (stageManager.CurrentStage.BossPrefab != null)
+
+            // 보스 몬스터 비우기
+            if (DataManager.Instance.MonsterDict.TryGetValue(bossId, out MonsterData bossData) &&
+                monsterSpawner.GetMonsterPrefab(bossData.monsterName) is GameObject bossPrefab)
             {
-                PoolManager.Instance.ClearPool(stageManager.CurrentStage.BossPrefab);
+                PoolManager.Instance.ClearPool(bossPrefab);
             }
 
             if (stageManager.TryAdvanceStage())
             {
                 // TryAdvanceStage 안에서 currentStageIndex가 +1 됨.
                 // 따라서 TransitionToStage를 부르면 자연스럽게 '다음 스테이지'가 세팅됨!
-
             }
             else
             {
-                Debug.Log("모든 스테이지 클리어! 엔딩!");
                 // 마지막 스테이지 무한 반복
+                Debug.Log("모든 스테이지 클리어! 엔딩!");
+                stageManager.Initialize();
             }
         }
 
-        // 3. 배경 텍스처 교체
-        StageConfig currentStage = stageManager.CurrentStage;
-        if (background != null)
-        {
-            background.ChangeTexture(currentStage.StageBackgroundTexture);
-        }
-
-        // todo : 4. 플레이어 초기화 (죽었을 수도 있으니 체력을 풀로 채우고 살림)
+        // todo : 3. 플레이어 초기화 (죽었을 수도 있으니 체력을 풀로 채우고 살림)
         //player.Revive(); // (주의: PlayerController에 체력 채우고 IsAlive=true 하는 함수 필요!)
         //player.transform.position = defaultPlayerPosition; // 위치도 처음 자리로 리셋
 
-        // 5. 진행도(보스 게이지) 리셋
-        stageManager.Initialize();
-
-        // --- 세팅 끝! ---
+        // 4. 현재 스테이지 리셋
+        if (!canNext)
+        {
+            stageManager.Initialize();
+        }
     }
 }

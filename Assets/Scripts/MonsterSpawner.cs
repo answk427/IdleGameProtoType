@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 public class MonsterSpawner : MonoBehaviour
@@ -9,23 +10,30 @@ public class MonsterSpawner : MonoBehaviour
     [SerializeField] private Vector3 firstMonsterPosition = new Vector3(0f, 0f, 0f);
 
     private readonly List<Monster> activeMonsters = new List<Monster>();
-    
+
     public IReadOnlyList<Monster> ActiveMonsters => activeMonsters;
 
-    public List<Monster> SpawnEncounter(StageConfig stage)
+    public List<Monster> SpawnEncounter(StageData stage)
     {
         ClearEncounter();
 
         if (stage == null)
         {
-            Debug.LogError("MonsterSpawner needs a StageConfig.");
+            Debug.LogError($"MonsterSpawner needs a StageData. stageNumber:{stage.stageNumber}");
             return new List<Monster>();
         }
 
-        GameObject monsterPrefab = stage.MonsterPrefab != null ? stage.MonsterPrefab : fallbackMonsterPrefab;
+        int monsterId = stage.normalMonsterId;
+        if (!DataManager.Instance.MonsterDict.TryGetValue(monsterId, out MonsterData monsterData))
+        {
+            Debug.LogError($"MonsterStatData is Not Found. monsterId:{monsterId}");
+            return new List<Monster>();
+        }
+
+        GameObject monsterPrefab = GetMonsterPrefab(monsterData.monsterName);
         if (monsterPrefab == null)
         {
-            Debug.LogError("MonsterSpawner needs a monster prefab from StageConfig or fallback.");
+            Debug.LogError($"MonsterSpawner needs a monster prefab. monsterID:{monsterId}, monsterName:{monsterData.monsterName}");
             return new List<Monster>();
         }
 
@@ -35,21 +43,11 @@ public class MonsterSpawner : MonoBehaviour
             basePosition += spawnAnchor.position;
         }
 
-        for (int i = 0; i < stage.MonstersPerEncounter; i++)
+        for (int i = 0; i < stage.monstersPerEncounter; i++)
         {
-            Vector3 spawnPosition = basePosition + Vector3.right * stage.MonsterSpacing * i;
+            Vector3 spawnPosition = basePosition + Vector3.right * stage.monsterSpacing * i;
 
-            GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, Quaternion.identity);
-
-            Monster monster = monsterObject.GetComponent<Monster>();
-            if (monster == null)
-            {
-                monster = monsterObject.AddComponent<Monster>();
-            }
-            // 반납할 때를 대비해 자신의 원본 프리팹을 기억해둠
-            monster.OriginPrefab = monsterPrefab;
-
-            monster.Initialize(stage.MonsterHp, stage.MonsterGoldReward);
+            Monster monster = SpawnMonster(monsterData, stage, monsterPrefab, spawnPosition, Quaternion.identity);
             activeMonsters.Add(monster);
         }
 
@@ -95,13 +93,12 @@ public class MonsterSpawner : MonoBehaviour
         return closestMonster;
     }
 
-    //임시 함수(삭제 필수)
     public bool AllDie()
     {
         if (activeMonsters.Count == 0) return true;
 
         int deadCount = 0;
-        for(int i = 0;i < activeMonsters.Count;i++)
+        for (int i = 0; i < activeMonsters.Count; i++)
         {
             Monster m = activeMonsters[i];
             if (m.IsAlive == false) deadCount++;
@@ -112,27 +109,83 @@ public class MonsterSpawner : MonoBehaviour
         return false;
     }
 
-    // MonsterSpawner.cs 안에 추가
-    public void SpawnBoss(StageConfig stage)
+    public Monster SpawnMonster(MonsterData monsterData, StageData stageData, GameObject monsterPrefab, Vector3 spawnPosition, Quaternion quaternion)
+    {
+        Vector3 basePosition = firstMonsterPosition;
+        if (spawnAnchor != null)
+        {
+            basePosition += spawnAnchor.position;
+        }
+
+
+        GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, quaternion);
+
+        Monster monster = monsterObject.GetComponent<Monster>();
+        if (monster == null)
+        {
+            monster = monsterObject.AddComponent<Monster>();
+        }
+
+        // 반납할 때를 대비해 자신의 원본 프리팹을 기억해둠
+        monster.OriginPrefab = monsterPrefab;
+
+        float hpMult, dmgMult, goldMult;
+        CalcStageMultiplier(stageData, out hpMult, out dmgMult, out goldMult);
+
+        monster.Initialize(monsterData, goldMult, hpMult, dmgMult);
+
+        return monster;
+    }
+
+    public Monster SpawnBoss(StageData stage)
     {
         ClearEncounter(); // 혹시 남아있는 일반 몬스터가 있다면 싹 청소
+        
+        if (!DataManager.Instance.MonsterDict.TryGetValue(stage.bossMonsterId, out MonsterData monsterData))
+        {
+            Debug.LogError($"BossMonsterData is not found, stageNumber:{stage.stageNumber}");
+            return null;
+        }
 
-        if (stage.BossPrefab == null) return;
+        GameObject bossPrefab = GetMonsterPrefab(monsterData.monsterName);
+
+        if (bossPrefab == null)
+        {
+            Debug.LogError($"MonsterSpawner needs a monster prefab. bossID:{stage.bossMonsterId}");
+            return null;
+        }
 
         // 보스는 플레이어 앞쪽 정해진 위치에 1마리만 스폰
         Vector3 spawnPosition = firstMonsterPosition + (spawnAnchor != null ? spawnAnchor.position : Vector3.zero);
 
-        // PoolManager를 쓴다고 가정 (안 쓰면 Instantiate)
-        GameObject obj = PoolManager.Instance.Spawn(stage.BossPrefab, spawnPosition, Quaternion.identity, spawnRoot);
+        GameObject obj = PoolManager.Instance.Spawn(bossPrefab, spawnPosition, Quaternion.identity, spawnRoot);
 
         Monster boss = obj.GetComponent<Monster>();
         if (boss == null) boss = obj.AddComponent<Monster>();
 
-        boss.OriginPrefab = stage.BossPrefab;
+        boss.OriginPrefab = bossPrefab;
 
-        // 보스 전용 체력과 보상으로 초기화 (StageConfig에 보스용 스탯이 있어야 함)
-        boss.Initialize(stage.BossHp, stage.BossGoldReward);
+        float hpMult, dmgMult, goldMult;
+        CalcStageMultiplier(stage, out hpMult, out dmgMult, out goldMult);
+        boss.Initialize(monsterData, goldMult, hpMult, dmgMult);
 
         activeMonsters.Add(boss);
+
+        return boss;
+    }
+
+    public GameObject GetMonsterPrefab(string monsterName)
+    {
+        string monsterPath = $"Prefabs/Monsters/{monsterName}";
+        Debug.Log($"monsterPath:{monsterPath}");
+        GameObject monsterPrefab = Resources.Load<GameObject>(monsterPath);
+        return monsterPrefab;
+    }
+
+    private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)
+    {
+        hpMult = Mathf.Pow(1.15f, stageData.stageNumber);
+        dmgMult = Mathf.Pow(1.10f, stageData.stageNumber);
+        goldMult = Mathf.Pow(1.05f, stageData.stageNumber);
     }
 }
