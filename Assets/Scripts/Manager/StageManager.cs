@@ -1,4 +1,3 @@
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 public class StageManager : MonoBehaviour
@@ -65,7 +64,6 @@ public class StageManager : MonoBehaviour
     public bool RecordEncounterCompleted()
     {
         encounterProgress++;
-        Debug.Log($"currentProgress:{encounterProgress}, completeProgress:{CurrentStage.encountersToComplete}");
         if (encounterProgress < CurrentStage.encountersToComplete)
         {
             return false;
@@ -78,7 +76,7 @@ public class StageManager : MonoBehaviour
 
     public bool TryAdvanceStage()
     {
-        if (!isCompleted())
+        if (!IsCompleted())
         {
             return false;
         }
@@ -92,7 +90,7 @@ public class StageManager : MonoBehaviour
         return true;
     }
 
-    public bool isCompleted()
+    public bool IsCompleted()
     {
         return isStageCleared;
     }

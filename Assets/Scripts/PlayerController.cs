@@ -1,17 +1,29 @@
 using System;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour, IHasHp
+public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 {
-    [SerializeField] private PlayerStats stats = new PlayerStats();
+    [Header("스탯 설정 (ScriptableObject)")]
+    [SerializeField] private PlayerStatData statData;
+    [SerializeField] private PlayerUpgradeConfig upgradeConfig;
+
+    [Header("애니메이션")]
     [SerializeField] private Animator animator;
-    [SerializeField] private string runBoolName = "";
-    [SerializeField] private string attackTriggerName = "";
+    [SerializeField] private string runBoolName = "Run";
+    [SerializeField] private string attackTriggerName = "Attack";
+    [SerializeField] private string deathTriggerName = "Death";
+    [SerializeField] private string reviveTriggerName = "Revive";
     [SerializeField] private float attackRange = 0.5f;
+
+    private PlayerStats stats = new PlayerStats();
+    private int currentHp;
+
 
     public event Action OnHitEvent;
     public event Action OnAttackEndEvent;
+    public event Action OnDeathEndEvent;
     public event Action<float, float> OnHpChanged;
+    public event Action<int> OnDamaged;
 
     public StateMachine fsm { get; private set; }
     public bool IsAlive { get; private set; }
@@ -19,16 +31,25 @@ public class PlayerController : MonoBehaviour, IHasHp
     public int AttackDamage => stats.AttackDamage;
     public float AttackInterval => stats.AttackInterval;
     public float AttackRange => attackRange;
+    public int MaxHp => stats.MaxHp;
+    public int CurrentHp => currentHp;
+    public PlayerStats Stats => stats;
 
-    private void Awake()
+
+private void Awake()
     {
         if (animator == null)
         {
             animator = GetComponent<Animator>();
         }
 
-        IsAlive = true;
         fsm = new StateMachine();
+
+        stats.Initialize(statData, upgradeConfig);
+        stats.LoadSave(PlayerSaveData.Load());
+
+        currentHp = stats.MaxHp;
+        IsAlive = true;
     }
 
     private void Update()
@@ -38,7 +59,6 @@ public class PlayerController : MonoBehaviour, IHasHp
 
     public void Run()
     {
-        Debug.Log("Run");
         SetRunAnimation(true);
     }
 
@@ -49,8 +69,6 @@ public class PlayerController : MonoBehaviour, IHasHp
 
     public void Attack()
     {
-        Debug.Log("Attack");
-
         PlayTrigger(attackTriggerName);
     }
 
@@ -88,4 +106,82 @@ public class PlayerController : MonoBehaviour, IHasHp
     {
         OnAttackEndEvent?.Invoke();
     }
+
+    public void AE_OnDeathEnd()
+    {
+        OnDeathEndEvent?.Invoke();
+    }
+
+public void TakeDamage(int damage)
+    {
+        Debug.Log($"Player TakeDamage {damage}, currentHp : {currentHp}");
+        if (!IsAlive) return;
+
+        currentHp = Mathf.Max(currentHp - damage, 0);
+        OnHpChanged?.Invoke(currentHp, stats.MaxHp);
+        OnDamaged?.Invoke(damage);
+        GlobalCombatEvents.TriggerAnyTargetDamaged(this, damage, transform.position);
+
+        if (currentHp <= 0)
+        {
+            Die();
+            return;
+        }
+    }
+
+    public void Die()
+    {
+        IsAlive = false;
+        fsm?.ChangeState(new PlayerDieState(this));
+    }
+
+    public void PlayDeathAnimation()
+    {
+        PlayTrigger(deathTriggerName);
+    }
+
+public void Revive()
+    {
+        currentHp = stats.MaxHp;
+        IsAlive = true;
+        PlayTrigger(reviveTriggerName);
+        OnHpChanged?.Invoke(currentHp, stats.MaxHp);
+        fsm?.ChangeState(new PlayerRunState(this));
+    }
+
+
+
+    // ── 경험치 / 업그레이드 (외부 UI, 몬스터 처치 보상 등에서 호출) ──
+
+    public void AddExp(int amount) => stats.AddExp(amount);
+
+    public void SaveProgress() => stats.Save();
+
+    public bool TryUpgradeHp()
+    {
+        if (GameManager.Instance == null) return false;
+        if (!GameManager.Instance.TrySpendGold(stats.NextHpUpgradeCost)) return false;
+        stats.UpgradeHp();
+        stats.Save();
+        return true;
+    }
+
+    public bool TryUpgradeAttack()
+    {
+        if (GameManager.Instance == null) return false;
+        if (!GameManager.Instance.TrySpendGold(stats.NextAttackUpgradeCost)) return false;
+        stats.UpgradeAttack();
+        stats.Save();
+        return true;
+    }
+
+    public bool TryUpgradeSpeed()
+    {
+        if (GameManager.Instance == null) return false;
+        if (!GameManager.Instance.TrySpendGold(stats.NextSpeedUpgradeCost)) return false;
+        stats.UpgradeSpeed();
+        stats.Save();
+        return true;
+    }
 }
+    

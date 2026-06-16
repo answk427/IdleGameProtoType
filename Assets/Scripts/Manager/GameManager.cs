@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEditor.Timeline.TimelinePlaybackControls;
 
 public class GameManager : MonoBehaviour
 {
@@ -14,10 +13,8 @@ public class GameManager : MonoBehaviour
     }
 
     public static GameManager Instance;
-    
-    // ¼¼»óÀÌ ½ºÅ©·Ñ ÁßÀÎÁö(ÇÃ·¹ÀÌ¾î°¡ ´Ş¸®°í ÀÖ´ÂÁö) ¾Ë·ÁÁÖ´Â ½ºÀ§Ä¡
+
     private bool isScrolling = true;
-    public event Action<bool> OnScrollStateChanged;
 
     private GameState currentState;
     private int gold;
@@ -44,8 +41,7 @@ public class GameManager : MonoBehaviour
         {
             if (isScrolling == value) return;
             isScrolling = value;
-
-            OnScrollStateChanged.Invoke(isScrolling);
+            GlobalGameEvents.TriggerScrollChanged(isScrolling);
         }
     }
 
@@ -53,21 +49,22 @@ public class GameManager : MonoBehaviour
     {
         Instance = this;
         GlobalGameEvents.OnStageCleared += StartStageTransition;
+        GlobalGameEvents.OnPlayerDied += HandlePlayerDied;
     }
 
     private void Start()
     {
-        //TODO:ÇöÀç ÇÃ·¹ÀÌ¾îÀÇ ½ºÅ×ÀÌÁö(ÀÓ½Ã)
+        //TODO: ì €ì¥ëœ í”Œë ˆì´ì–´ ìŠ¤í…Œì´ì§€ë²ˆí˜¸(ì„ì‹œ)
         int currStage = 1;
         if (!ValidateReferences() || !stageManager.Initialize(currStage))
         {
             return;
         }
 
-        // 1. °ÔÀÓ ½ÃÀÛ! ÇÃ·¹ÀÌ¾î¿¡°Ô '´Ş¸®±â' º»´ÉÀ» ÁÖÀÔÇÔ. (¾Ë¾Æ¼­ ½ºÅ©·Ñ ÄÑÁü)
+        // 1. ê²Œì„ ì‹œì‘! í”Œë ˆì´ì–´ëŠ” 'ë‹¬ë¦¬ëŠ”' ìƒíƒœë¡œ ì‹œì‘í•œë‹¤. (ì•Œì•„ì„œ ìŠ¤í¬ë¡¤ ì¼œì§)
         player.fsm.ChangeState(new PlayerRunState(player));
 
-        // 2. ¹«ÇÑ ½ºÆù ·çÇÁ °¡µ¿
+        // 2. ëª¬ìŠ¤í„° ì—°ì† ì†Œí™˜ ë£¨í”„ ì‹œì‘
         currentSpawnLoop = StartCoroutine(ContinuousSpawnLoop());
     }
 
@@ -79,6 +76,7 @@ public class GameManager : MonoBehaviour
         }
 
         GlobalGameEvents.OnStageCleared -= StartStageTransition;
+        GlobalGameEvents.OnPlayerDied -= HandlePlayerDied;
     }
 
     private void StartStageTransition()
@@ -87,34 +85,32 @@ public class GameManager : MonoBehaviour
         StartCoroutine(TransitionToStage(true));
     }
 
+    private void HandlePlayerDied()
+    {
+        if (currentSpawnLoop != null) StopCoroutine(currentSpawnLoop);
+        StartCoroutine(TransitionToStage(false));
+    }
+
     private IEnumerator ContinuousSpawnLoop()
     {
         while (true)
         {
             currentState = GameState.Running;
 
-            // 1. È­¸é ¿À¸¥ÂÊ(¾È º¸ÀÌ´Â °÷)¿¡ N¸¶¸® ½ºÆù!
-            // ÇÃ·¹ÀÌ¾î´Â ÀÌ¹Ì RunStateÀÌ¹Ç·Î, ½ºÆùµÇÀÚ¸¶ÀÚ ¹è°æ°ú ÇÔ²² ¸ó½ºÅÍ°¡ ¿ŞÂÊÀ¸·Î ´Ù°¡¿È
             monsterSpawner.SpawnEncounter(stageManager.CurrentStage);
 
-            // 2. ½ºÆùµÈ ¸ó½ºÅÍµéÀÌ ÀüºÎ Á×À» ¶§±îÁö ±â´Ù¸²
             while (!monsterSpawner.AllDie())
             {
-                yield return null; // ÇÃ·¹ÀÌ¾î FSMÀÌ ¾Ë¾Æ¼­ ½Î¿ì°í Á×ÀÌ°í ´Ù ÇÒ °ÅÀÓ!
+                yield return null;
             }
 
-            // 3. ¿şÀÌºê Å¬¸®¾î! ½ÃÃ¼ Áö¿ì±â ¹× ½ºÅ×ÀÌÁö ÁøÇàµµ ±â·Ï
             yield return new WaitForSeconds(postEncounterDelay);
             monsterSpawner.ClearEncounter();
 
             if (stageManager.RecordEncounterCompleted())
             {
-                // º¸½ºÀü ÁøÀÔ UI ¶ç¿ò
                 UIManager.Instance.ShowUI<BossChallengeButton>();
-                Debug.Log($"Stage {CurrentStageNumber} loop complete. Boss is available.");
             }
-
-            // ·çÇÁ°¡ ´Ù½Ã µ¹¸é¼­ Áï½Ã ´ÙÀ½ N¸¶¸®°¡ ½ºÆùµÊ! ¹«ÇÑ ¹İº¹!
         }
     }
 
@@ -141,44 +137,49 @@ public class GameManager : MonoBehaviour
         return true;
     }
 
+    public PlayerController GetPlayer() => player;
+
     public Monster GetClosestMonster(float originX)
     {
         if (monsterSpawner == null) return null;
         return monsterSpawner.GetClosestMonster(originX);
     }
 
-    public void AddGold(int gold)
+    public void AddGold(int amount)
     {
-        gold += gold;
+        this.gold += amount;
     }
+
+    public bool TrySpendGold(int amount)
+    {
+        if (amount <= 0) return true;
+        if (gold < amount) return false;
+        gold -= amount;
+        return true;
+    }
+
 
     public void EnterBossBattle()
     {
-        // 1. µ¹¾Æ°¡°í ÀÖ´ø ÀÏ¹İ ¸ó½ºÅÍ ¹«ÇÑ ½ºÆù ·çÇÁ¸¦ °­Á¦·Î ¸ØÃã
         if (currentSpawnLoop != null)
         {
             StopCoroutine(currentSpawnLoop);
         }
 
-        // 2. º¸½ºÀü ÄÚ·çÆ¾ ½ÃÀÛ!
         currentSpawnLoop = StartCoroutine(BossBattleRoutine());
     }
 
     private IEnumerator BossBattleRoutine()
     {
         currentState = GameState.Fighting;
-        Debug.Log("º¸½ºÀü ½ÃÀÛ!!!");
+        Debug.Log("ë³´ìŠ¤ì „ ì‹œì‘!!!");
 
-        // 1. ÇöÀç ÇÊµå¿¡ ÀÖ´ø ÀÏ¹İ ¸ó½ºÅÍµé ½Ï ´Ù »èÁ¦ ¹× È­¸é ¹ÛÀ¸·Î Ä¡¿ò
         monsterSpawner.ClearEncounter();
 
-        // º¸½º µîÀå ¿¬ÃâÀ» À§ÇØ 1ÃÊ Á¤µµ ´ë±â
         yield return new WaitForSeconds(1.0f);
 
-        // 2. º¸½º ¼ÒÈ¯!
         monsterSpawner.SpawnBoss(stageManager.CurrentStage);
 
-        // 3. º¸½º°¡ »ì¾ÆÀÖ°í && ÇÃ·¹ÀÌ¾îµµ »ì¾ÆÀÖÀ» ¶§¸¸ ´ë±âÇÏ¸é¼­ ÀüÅõ
         while (!monsterSpawner.AllDie() && player.IsAlive)
         {
             yield return null;
@@ -192,29 +193,24 @@ public class GameManager : MonoBehaviour
             TransitionToStageInternal(canNext);
         }));
 
-
-        // ÀÏ¹İ ¸÷ »ç³É ¹«ÇÑ ·çÇÁ Àç°¡µ¿!
         currentSpawnLoop = StartCoroutine(ContinuousSpawnLoop());
     }
+
     private void TransitionToStageInternal(bool canNext)
     {
-        // 1. ÇÊµå¿¡ ³²¾ÆÀÖ´Â ¸ó½ºÅÍ µğ½ºÆù
         monsterSpawner.ClearEncounter();
 
         if (canNext)
         {
-            // 2. ÀÌÀü ½ºÅ×ÀÌÁö ¸ó½ºÅÍ Pool ºñ¿ì±â
             int monsterId = stageManager.CurrentStage.normalMonsterId;
             int bossId = stageManager.CurrentStage.bossMonsterId;
 
-            // ÀÏ¹İ ¸ó½ºÅÍ ºñ¿ì±â
-            if(DataManager.Instance.MonsterDict.TryGetValue(monsterId, out MonsterData monsterData) &&
+            if (DataManager.Instance.MonsterDict.TryGetValue(monsterId, out MonsterData monsterData) &&
                 monsterSpawner.GetMonsterPrefab(monsterData.monsterName) is GameObject monsterPrefab)
             {
                 PoolManager.Instance.ClearPool(monsterPrefab);
             }
 
-            // º¸½º ¸ó½ºÅÍ ºñ¿ì±â
             if (DataManager.Instance.MonsterDict.TryGetValue(bossId, out MonsterData bossData) &&
                 monsterSpawner.GetMonsterPrefab(bossData.monsterName) is GameObject bossPrefab)
             {
@@ -223,22 +219,17 @@ public class GameManager : MonoBehaviour
 
             if (stageManager.TryAdvanceStage())
             {
-                // TryAdvanceStage ¾È¿¡¼­ currentStageIndex°¡ +1 µÊ.
-                // µû¶ó¼­ TransitionToStage¸¦ ºÎ¸£¸é ÀÚ¿¬½º·´°Ô '´ÙÀ½ ½ºÅ×ÀÌÁö'°¡ ¼¼ÆÃµÊ!
+                // TryAdvanceStage ë‚´ë¶€ì—ì„œ currentStageIndexê°€ +1 ë¨.
             }
             else
             {
-                // ¸¶Áö¸· ½ºÅ×ÀÌÁö ¹«ÇÑ ¹İº¹
-                Debug.Log("¸ğµç ½ºÅ×ÀÌÁö Å¬¸®¾î! ¿£µù!");
+                Debug.Log("ëª¨ë“  ìŠ¤í…Œì´ì§€ í´ë¦¬ì–´! ì¬ì‹œì‘!");
                 stageManager.Initialize();
             }
         }
 
-        // todo : 3. ÇÃ·¹ÀÌ¾î ÃÊ±âÈ­ (Á×¾úÀ» ¼öµµ ÀÖÀ¸´Ï Ã¼·ÂÀ» Ç®·Î Ã¤¿ì°í »ì¸²)
-        //player.Revive(); // (ÁÖÀÇ: PlayerController¿¡ Ã¼·Â Ã¤¿ì°í IsAlive=true ÇÏ´Â ÇÔ¼ö ÇÊ¿ä!)
-        //player.transform.position = defaultPlayerPosition; // À§Ä¡µµ Ã³À½ ÀÚ¸®·Î ¸®¼Â
+        player.Revive();
 
-        // 4. ÇöÀç ½ºÅ×ÀÌÁö ¸®¼Â
         if (!canNext)
         {
             stageManager.Initialize();

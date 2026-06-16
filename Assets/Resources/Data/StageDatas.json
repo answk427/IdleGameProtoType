@@ -4,7 +4,7 @@
     "normalMonsterId": 1001,
     "bossMonsterId": 2001,
     "monstersPerEncounter": 2,
-    "encountersToComplete": 2,
+    "encountersToComplete": 1,
     "monsterSpacing": 1.2,
     "bgTexturePath": "Textures/Backgrounds/Stage1",
     "clearType": 0
@@ -13,8 +13,8 @@
     "stageNumber": 2,
     "normalMonsterId": 1002,
     "bossMonsterId": 2001,
-    "monstersPerEncounter": 3,
-    "encountersToComplete": 3,
+    "monstersPerEncounter": 2,
+    "encountersToComplete": 1,
     "monsterSpacing": 1.0,
     "bgTexturePath": "Textures/Backgrounds/Stage2",
     "clearType": 0

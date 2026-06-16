@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class PlyaerIdleState
+public class PlayerIdleState
 {
     
 }

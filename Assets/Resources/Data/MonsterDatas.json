@@ -2,7 +2,7 @@
   {
     "id": 1001,
     "monsterName": "BlueSlime",
-    "maxHp": 30,
+    "maxHp": 10,
     "attackDamage": 2,
     "moveSpeed": 0.8,
     "goldReward": 5
@@ -10,7 +10,7 @@
   {
     "id": 1002,
     "monsterName": "BlueSlime2",
-    "maxHp": 100,
+    "maxHp": 20,
     "attackDamage": 10,
     "moveSpeed": 1.2,
     "goldReward": 15
@@ -18,9 +18,11 @@
   {
     "id": 2001,
     "monsterName": "BossSlime",
-    "maxHp": 100,
+    "maxHp": 10,
     "attackDamage": 10,
     "moveSpeed": 1.2,
-    "goldReward": 15
+    "goldReward": 15,
+    "attackInterval": 1.0,
+    "attackRange": 1.0
   }
 ]

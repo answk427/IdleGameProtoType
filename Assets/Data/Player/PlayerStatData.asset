@@ -1,0 +1,195 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 133ae2aa843192241854497122086201, type: 3}
+  m_Name: PlayerStatData
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerStatData
+  levelStats:
+  - level: 1
+    requiredExp: 50
+    baseMaxHp: 100
+    baseAttackDamage: 5
+    baseAttackInterval: 1
+    baseRunSpeed: 2
+  - level: 2
+    requiredExp: 80
+    baseMaxHp: 120
+    baseAttackDamage: 7
+    baseAttackInterval: 0.98
+    baseRunSpeed: 2.05
+  - level: 3
+    requiredExp: 110
+    baseMaxHp: 140
+    baseAttackDamage: 9
+    baseAttackInterval: 0.96
+    baseRunSpeed: 2.1
+  - level: 4
+    requiredExp: 140
+    baseMaxHp: 160
+    baseAttackDamage: 11
+    baseAttackInterval: 0.94
+    baseRunSpeed: 2.15
+  - level: 5
+    requiredExp: 170
+    baseMaxHp: 180
+    baseAttackDamage: 13
+    baseAttackInterval: 0.92
+    baseRunSpeed: 2.2
+  - level: 6
+    requiredExp: 200
+    baseMaxHp: 200
+    baseAttackDamage: 15
+    baseAttackInterval: 0.9
+    baseRunSpeed: 2.25
+  - level: 7
+    requiredExp: 230
+    baseMaxHp: 220
+    baseAttackDamage: 17
+    baseAttackInterval: 0.88
+    baseRunSpeed: 2.3
+  - level: 8
+    requiredExp: 260
+    baseMaxHp: 240
+    baseAttackDamage: 19
+    baseAttackInterval: 0.86
+    baseRunSpeed: 2.35
+  - level: 9
+    requiredExp: 290
+    baseMaxHp: 260
+    baseAttackDamage: 21
+    baseAttackInterval: 0.84000003
+    baseRunSpeed: 2.4
+  - level: 10
+    requiredExp: 320
+    baseMaxHp: 280
+    baseAttackDamage: 23
+    baseAttackInterval: 0.82
+    baseRunSpeed: 2.45
+  - level: 11
+    requiredExp: 350
+    baseMaxHp: 300
+    baseAttackDamage: 25
+    baseAttackInterval: 0.8
+    baseRunSpeed: 2.5
+  - level: 12
+    requiredExp: 380
+    baseMaxHp: 320
+    baseAttackDamage: 27
+    baseAttackInterval: 0.78000003
+    baseRunSpeed: 2.55
+  - level: 13
+    requiredExp: 410
+    baseMaxHp: 340
+    baseAttackDamage: 29
+    baseAttackInterval: 0.76
+    baseRunSpeed: 2.6
+  - level: 14
+    requiredExp: 440
+    baseMaxHp: 360
+    baseAttackDamage: 31
+    baseAttackInterval: 0.74
+    baseRunSpeed: 2.65
+  - level: 15
+    requiredExp: 470
+    baseMaxHp: 380
+    baseAttackDamage: 33
+    baseAttackInterval: 0.72
+    baseRunSpeed: 2.7
+  - level: 16
+    requiredExp: 500
+    baseMaxHp: 400
+    baseAttackDamage: 35
+    baseAttackInterval: 0.7
+    baseRunSpeed: 2.75
+  - level: 17
+    requiredExp: 530
+    baseMaxHp: 420
+    baseAttackDamage: 37
+    baseAttackInterval: 0.68
+    baseRunSpeed: 2.8
+  - level: 18
+    requiredExp: 560
+    baseMaxHp: 440
+    baseAttackDamage: 39
+    baseAttackInterval: 0.66
+    baseRunSpeed: 2.85
+  - level: 19
+    requiredExp: 590
+    baseMaxHp: 460
+    baseAttackDamage: 41
+    baseAttackInterval: 0.64
+    baseRunSpeed: 2.9
+  - level: 20
+    requiredExp: 620
+    baseMaxHp: 480
+    baseAttackDamage: 43
+    baseAttackInterval: 0.62
+    baseRunSpeed: 2.95
+  - level: 21
+    requiredExp: 650
+    baseMaxHp: 500
+    baseAttackDamage: 45
+    baseAttackInterval: 0.6
+    baseRunSpeed: 3
+  - level: 22
+    requiredExp: 680
+    baseMaxHp: 520
+    baseAttackDamage: 47
+    baseAttackInterval: 0.58
+    baseRunSpeed: 3.05
+  - level: 23
+    requiredExp: 710
+    baseMaxHp: 540
+    baseAttackDamage: 49
+    baseAttackInterval: 0.56
+    baseRunSpeed: 3.1
+  - level: 24
+    requiredExp: 740
+    baseMaxHp: 560
+    baseAttackDamage: 51
+    baseAttackInterval: 0.54
+    baseRunSpeed: 3.15
+  - level: 25
+    requiredExp: 770
+    baseMaxHp: 580
+    baseAttackDamage: 53
+    baseAttackInterval: 0.52
+    baseRunSpeed: 3.2
+  - level: 26
+    requiredExp: 800
+    baseMaxHp: 600
+    baseAttackDamage: 55
+    baseAttackInterval: 0.5
+    baseRunSpeed: 3.25
+  - level: 27
+    requiredExp: 830
+    baseMaxHp: 620
+    baseAttackDamage: 57
+    baseAttackInterval: 0.48000002
+    baseRunSpeed: 3.3
+  - level: 28
+    requiredExp: 860
+    baseMaxHp: 640
+    baseAttackDamage: 59
+    baseAttackInterval: 0.46
+    baseRunSpeed: 3.35
+  - level: 29
+    requiredExp: 890
+    baseMaxHp: 660
+    baseAttackDamage: 61
+    baseAttackInterval: 0.44
+    baseRunSpeed: 3.4
+  - level: 30
+    requiredExp: 920
+    baseMaxHp: 680
+    baseAttackDamage: 63
+    baseAttackInterval: 0.42000002
+    baseRunSpeed: 3.45

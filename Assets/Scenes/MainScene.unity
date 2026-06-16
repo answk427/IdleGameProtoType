@@ -739,6 +739,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 4912481929491568659, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
+      propertyPath: statData
+      value: 
+      objectReference: {fileID: 11400000, guid: 3c8f30428dd9a994e91e2c22b4604cf2, type: 2}
+    - target: {fileID: 4912481929491568659, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
+      propertyPath: attackRange
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4912481929491568659, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
+      propertyPath: upgradeConfig
+      value: 
+      objectReference: {fileID: 11400000, guid: f994c30e3f6d11f4daa312febea87fbc, type: 2}
+    - target: {fileID: 4912481929491568659, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
+      propertyPath: deathTriggerName
+      value: Death
+      objectReference: {fileID: 0}
     - target: {fileID: 6323719953710832613, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
       propertyPath: m_Name
       value: HeroKnight

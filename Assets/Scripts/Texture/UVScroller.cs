@@ -13,7 +13,7 @@ public class UVScroller : MonoBehaviour
     void Start()
     {
         GlobalGameEvents.OnStageChanged += HandleStageChanged;
-        GameManager.Instance.OnScrollStateChanged += UpdateScrollState;
+        GlobalGameEvents.OnScrollChanged += UpdateScrollState;
 
         // 내 Quad에 입혀진 매터리얼을 가져옴
         mat = GetComponent<Renderer>().material;
@@ -48,7 +48,7 @@ public class UVScroller : MonoBehaviour
 
     private void OnDestroy()
     {
-        GameManager.Instance.OnScrollStateChanged -= UpdateScrollState;
+        GlobalGameEvents.OnScrollChanged -= UpdateScrollState;
         GlobalGameEvents.OnStageChanged -= HandleStageChanged;
     }
 
