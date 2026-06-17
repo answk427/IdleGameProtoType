@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEditor.Timeline.TimelinePlaybackControls;
 
 public class GameManager : MonoBehaviour
 {
@@ -136,9 +135,9 @@ public class GameManager : MonoBehaviour
         return monsterSpawner.GetClosestMonster(originX);
     }
 
-    public void AddGold(int gold)
+    public void AddGold(int amount)
     {
-        gold += gold;
+        gold += amount;
     }
 
     public void EnterBossBattle()

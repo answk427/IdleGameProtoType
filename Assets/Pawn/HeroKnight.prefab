@@ -217,7 +217,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   stats:
     runSpeed: 2
-    attackDamage: 5
+    attackDamage: 100
     attackInterval: 1
   animator: {fileID: 0}
   runBoolName: Run

@@ -99,11 +99,10 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     private void Die()
     {
-        Debug.Log("Monster Die");
+        if (!isAlive) return;
+
         isAlive = false;
-        fsm?.ChangeState(null);
-        GameManager.Instance.AddGold(goldReward);
-        PlayTrigger("Death");
+        fsm.ChangeState(new MonsterDieState(this));
     }
 
     private void PlayTrigger(string triggerName)
@@ -117,6 +116,11 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     public void PlayIdleAnimation()
     {
         animator.Play("Idle");
+    }
+
+    public void PlayDieAnimation()
+    {
+        PlayTrigger("Death");
     }
 
     public void moveToPlayer()
