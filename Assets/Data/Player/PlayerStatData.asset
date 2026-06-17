@@ -16,7 +16,7 @@ MonoBehaviour:
   - level: 1
     requiredExp: 50
     baseMaxHp: 100
-    baseAttackDamage: 5
+    baseAttackDamage: 500
     baseAttackInterval: 1
     baseRunSpeed: 2
   - level: 2

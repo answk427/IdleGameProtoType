@@ -7,7 +7,6 @@ public class MonsterData : IData
     public int ID => id;
 
     public string monsterName;
-    public string prefabName;
     
     public int maxHp;
     public int goldReward;
