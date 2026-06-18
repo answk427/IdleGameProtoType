@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class MonsterSpawner : MonoBehaviour
@@ -23,13 +23,15 @@ public class MonsterSpawner : MonoBehaviour
         }
 
         int monsterId = stage.normalMonsterId;
-        if (!DataManager.Instance.MonsterDict.TryGetValue(monsterId, out MonsterData monsterData))
+        MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
+        if (monsterEntry == null || monsterEntry.data == null)
         {
-            Debug.LogError($"MonsterStatData is Not Found. monsterId:{monsterId}");
+            Debug.LogError($"MonsterData is Not Found. monsterId:{monsterId}");
             return new List<Monster>();
         }
 
-        GameObject monsterPrefab = GetMonsterPrefab(monsterData.monsterName);
+        MonsterData monsterData = monsterEntry.data;
+        GameObject monsterPrefab = monsterEntry.prefab;
         if (monsterPrefab == null)
         {
             Debug.LogError($"MonsterSpawner needs a monster prefab. monsterID:{monsterId}, monsterName:{monsterData.monsterName}");
@@ -112,13 +114,15 @@ public class MonsterSpawner : MonoBehaviour
     {
         ClearEncounter();
 
-        if (!DataManager.Instance.MonsterDict.TryGetValue(stage.bossMonsterId, out MonsterData monsterData))
+        MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(stage.bossMonsterId);
+        if (bossEntry == null || bossEntry.data == null)
         {
             Debug.LogError($"BossMonsterData is not found, stageNumber:{stage.stageNumber}");
             return null;
         }
 
-        GameObject bossPrefab = GetMonsterPrefab(monsterData.monsterName);
+        MonsterData monsterData = bossEntry.data;
+        GameObject bossPrefab = bossEntry.prefab;
         if (bossPrefab == null)
         {
             Debug.LogError($"MonsterSpawner needs a boss prefab. bossID:{stage.bossMonsterId}");
@@ -145,12 +149,6 @@ public class MonsterSpawner : MonoBehaviour
         activeMonsters.Add(boss);
 
         return boss;
-    }
-
-    public GameObject GetMonsterPrefab(string monsterName)
-    {
-        string monsterPath = $"Prefabs/Monsters/{monsterName}";
-        return Resources.Load<GameObject>(monsterPath);
     }
 
     private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)

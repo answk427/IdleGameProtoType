@@ -33,12 +33,13 @@ public class StageManager : MonoBehaviour
 
     public bool Initialize(int stageNumber)
     {
-        if(!DataManager.Instance.StageDict.TryGetValue(stageNumber, out StageData nextStage))
+        StageEntry nextStageEntry = GameDatabaseManager.Instance.GetStage(stageNumber);
+        if (nextStageEntry == null || nextStageEntry.data == null)
         {
             return false;
         }
 
-        stage = nextStage;
+        stage = nextStageEntry.data;
         currentStageIndex = stageNumber;
 
         Initialize();

@@ -11,7 +11,12 @@ public class PoolManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
     }
 
     //해당 프리팹 전용 Pool이 없으면 만들고, 있으면 가져옴

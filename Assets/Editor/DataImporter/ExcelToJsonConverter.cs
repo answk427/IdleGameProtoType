@@ -24,6 +24,8 @@ public class ExcelToJsonConverter : EditorWindow
     private List<Type> targetClasses = new List<Type>();
     private string[] targetClassNames;
     private int selectedClassIndex = 0;
+    //IDataSyncer를 구현한 모든 클래스의 인스턴스 (SO 동기화 자동 디스패치용)
+    private List<IDataSyncer> syncers = new List<IDataSyncer>();
 
     [MenuItem("Tools/Excel to JSON Converter")]
     public static void ConvertExcelToJson()
@@ -35,6 +37,7 @@ public class ExcelToJsonConverter : EditorWindow
     private void OnEnable()
     {
         FindAllDataClasses();
+        FindAllSyncers();
         AddLog("데이터 임포터가 로드되었습니다. 데이터 클래스를 검색했습니다.");
     }
 
@@ -146,6 +149,17 @@ public class ExcelToJsonConverter : EditorWindow
         targetClassNames = targetClasses.Select(t => t.Name).ToArray();
     }
 
+    // IDataSyncer를 구현한 모든 클래스를 자동 탐색해서 인스턴스화.
+    // 새 SO를 추가할 때 이 파일은 건드릴 필요 없이, IDataSyncer 구현 클래스만 추가하면 자동으로 여기서 잡힌다.
+    private void FindAllSyncers()
+    {
+        syncers = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t.IsClass && !t.IsAbstract && typeof(IDataSyncer).IsAssignableFrom(t))
+            .Select(t => (IDataSyncer)Activator.CreateInstance(t))
+            .ToList();
+    }
+
     private void LoadSheetNames(string path)
     {
         sheetNames.Clear();
@@ -190,6 +204,25 @@ public class ExcelToJsonConverter : EditorWindow
         public Type TargetType; 
     }
 
+    // 이름이 대소문자만 다른 멤버가 여러 개 있어도(예: MonsterData의 ID/id) 예외 없이 하나를 골라낸다.
+    // 정확한 대소문자 일치를 우선하고, 없으면 대소문자 무시 매칭 중 첫 번째를 사용한다.
+    private static FieldInfo GetFieldIgnoreCase(Type type, string name)
+    {
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        return type.GetField(name, flags)
+            ?? type.GetFields(flags).FirstOrDefault(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static PropertyInfo GetPropertyIgnoreCase(Type type, string name)
+    {
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        var exact = type.GetProperty(name, flags);
+        if (exact != null && exact.CanWrite) return exact;
+
+        return type.GetProperties(flags)
+            .FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && p.CanWrite);
+    }
+
     private void ConvertDynamic(string filePath, string sheetName, Type targetType)
     {
         try
@@ -218,8 +251,8 @@ public class ExcelToJsonConverter : EditorWindow
                         if (seenHeaders.Contains(fieldName)) continue;
                         seenHeaders.Add(fieldName);
 
-                        FieldInfo fieldInfo = targetType.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                        PropertyInfo propertyInfo = targetType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                        FieldInfo fieldInfo = GetFieldIgnoreCase(targetType, fieldName);
+                        PropertyInfo propertyInfo = fieldInfo == null ? GetPropertyIgnoreCase(targetType, fieldName) : null;
 
                         if (fieldInfo != null)
                         {
@@ -289,6 +322,12 @@ public class ExcelToJsonConverter : EditorWindow
                     File.WriteAllText(savePath, jsonString);
                     AssetDatabase.Refresh();
 
+                    // SO 데이터베이스 동기화: targetType을 처리하는 IDataSyncer가 있으면 자동으로 실행.
+                    // 새 SO 추가 시 여기는 그대로 두고, IDataSyncer 구현 클래스(Syncer)만 추가하면 된다.
+                    var syncer = syncers.FirstOrDefault(s => s.DataType == targetType);
+                    syncer?.Sync(dataList, AddLog);
+
+
                     AddLog($"✅ 성공: 총 {dataList.Count}개의 데이터를 {sheetName}.json 으로 변환 완료!");
                     EditorUtility.DisplayDialog("성공", $"{sheetName}.json 변환 및 저장 완료!", "확인");
                 }
@@ -327,4 +366,5 @@ public class ExcelToJsonConverter : EditorWindow
         }
         catch { return null; }
     }
+
 }

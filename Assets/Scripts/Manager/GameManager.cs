@@ -28,7 +28,7 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private float postEncounterDelay = 0.5f;
 
-    public int CurrentStageNumber => stageManager != null ? stageManager.CurrentStage.ID : 0;
+    public int CurrentStageNumber => stageManager != null ? stageManager.CurrentStage.Key : 0;
     public string CurrentState => currentState.ToString();
     public int EncounterProgress => stageManager != null ? stageManager.EncounterProgress : 0;
     public int EncountersToComplete => stageManager != null ? stageManager.CurrentStage.encountersToComplete : 0;
@@ -205,16 +205,16 @@ public class GameManager : MonoBehaviour
             int monsterId = stageManager.CurrentStage.normalMonsterId;
             int bossId = stageManager.CurrentStage.bossMonsterId;
 
-            if (DataManager.Instance.MonsterDict.TryGetValue(monsterId, out MonsterData monsterData) &&
-                monsterSpawner.GetMonsterPrefab(monsterData.monsterName) is GameObject monsterPrefab)
+            MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
+            if (monsterEntry?.prefab != null)
             {
-                PoolManager.Instance.ClearPool(monsterPrefab);
+                PoolManager.Instance.ClearPool(monsterEntry.prefab);
             }
 
-            if (DataManager.Instance.MonsterDict.TryGetValue(bossId, out MonsterData bossData) &&
-                monsterSpawner.GetMonsterPrefab(bossData.monsterName) is GameObject bossPrefab)
+            MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(bossId);
+            if (bossEntry?.prefab != null)
             {
-                PoolManager.Instance.ClearPool(bossPrefab);
+                PoolManager.Instance.ClearPool(bossEntry.prefab);
             }
 
             if (stageManager.TryAdvanceStage())

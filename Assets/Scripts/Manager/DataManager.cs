@@ -44,7 +44,7 @@ public class DataManager : MonoBehaviour
 
         foreach (T data in dataList)
         {
-            dictionary.Add(data.ID, data);
+            dictionary.Add(data.Key, data);
         }
 
         Debug.Log($"<color=cyan>[로딩 완료]</color> {path} -> {dictionary.Count}개");

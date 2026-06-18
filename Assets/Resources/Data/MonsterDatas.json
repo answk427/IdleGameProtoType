@@ -1,32 +1,32 @@
 [
   {
+    "Key": 1001,
     "id": 1001,
+    "goldReward": 111,
     "monsterName": "BlueSlime",
     "maxHp": 30,
-    "goldReward": 111,
     "attackDamage": 0,
     "attackInterval": 0.0,
-    "attackRange": 0.0,
-    "ID": 1001
+    "attackRange": 0.0
   },
   {
+    "Key": 1002,
     "id": 1002,
+    "goldReward": 222,
     "monsterName": "BlueSlime2",
     "maxHp": 50,
-    "goldReward": 222,
     "attackDamage": 0,
     "attackInterval": 0.0,
-    "attackRange": 0.0,
-    "ID": 1002
+    "attackRange": 0.0
   },
   {
+    "Key": 2001,
     "id": 2001,
+    "goldReward": 1000,
     "monsterName": "BossSlime",
     "maxHp": 100,
-    "goldReward": 1000,
     "attackDamage": 20,
     "attackInterval": 1.0,
-    "attackRange": 1.0,
-    "ID": 2001
+    "attackRange": 1.0
   }
 ]
