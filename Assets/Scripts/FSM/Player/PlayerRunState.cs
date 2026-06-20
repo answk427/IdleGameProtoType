@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class PlayerRunState : IState
 {
@@ -7,7 +7,6 @@ public class PlayerRunState : IState
     public PlayerRunState(PlayerController playerController)
     {
         this.playerController = playerController;
-
     }
 
     public void Enter()
@@ -20,16 +19,10 @@ public class PlayerRunState : IState
     {
         Monster target = GameManager.Instance.GetClosestMonster(playerController.transform.position.x);
 
-        if (target == null)
-        {
-            //Debug.Log("target is null");
-        }
-
         if (target != null && (target.transform.position.x - playerController.transform.position.x)
             <= playerController.AttackRange)
         {
-            Debug.Log("»ç°Å¸® ¾È¿¡ µé¾î¿È");
-            // »ç°Å¸®¿¡ µé¾î¿À¸é °ø°Ý »óÅÂ·Î º¯°æ!
+            Debug.Log("ì‚¬ê±°ë¦¬ ì•ˆì— ë“¤ì–´ì˜´");
             playerController.fsm.ChangeState(new PlayerAttackState(playerController, target));
         }
     }

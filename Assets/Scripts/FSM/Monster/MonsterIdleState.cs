@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class MonsterIdleState : IState
 {
@@ -13,27 +13,23 @@ public class MonsterIdleState : IState
     {
         monster.PlayIdleAnimation();
 
-        GameManager.Instance.OnScrollStateChanged += HandleScrollChanged;
+        GlobalGameEvents.OnScrollChanged += HandleScrollChanged;
 
+        // í˜„ì¬ ìŠ¤í¬ë¡¤ ìƒíƒœ ì¦‰ì‹œ ë°˜ì˜
         HandleScrollChanged(GameManager.Instance.IsScrolling);
     }
 
     public void Execute()
     {
-        
     }
 
     public void Exit()
     {
-        // »óÅÂ¸¦ ºüÁ®³ª°¥ ¶© ¹«Á¶°Ç ±¸µ¶ Ãë¼Ò(Áßº¹ ½ÇÇà ¹æÁö)
-        if (GameManager.Instance != null)
-            GameManager.Instance.OnScrollStateChanged -= HandleScrollChanged;
+        GlobalGameEvents.OnScrollChanged -= HandleScrollChanged;
     }
 
     private void HandleScrollChanged(bool isScrolling)
     {
-        //¹è°æÀÌ ½ºÅ©·Ñ µÉ ¶§ ¸ó½ºÅÍ´Â ÇÃ·¹ÀÌ¾î¿¡°Ô Á¢±ÙÇØ¾ß ÇÏ¹Ç·Î Run »óÅÂ·Î º¯°æ
-        Debug.Log($"[{monster.gameObject.name}] HandleScrollChanged È£ÃâµÊ! isScrolling: {isScrolling}");
         if (isScrolling && monster.IsAlive)
         {
             monster.fsm.ChangeState(new MonsterRunState(monster));

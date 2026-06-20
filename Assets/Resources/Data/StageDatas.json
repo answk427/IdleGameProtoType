@@ -1,0 +1,35 @@
+[
+  {
+    "Key": 1,
+    "clearType": 0,
+    "stageNumber": 1,
+    "normalMonsterId": 1001,
+    "bossMonsterId": 2001,
+    "monstersPerEncounter": 2,
+    "encountersToComplete": 2,
+    "monsterSpacing": 3.0,
+    "bgTexturePath": "stage1"
+  },
+  {
+    "Key": 2,
+    "clearType": 0,
+    "stageNumber": 2,
+    "normalMonsterId": 1002,
+    "bossMonsterId": 2001,
+    "monstersPerEncounter": 3,
+    "encountersToComplete": 2,
+    "monsterSpacing": 3.0,
+    "bgTexturePath": null
+  },
+  {
+    "Key": 3,
+    "clearType": 0,
+    "stageNumber": 3,
+    "normalMonsterId": 1001,
+    "bossMonsterId": 2001,
+    "monstersPerEncounter": 1,
+    "encountersToComplete": 2,
+    "monsterSpacing": 3.0,
+    "bgTexturePath": null
+  }
+]

@@ -2,35 +2,70 @@ using UnityEngine;
 
 public class StageManager : MonoBehaviour
 {
-    [SerializeField] private StageConfig[] stages;
+    [SerializeField] private StageData stage;
 
     private int currentStageIndex;
     private int encounterProgress;
     private bool bossAvailable;
+    private bool isStageCleared;
 
-    public StageConfig CurrentStage => stages[currentStageIndex];
+    public StageData CurrentStage => stage;
     public int EncounterProgress => encounterProgress;
     public bool BossAvailable => bossAvailable;
 
-    public bool Initialize()
+    private void OnEnable()
     {
-        if (stages == null || stages.Length == 0)
+        GlobalGameEvents.OnBossKilled += HandleBossKilled;
+    }
+
+    private void OnDisable()
+    {
+        GlobalGameEvents.OnBossKilled -= HandleBossKilled;
+    }
+
+
+    public void Initialize()
+    {
+        encounterProgress = 0;
+        bossAvailable = false;
+        isStageCleared = false;
+    }
+
+    public bool Initialize(int stageNumber)
+    {
+        StageEntry nextStageEntry = GameDatabaseManager.Instance.GetStage(stageNumber);
+        if (nextStageEntry == null || nextStageEntry.data == null)
         {
-            Debug.LogError("StageManager needs at least one StageConfig.");
             return false;
         }
 
-        currentStageIndex = Mathf.Clamp(currentStageIndex, 0, stages.Length - 1);
-        encounterProgress = 0;
-        bossAvailable = false;
+        stage = nextStageEntry.data;
+        currentStageIndex = stageNumber;
+
+        Initialize();
         return true;
+    }
+
+    private void HandleBossKilled()
+    {
+        if (stage.clearType == StageClearType.KillBoss && !isStageCleared)
+        {
+            CompleteStage();
+        }
+    }
+
+    private void CompleteStage()
+    {
+        isStageCleared = true;
+        Debug.Log($"<color=yellow>[스테이지 클리어 판정!]</color>");
+
+        GlobalGameEvents.TriggerStageCleared();
     }
 
     public bool RecordEncounterCompleted()
     {
         encounterProgress++;
-        Debug.Log($"currentProgress:{encounterProgress}, completeProgress:{CurrentStage.EncountersToComplete}");
-        if (encounterProgress < CurrentStage.EncountersToComplete)
+        if (encounterProgress < CurrentStage.encountersToComplete)
         {
             return false;
         }
@@ -42,14 +77,22 @@ public class StageManager : MonoBehaviour
 
     public bool TryAdvanceStage()
     {
-        if (!bossAvailable || currentStageIndex >= stages.Length - 1)
+        if (!IsCompleted())
         {
             return false;
         }
 
-        currentStageIndex++;
-        encounterProgress = 0;
-        bossAvailable = false;
+        if (!Initialize(currentStageIndex + 1))
+        {
+            return false;
+        }
+
+        GlobalGameEvents.TriggerStageChanged(stage);
         return true;
+    }
+
+    public bool IsCompleted()
+    {
+        return isStageCleared;
     }
 }

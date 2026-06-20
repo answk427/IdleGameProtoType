@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class MonsterDieState : IState
@@ -11,7 +12,7 @@ public class MonsterDieState : IState
 
     public void Enter()
     {
-        monster.PlayDieAnimation();
+        monster.PlayDeathAnimation();
         GlobalCombatEvents.TriggerMonsterDied(monster, monster.GoldReward, monster.transform.position);
     }
 

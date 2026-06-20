@@ -25,8 +25,9 @@ public abstract class PlayerCombatState : IState
 
     public void Execute()
     {
+        Debug.Log($"PlayerCombatState Execute, targetLive : {target.IsAlive}");
         // 대상이 사라졌고 공격 애니메이션까지 끝났다면 달림
-        if ((target == null || !target.IsAlive) && isAnimationFinished)
+        if ((target == null || !target.IsAlive ) && isAnimationFinished)
         {
             player.fsm.ChangeState(new PlayerRunState(player));
             return;

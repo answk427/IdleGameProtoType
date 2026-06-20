@@ -9,47 +9,43 @@ public class MonsterSpawner : MonoBehaviour
     [SerializeField] private Vector3 firstMonsterPosition = new Vector3(0f, 0f, 0f);
 
     private readonly List<Monster> activeMonsters = new List<Monster>();
-    
+
     public IReadOnlyList<Monster> ActiveMonsters => activeMonsters;
 
-    public List<Monster> SpawnEncounter(StageConfig stage)
+    public List<Monster> SpawnEncounter(StageData stage)
     {
         ClearEncounter();
 
         if (stage == null)
         {
-            Debug.LogError("MonsterSpawner needs a StageConfig.");
+            Debug.LogError("MonsterSpawner needs a StageData.");
             return new List<Monster>();
         }
 
-        GameObject monsterPrefab = stage.MonsterPrefab != null ? stage.MonsterPrefab : fallbackMonsterPrefab;
+        int monsterId = stage.normalMonsterId;
+        MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
+        if (monsterEntry == null || monsterEntry.data == null)
+        {
+            Debug.LogError($"MonsterData is Not Found. monsterId:{monsterId}");
+            return new List<Monster>();
+        }
+
+        MonsterData monsterData = monsterEntry.data;
+        GameObject monsterPrefab = monsterEntry.prefab;
         if (monsterPrefab == null)
         {
-            Debug.LogError("MonsterSpawner needs a monster prefab from StageConfig or fallback.");
+            Debug.LogError($"MonsterSpawner needs a monster prefab. monsterID:{monsterId}, monsterName:{monsterData.monsterName}");
             return new List<Monster>();
         }
 
         Vector3 basePosition = firstMonsterPosition;
         if (spawnAnchor != null)
-        {
             basePosition += spawnAnchor.position;
-        }
 
-        for (int i = 0; i < stage.MonstersPerEncounter; i++)
+        for (int i = 0; i < stage.monstersPerEncounter; i++)
         {
-            Vector3 spawnPosition = basePosition + Vector3.right * stage.MonsterSpacing * i;
-
-            GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, Quaternion.identity);
-
-            Monster monster = monsterObject.GetComponent<Monster>();
-            if (monster == null)
-            {
-                monster = monsterObject.AddComponent<Monster>();
-            }
-            // ¹İ³³ÇÒ ¶§¸¦ ´ëºñÇØ ÀÚ½ÅÀÇ ¿øº» ÇÁ¸®ÆÕÀ» ±â¾ïÇØµÒ
-            monster.OriginPrefab = monsterPrefab;
-
-            monster.Initialize(stage.MonsterHp, stage.MonsterGoldReward);
+            Vector3 spawnPosition = basePosition + Vector3.right * stage.monsterSpacing * i;
+            Monster monster = SpawnMonster(monsterData, stage, monsterPrefab, spawnPosition, Quaternion.identity);
             activeMonsters.Add(monster);
         }
 
@@ -61,18 +57,12 @@ public class MonsterSpawner : MonoBehaviour
         for (int i = activeMonsters.Count - 1; i >= 0; i--)
         {
             Monster monster = activeMonsters[i];
-
             if (monster != null)
-            {
                 PoolManager.Instance.Despawn(monster.OriginPrefab, monster.gameObject);
-            }
         }
-
         activeMonsters.Clear();
     }
 
-
-    // ±âÁØ À§Ä¡(originX)¸¦ ÁÖ¸é, ±×°Íº¸´Ù ¿À¸¥ÂÊ¿¡ ÀÖ´Â °¡Àå °¡±î¿î ¸ó½ºÅÍ¸¦ ¹İÈ¯
     public Monster GetClosestMonster(float originX)
     {
         Monster closestMonster = null;
@@ -84,8 +74,6 @@ public class MonsterSpawner : MonoBehaviour
             if (m == null || !m.IsAlive) continue;
 
             float distance = m.transform.position.x - originX;
-
-            // ±âÁØÁ¡º¸´Ù ¾Õ¿¡ ÀÖ°í, ÃÖ¼Ò °Å¸®º¸´Ù °¡±õ´Ù¸é °»½Å
             if (distance > 0 && distance < minDistance)
             {
                 minDistance = distance;
@@ -95,44 +83,78 @@ public class MonsterSpawner : MonoBehaviour
         return closestMonster;
     }
 
-    //ÀÓ½Ã ÇÔ¼ö(»èÁ¦ ÇÊ¼ö)
     public bool AllDie()
     {
         if (activeMonsters.Count == 0) return true;
 
-        int deadCount = 0;
-        for(int i = 0;i < activeMonsters.Count;i++)
+        for (int i = 0; i < activeMonsters.Count; i++)
         {
-            Monster m = activeMonsters[i];
-            if (m.IsAlive == false) deadCount++;
+            if (activeMonsters[i].IsAlive) return false;
         }
-
-        if (deadCount == activeMonsters.Count) return true;
-
-        return false;
+        return true;
     }
 
-    // MonsterSpawner.cs ¾È¿¡ Ãß°¡
-    public void SpawnBoss(StageConfig stage)
+    public Monster SpawnMonster(MonsterData monsterData, StageData stageData, GameObject monsterPrefab, Vector3 spawnPosition, Quaternion quaternion)
     {
-        ClearEncounter(); // È¤½Ã ³²¾ÆÀÖ´Â ÀÏ¹İ ¸ó½ºÅÍ°¡ ÀÖ´Ù¸é ½Ï Ã»¼Ò
+        GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, quaternion);
 
-        if (stage.BossPrefab == null) return;
+        Monster monster = monsterObject.GetComponent<Monster>();
+        if (monster == null)
+            monster = monsterObject.AddComponent<Monster>();
 
-        // º¸½º´Â ÇÃ·¹ÀÌ¾î ¾ÕÂÊ Á¤ÇØÁø À§Ä¡¿¡ 1¸¶¸®¸¸ ½ºÆù
+        monster.OriginPrefab = monsterPrefab;
+
+        CalcStageMultiplier(stageData, out float hpMult, out float dmgMult, out float goldMult);
+        monster.Initialize(monsterData, goldMult, hpMult, dmgMult);
+
+        return monster;
+    }
+
+    public BossMonster SpawnBoss(StageData stage)
+    {
+        ClearEncounter();
+
+        MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(stage.bossMonsterId);
+        if (bossEntry == null || bossEntry.data == null)
+        {
+            Debug.LogError($"BossMonsterData is not found, stageNumber:{stage.stageNumber}");
+            return null;
+        }
+
+        MonsterData monsterData = bossEntry.data;
+        GameObject bossPrefab = bossEntry.prefab;
+        if (bossPrefab == null)
+        {
+            Debug.LogError($"MonsterSpawner needs a boss prefab. bossID:{stage.bossMonsterId}");
+            return null;
+        }
+
         Vector3 spawnPosition = firstMonsterPosition + (spawnAnchor != null ? spawnAnchor.position : Vector3.zero);
+        GameObject obj = PoolManager.Instance.Spawn(bossPrefab, spawnPosition, Quaternion.identity, spawnRoot);
 
-        // PoolManager¸¦ ¾´´Ù°í °¡Á¤ (¾È ¾²¸é Instantiate)
-        GameObject obj = PoolManager.Instance.Spawn(stage.BossPrefab, spawnPosition, Quaternion.identity, spawnRoot);
+        // ë³´ìŠ¤ í”„ë¦¬íŒ¹ì—” BossMonster ì»´í¬ë„ŒíŠ¸ê°€ ë¶™ì–´ìˆì–´ì•¼ í•¨
+        BossMonster boss = obj.GetComponent<BossMonster>();
+        if (boss == null)
+        {
+            Debug.LogError($"{bossPrefab.name} prefabì— BossMonster ì»´í¬ë„ŒíŠ¸ê°€ ì—†ìŠµë‹ˆë‹¤.");
+            PoolManager.Instance.Despawn(bossPrefab, obj);
+            return null;
+        }
 
-        Monster boss = obj.GetComponent<Monster>();
-        if (boss == null) boss = obj.AddComponent<Monster>();
+        boss.OriginPrefab = bossPrefab;
 
-        boss.OriginPrefab = stage.BossPrefab;
-
-        // º¸½º Àü¿ë Ã¼·Â°ú º¸»óÀ¸·Î ÃÊ±âÈ­ (StageConfig¿¡ º¸½º¿ë ½ºÅÈÀÌ ÀÖ¾î¾ß ÇÔ)
-        boss.Initialize(stage.BossHp, stage.BossGoldReward);
+        CalcStageMultiplier(stage, out float hpMult, out float dmgMult, out float goldMult);
+        boss.Initialize(monsterData, goldMult, hpMult, dmgMult);
 
         activeMonsters.Add(boss);
+
+        return boss;
+    }
+
+    private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)
+    {
+        hpMult = Mathf.Pow(1.15f, stageData.stageNumber);
+        dmgMult = Mathf.Pow(1.10f, stageData.stageNumber);
+        goldMult = Mathf.Pow(1.05f, stageData.stageNumber);
     }
 }

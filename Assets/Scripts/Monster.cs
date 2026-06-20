@@ -1,16 +1,14 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 public class Monster : MonoBehaviour, IHasHp, IDamageable
 {
     [SerializeField] private FloatingHpBar hpBar;
-
-    [SerializeField] private Animator animator;
+    [SerializeField] protected Animator animator;
 
     [SerializeField] private int maxHp = 10;
     [SerializeField] private int goldReward = 1;
-    [SerializeField] private float destroyDelay = 0.5f;
-    [SerializeField] private float moveSpeed = 1.0f;
+    [SerializeField] protected float moveSpeed = 1.0f;
 
     public event Action<int> OnDamaged;
     public event Action<float, float> OnHpChanged;
@@ -18,48 +16,38 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     public StateMachine fsm { get; private set; }
 
     private int currentHp;
-    private bool isAlive = true;
+    protected int attackDamage;
 
-    public bool IsAlive => isAlive;
+    public bool IsAlive { get; protected set; }
     public int GoldReward => goldReward;
     public GameObject OriginPrefab { get; set; }
 
-    private void Awake()
+    protected virtual void Awake()
     {
         if (animator == null)
-        {
             animator = GetComponent<Animator>();
-        }
 
-        if (hpBar == null)
-        {
+        if (hpBar == null)  
             hpBar = GetComponentInChildren<FloatingHpBar>();
-        }
 
         fsm = new StateMachine();
 
         currentHp = maxHp;
-        isAlive = true;
+        IsAlive = true;
     }
 
-    private void Start()
-    {
-        Debug.Log("Monster Start");
-    }
-
-    private void OnEnable()
+    protected virtual void OnEnable()
     {
         Debug.Log("Monster OnEnable");
-        isAlive = true;
+        IsAlive = true;
         fsm.ChangeState(new MonsterIdleState(this));
     }
 
     private void OnDisable()
     {
+        IsAlive = false;
         if (fsm != null)
-        {
             fsm.ChangeState(null);
-        }
     }
 
     private void Update()
@@ -67,21 +55,20 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         fsm.Update();
     }
 
-    public void Initialize(int hp, int reward)
+    public virtual void Initialize(MonsterData monsterData, float goldMultiplier, float hpMultiplier, float dmgMultiplier)
     {
-        maxHp = hp;
-        goldReward = reward;
-        currentHp = maxHp;
-        isAlive = true;
+        this.maxHp = Mathf.RoundToInt(monsterData.maxHp * hpMultiplier);
+        this.currentHp = this.maxHp;
+        this.attackDamage = Mathf.RoundToInt(monsterData.attackDamage * dmgMultiplier);
+        this.goldReward = Mathf.RoundToInt(monsterData.goldReward * goldMultiplier);
+
+        IsAlive = true;
         OnHpChanged?.Invoke(currentHp, maxHp);
     }
 
     public void TakeDamage(int damage)
     {
-        if (!isAlive)
-        {
-            return;
-        }
+        if (!IsAlive) return;
 
         currentHp = Mathf.Max(currentHp - damage, 0);
         OnHpChanged?.Invoke(currentHp, maxHp);
@@ -93,24 +80,20 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
             Die();
             return;
         }
-
-        PlayTrigger("Hurt");
     }
 
-    private void Die()
+    protected virtual void Die()
     {
-        if (!isAlive) return;
-
-        isAlive = false;
-        fsm.ChangeState(new MonsterDieState(this));
+        Debug.Log("Monster Die");
+        IsAlive = false;
+        GameManager.Instance.AddGold(goldReward);
+        fsm?.ChangeState(new MonsterDieState(this));
     }
 
-    private void PlayTrigger(string triggerName)
+    protected void PlayTrigger(string triggerName)
     {
         if (animator != null)
-        {
             animator.SetTrigger(triggerName);
-        }
     }
 
     public void PlayIdleAnimation()
@@ -118,7 +101,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         animator.Play("Idle");
     }
 
-    public void PlayDieAnimation()
+    public void PlayDeathAnimation()
     {
         PlayTrigger("Death");
     }

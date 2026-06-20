@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEditor.Experimental.GraphView.GraphView;
 
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
 
     private readonly Dictionary<Type, UIBase> uiDict = new();
-
+    
     // 그룹 제어용 Dictionary
     private readonly Dictionary<UILayer, List<UIBase>> layerGroup = new()
     {

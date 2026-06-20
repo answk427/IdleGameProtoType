@@ -1,5 +1,4 @@
-using Unity.VisualScripting.Antlr3.Runtime.Misc;
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class PlayerAttackState : PlayerCombatState
 {
@@ -14,7 +13,7 @@ public class PlayerAttackState : PlayerCombatState
         Debug.Log("PlayerAttackState Enter()");
         base.Enter();
 
-        //½ÃÀÛÇÏÀÚ¸¶ÀÚ ¹Ù·Î ¶§¸®°Ô ¼¼ÆÃ
+        // ë“¤ì–´ì˜¤ìë§ˆì ë°”ë¡œ ê³µê²©í•  ìˆ˜ ìˆê²Œ
         timer = player.AttackInterval;
 
         GameManager.Instance.IsScrolling = false;
