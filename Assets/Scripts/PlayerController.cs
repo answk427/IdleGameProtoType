@@ -4,7 +4,7 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 {
     [Header("스탯 설정 (ScriptableObject)")]
-    [SerializeField] private PlayerStatData statData;
+    [SerializeField] private PlayerStatDatabase statData;
     [SerializeField] private PlayerUpgradeConfig upgradeConfig;
 
     [Header("애니메이션")]
@@ -36,7 +36,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     public PlayerStats Stats => stats;
 
 
-private void Awake()
+    private void Awake()
     {
         if (animator == null)
         {
@@ -55,7 +55,7 @@ private void Awake()
     private void Update()
     {
         fsm.Update();
-    }   
+    }
 
     public void Run()
     {
@@ -112,7 +112,7 @@ private void Awake()
         OnDeathEndEvent?.Invoke();
     }
 
-public void TakeDamage(int damage)
+    public void TakeDamage(int damage)
     {
         Debug.Log($"Player TakeDamage {damage}, currentHp : {currentHp}");
         if (!IsAlive) return;
@@ -140,7 +140,7 @@ public void TakeDamage(int damage)
         PlayTrigger(deathTriggerName);
     }
 
-public void Revive()
+    public void Revive()
     {
         currentHp = stats.MaxHp;
         IsAlive = true;
@@ -148,7 +148,6 @@ public void Revive()
         OnHpChanged?.Invoke(currentHp, stats.MaxHp);
         fsm?.ChangeState(new PlayerRunState(this));
     }
-
 
 
     // ── 경험치 / 업그레이드 (외부 UI, 몬스터 처치 보상 등에서 호출) ──
@@ -184,4 +183,3 @@ public void Revive()
         return true;
     }
 }
-    

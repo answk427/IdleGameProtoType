@@ -698,7 +698,7 @@ PrefabInstance:
     - target: {fileID: 4912481929491568659, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
       propertyPath: statData
       value: 
-      objectReference: {fileID: 11400000, guid: 3c8f30428dd9a994e91e2c22b4604cf2, type: 2}
+      objectReference: {fileID: 11400000, guid: 6eb66ad1c84d5cf42babc73c0ea2837c, type: 2}
     - target: {fileID: 4912481929491568659, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
       propertyPath: attackRange
       value: 1

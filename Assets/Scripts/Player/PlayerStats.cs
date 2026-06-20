@@ -4,10 +4,10 @@ using UnityEngine;
 /// <summary>
 /// 플레이어 최종 스탯 계산기
 /// 
-/// 최종 스탯 = 레벨 기본 스탯 (PlayerStatData) + 업그레이드 보너스 (PlayerSaveData)
+/// 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerSaveData)
 /// 
 /// 사용법:
-///   stats.Initialize(statData, upgradeConfig);
+///   stats.Initialize(statDatabase, upgradeConfig);
 ///   stats.LoadSave(saveData);
 ///   int hp = stats.MaxHp; // 최종 HP
 ///   stats.AddExp(30);     // 경험치 추가 → 레벨업 자동 처리
@@ -22,7 +22,7 @@ public class PlayerStats
     public event Action OnUpgraded;               // 업그레이드 구매 시
 
     // ── 참조 ────────────────────────────────────────────────
-    private PlayerStatData statData;
+    private PlayerStatDatabase statData;
     private PlayerUpgradeConfig upgradeConfig;
     private PlayerSaveData saveData;
 
@@ -44,11 +44,11 @@ public class PlayerStats
     public int NextAttackUpgradeCost => upgradeConfig.GetAttackUpgradeCost(saveData?.attackUpgradeLevel ?? 0);
     public int NextSpeedUpgradeCost => upgradeConfig.GetSpeedUpgradeCost(saveData?.speedUpgradeLevel ?? 0);
 
-    private PlayerStatData.LevelStat BaseStat => statData.GetStat(Level);
+    private PlayerStatData BaseStat => statData.GetByLevel(Level);
 
     // ── 초기화 ──────────────────────────────────────────────
 
-    public void Initialize(PlayerStatData statData, PlayerUpgradeConfig upgradeConfig)
+    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig)
     {
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
