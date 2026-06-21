@@ -55,7 +55,12 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
         if (GameDatabaseManager.Instance != null)
         {
-            InitializeSkills(new List<SkillData>(GameDatabaseManager.Instance.GetAllSkills()));
+            List<SkillData> skillDatas = new List<SkillData>();
+            foreach (var entry in GameDatabaseManager.Instance.GetAllSkills())
+            {
+                if (entry?.data != null) skillDatas.Add(entry.data);
+            }
+            InitializeSkills(skillDatas);
         }
     }
 

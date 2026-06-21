@@ -4,17 +4,17 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "SkillDatabase", menuName = "Data/Skill Database")]
 public class SkillDatabase : ScriptableObject
 {
-    public List<SkillData> entries = new List<SkillData>();
+    public List<SkillEntry> entries = new List<SkillEntry>();
 
-    private Dictionary<int, SkillData> lookup;
+    private Dictionary<int, SkillEntry> lookup;
 
-    public SkillData GetById(int id)
+    public SkillEntry GetById(int id)
     {
         EnsureLookup();
         return lookup.TryGetValue(id, out var entry) ? entry : null;
     }
 
-    public IReadOnlyList<SkillData> GetAll()
+    public IReadOnlyList<SkillEntry> GetAll()
     {
         return entries;
     }
@@ -23,11 +23,11 @@ public class SkillDatabase : ScriptableObject
     {
         if (lookup != null) return;
 
-        lookup = new Dictionary<int, SkillData>();
+        lookup = new Dictionary<int, SkillEntry>();
         foreach (var e in entries)
         {
-            if (e == null) continue;
-            lookup[e.id] = e;
+            if (e?.data == null) continue;
+            lookup[e.data.id] = e;
         }
     }
 

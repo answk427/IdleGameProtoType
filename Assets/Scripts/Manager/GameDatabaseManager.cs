@@ -78,7 +78,7 @@ public class GameDatabaseManager : MonoBehaviour
         return stageDatabase.GetByNumber(stageNumber);
     }
 
-    public SkillData GetSkill(int id)
+    public SkillEntry GetSkill(int id)
     {
         if (skillDatabase == null)
         {
@@ -88,12 +88,12 @@ public class GameDatabaseManager : MonoBehaviour
         return skillDatabase.GetById(id);
     }
 
-    public System.Collections.Generic.IReadOnlyList<SkillData> GetAllSkills()
+    public System.Collections.Generic.IReadOnlyList<SkillEntry> GetAllSkills()
     {
         if (skillDatabase == null)
         {
             Debug.LogError("[GameDatabaseManager] SkillDatabase가 연결되어 있지 않습니다.");
-            return new System.Collections.Generic.List<SkillData>();
+            return new System.Collections.Generic.List<SkillEntry>();
         }
         return skillDatabase.GetAll();
     }
