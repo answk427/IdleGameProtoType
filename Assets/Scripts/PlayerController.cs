@@ -53,9 +53,9 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         currentHp = stats.MaxHp;
         IsAlive = true;
 
-        if (DataManager.Instance != null)
+        if (GameDatabaseManager.Instance != null)
         {
-            InitializeSkills(new List<SkillData>(DataManager.Instance.SkillDict.Values));
+            InitializeSkills(new List<SkillData>(GameDatabaseManager.Instance.GetAllSkills()));
         }
     }
 
