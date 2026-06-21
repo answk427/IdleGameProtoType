@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class CombatEffectManager : MonoBehaviour
 {
@@ -263,6 +263,34 @@ public class CombatEffectManager : MonoBehaviour
 
         texture.Apply();
         return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 32f);
+    }
+
+    [Header("Generic Skill VFX")]
+    [SerializeField] private float defaultVfxLifetime = 1.5f;
+
+    // 스킬 등 범용 일회성 VFX 프리팹 재생. 풀링 후 일정 시간 뒤 자동 반납.
+    public void PlayVfx(GameObject vfxPrefab, Vector3 worldPos)
+    {
+        if (vfxPrefab == null) return;
+
+        GameObject obj = PoolManager.Instance.Spawn(vfxPrefab, worldPos, Quaternion.identity);
+        StartCoroutine(ReturnVfxAfterDelay(vfxPrefab, obj, GetVfxLifetime(obj)));
+    }
+
+    private float GetVfxLifetime(GameObject obj)
+    {
+        if (obj.TryGetComponent(out ParticleSystem ps))
+        {
+            return ps.main.duration + ps.main.startLifetime.constantMax;
+        }
+        return defaultVfxLifetime;
+    }
+
+    private System.Collections.IEnumerator ReturnVfxAfterDelay(GameObject prefab, GameObject instance, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (instance != null)
+            PoolManager.Instance.Despawn(prefab, instance);
     }
 
     public void ReturnDamageText(GameObject obj)

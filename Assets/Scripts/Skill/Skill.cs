@@ -1,13 +1,16 @@
 ﻿public class Skill
 {
     public SkillData Data { get; }
+    public SkillEntry Entry { get; }
+
     private float currentCooldown;
     private readonly ISkillEffect effect;
 
-    public Skill(SkillData data)
+    public Skill(SkillEntry entry)
     {
-        Data = data;
-        effect = CreateEffect(data);
+        Entry = entry;
+        Data = entry.data;
+        effect = CreateEffect(Data);
     }
 
     public bool IsReady => currentCooldown <= 0f;

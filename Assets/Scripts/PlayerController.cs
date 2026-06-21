@@ -55,12 +55,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
         if (GameDatabaseManager.Instance != null)
         {
-            List<SkillData> skillDatas = new List<SkillData>();
-            foreach (var entry in GameDatabaseManager.Instance.GetAllSkills())
-            {
-                if (entry?.data != null) skillDatas.Add(entry.data);
-            }
-            InitializeSkills(skillDatas);
+            InitializeSkills(new List<SkillEntry>(GameDatabaseManager.Instance.GetAllSkills()));
         }
     }
 
@@ -207,12 +202,13 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     // ── 스킬 시스템 ──
 
-    public void InitializeSkills(List<SkillData> skillDatas)
+    public void InitializeSkills(List<SkillEntry> skillEntries)
     {
         skills.Clear();
-        foreach (var data in skillDatas)
+        foreach (var entry in skillEntries)
         {
-            skills.Add(new Skill(data));
+            if (entry?.data == null) continue;
+            skills.Add(new Skill(entry));
         }
     }
 

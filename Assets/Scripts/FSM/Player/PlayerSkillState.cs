@@ -1,4 +1,6 @@
-﻿public class PlayerSkillState : PlayerCombatState
+﻿using UnityEngine;
+
+public class PlayerSkillState : PlayerCombatState
 {
     private readonly Skill skill;
 
@@ -12,6 +14,15 @@
     {
         base.Enter();
         player.PlayAnimationTrigger(skill.Data.animationTrigger);
+
+        SkillEntry entry = skill.Entry;
+        if (entry == null) return;
+
+        if (entry.castVfxPrefab != null)
+            CombatEffectManager.Instance.PlayVfx(entry.castVfxPrefab, player.transform.position);
+
+        if (entry.castSfx != null)
+            AudioSource.PlayClipAtPoint(entry.castSfx, player.transform.position);
     }
 
     protected override void DoAction()
@@ -22,5 +33,16 @@
     protected override void OnHitImpact()
     {
         skill.Use(player, target);
+
+        SkillEntry entry = skill.Entry;
+        if (entry == null) return;
+
+        Vector3 hitPos = target is Monster m ? m.transform.position : player.transform.position;
+
+        if (entry.hitVfxPrefab != null)
+            CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, hitPos);
+
+        if (entry.hitSfx != null)
+            AudioSource.PlayClipAtPoint(entry.hitSfx, hitPos);
     }
 }
