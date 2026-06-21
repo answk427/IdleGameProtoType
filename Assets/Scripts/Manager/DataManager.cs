@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,6 +8,7 @@ public class DataManager : MonoBehaviour
 
     public Dictionary<int, MonsterData> MonsterDict { get; private set; }
     public Dictionary<int, StageData> StageDict { get; private set; }
+    public Dictionary<int, SkillData> SkillDict { get; private set; }
 
     private void Awake()
     {
@@ -27,6 +28,7 @@ public class DataManager : MonoBehaviour
     {
         MonsterDict = LoadJson<MonsterData>("Data/MonsterDatas");
         StageDict = LoadJson<StageData>("Data/StageDatas");
+        SkillDict = LoadJson<SkillData>("Data/SkillDatas");
     }
 
     private Dictionary<int, T> LoadJson<T>(string path) where T : IData
@@ -54,12 +56,12 @@ public class DataManager : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 }

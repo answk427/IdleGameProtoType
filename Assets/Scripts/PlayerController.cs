@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour, IHasHp, IDamageable
@@ -18,6 +19,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     private PlayerStats stats = new PlayerStats();
     private int currentHp;
 
+    private readonly List<Skill> skills = new List<Skill>();
 
     public event Action OnHitEvent;
     public event Action OnAttackEndEvent;
@@ -50,11 +52,21 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
         currentHp = stats.MaxHp;
         IsAlive = true;
+
+        if (DataManager.Instance != null)
+        {
+            InitializeSkills(new List<SkillData>(DataManager.Instance.SkillDict.Values));
+        }
     }
 
     private void Update()
     {
         fsm.Update();
+
+        for (int i = 0; i < skills.Count; i++)
+        {
+            skills[i].Tick(Time.deltaTime);
+        }
     }
 
     public void Run()
@@ -88,6 +100,11 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         }
     }
 
+    public void PlayAnimationTrigger(string triggerName)
+    {
+        PlayTrigger(triggerName);
+    }
+
     public int GetCalculatedDamage(float skillMultiplier = 1.0f)
     {
         // 크리티컬 계산, 버프 계산 등 적용
@@ -101,7 +118,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         OnHitEvent?.Invoke();
     }
 
-    //애니메이션 이벤트가 호출할 함수(애니메이션 끝난 시점)"
+    //애니메이션 이벤트가 호출할 함수(애니메이션 끝난 시점)
     public void AE_OnAttackEnd()
     {
         OnAttackEndEvent?.Invoke();
@@ -181,5 +198,31 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         stats.UpgradeSpeed();
         stats.Save();
         return true;
+    }
+
+    // ── 스킬 시스템 ──
+
+    public void InitializeSkills(List<SkillData> skillDatas)
+    {
+        skills.Clear();
+        foreach (var data in skillDatas)
+        {
+            skills.Add(new Skill(data));
+        }
+    }
+
+    public Skill GetReadySkill()
+    {
+        for (int i = 0; i < skills.Count; i++)
+        {
+            if (skills[i].IsReady) return skills[i];
+        }
+        return null;
+    }
+
+    public void Heal(int amount)
+    {
+        currentHp = Mathf.Min(currentHp + amount, stats.MaxHp);
+        OnHpChanged?.Invoke(currentHp, stats.MaxHp);
     }
 }

@@ -44,6 +44,11 @@ public class PlayerStats
     public int NextAttackUpgradeCost => upgradeConfig.GetAttackUpgradeCost(saveData?.attackUpgradeLevel ?? 0);
     public int NextSpeedUpgradeCost => upgradeConfig.GetSpeedUpgradeCost(saveData?.speedUpgradeLevel ?? 0);
 
+    // 최대 업그레이드 도달 여부 (UI에서 "MAX" 표시용)
+    public bool IsHpUpgradeMaxed => upgradeConfig.maxUpgradeLevel > 0 && (saveData?.hpUpgradeLevel ?? 0) >= upgradeConfig.maxUpgradeLevel;
+    public bool IsAttackUpgradeMaxed => upgradeConfig.maxUpgradeLevel > 0 && (saveData?.attackUpgradeLevel ?? 0) >= upgradeConfig.maxUpgradeLevel;
+    public bool IsSpeedUpgradeMaxed => upgradeConfig.maxUpgradeLevel > 0 && (saveData?.speedUpgradeLevel ?? 0) >= upgradeConfig.maxUpgradeLevel;
+
     private PlayerStatData BaseStat => statData.GetByLevel(Level);
 
     // ── 초기화 ──────────────────────────────────────────────

@@ -21,6 +21,13 @@ public class PlayerAttackState : PlayerCombatState
 
     protected override void DoAction()
     {
+        Skill readySkill = player.GetReadySkill();
+        if (readySkill != null)
+        {
+            player.fsm.ChangeState(new PlayerSkillState(player, target, readySkill));
+            return;
+        }
+
         timer += Time.deltaTime;
         if (timer >= player.AttackInterval)
         {

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class MonsterSpawner : MonoBehaviour
@@ -81,6 +81,23 @@ public class MonsterSpawner : MonoBehaviour
             }
         }
         return closestMonster;
+    }
+
+    public List<Monster> GetMonstersInRange(float originX, float radius)
+    {
+        List<Monster> result = new List<Monster>();
+        for (int i = 0; i < activeMonsters.Count; i++)
+        {
+            Monster m = activeMonsters[i];
+            if (m == null || !m.IsAlive) continue;
+
+            float distance = Mathf.Abs(m.transform.position.x - originX);
+            if (distance <= radius)
+            {
+                result.Add(m);
+            }
+        }
+        return result;
     }
 
     public bool AllDie()

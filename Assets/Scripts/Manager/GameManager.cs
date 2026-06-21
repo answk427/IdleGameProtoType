@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -63,6 +63,9 @@ public class GameManager : MonoBehaviour
 
         // 1. 게임 시작! 플레이어는 '달리는' 상태로 시작한다. (알아서 스크롤 켜짐)
         player.fsm.ChangeState(new PlayerRunState(player));
+
+        // 플레이어 HUD(체력/경험치/업그레이드) 표시
+        UIManager.Instance.ShowUI<PlayerHud>();
 
         // 2. 몬스터 연속 소환 루프 시작
         currentSpawnLoop = StartCoroutine(ContinuousSpawnLoop());
@@ -143,6 +146,12 @@ public class GameManager : MonoBehaviour
     {
         if (monsterSpawner == null) return null;
         return monsterSpawner.GetClosestMonster(originX);
+    }
+
+    public List<Monster> GetMonstersInRange(float originX, float radius)
+    {
+        if (monsterSpawner == null) return new List<Monster>();
+        return monsterSpawner.GetMonstersInRange(originX, radius);
     }
 
     public void AddGold(int amount)
