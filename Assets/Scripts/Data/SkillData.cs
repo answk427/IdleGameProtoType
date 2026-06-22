@@ -19,6 +19,7 @@ public class SkillData : IData
     [UnityEngine.SerializeField] private SkillEffectType _effectType;
     [UnityEngine.SerializeField] private float _value1; // damageMultiplier 또는 healAmount
     [UnityEngine.SerializeField] private float _value2; // radius 등 (선택적)
+    [UnityEngine.SerializeField] private int _requiredLevel; // 스킬 학습에 필요한 플레이어 레벨
 
     [JsonProperty("id")]
     public int id { get => _id; private set => _id = value; }
@@ -34,4 +35,6 @@ public class SkillData : IData
     public float value1 { get => _value1; private set => _value1 = value; }
     [JsonProperty("value2")]
     public float value2 { get => _value2; private set => _value2 = value; }
+    [JsonProperty("requiredLevel")]
+    public int requiredLevel { get => _requiredLevel; private set => _requiredLevel = value; }
 }

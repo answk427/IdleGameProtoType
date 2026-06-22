@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public enum UpgradeStatType
@@ -27,6 +28,8 @@ public class PlayerStats
     public event Action<int> OnLevelUp;           // 레벨업 시 (새 레벨 전달)
     public event Action<int, int> OnExpChanged;   // 경험치 변화 시 (현재, 필요)
     public event Action OnUpgraded;               // 업그레이드 구매 시
+    public event Action OnSkillLearned;           // 스킬 학습 시
+    public event Action OnSkillEquipChanged;      // 스킬 슬롯 배치 변경 시
 
     // ── 참조 ────────────────────────────────────────────────
     private PlayerStatDatabase statData;
@@ -148,6 +151,70 @@ public class PlayerStats
 
         OnUpgraded?.Invoke();
         Debug.Log($"[PlayerStats] {type} 업그레이드 → Lv.{GetCurrentUpgradeLevel(type)}, 현재값:{GetCurrentStatValue(type)}");
+    }
+
+    // ── 스킬 학습 / 장착 ────────────────────────────────────
+    // 학습 조건은 플레이어 레벨만 체크 (골드 비용 없음).
+
+    public bool IsSkillLearned(int skillId) => saveData?.learnedSkillIds.Contains(skillId) ?? false;
+
+    public IReadOnlyList<int> LearnedSkillIds => saveData?.learnedSkillIds;
+
+    public bool CanLearnSkill(int skillId)
+    {
+        if (IsSkillLearned(skillId)) return false;
+
+        SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
+        if (entry?.data == null) return false;
+
+        return Level >= entry.data.requiredLevel;
+    }
+
+    public bool LearnSkill(int skillId)
+    {
+        if (!CanLearnSkill(skillId)) return false;
+
+        saveData.learnedSkillIds.Add(skillId);
+        Save();
+        OnSkillLearned?.Invoke();
+        Debug.Log($"[PlayerStats] 스킬 학습: {skillId}");
+        return true;
+    }
+
+    public int GetEquippedSkillId(int slotIndex)
+    {
+        if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length)
+            return PlayerSaveData.EmptySlot;
+        return saveData.equippedSkillSlotIds[slotIndex];
+    }
+
+    public bool EquipSkill(int skillId, int slotIndex)
+    {
+        if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length) return false;
+        if (!IsSkillLearned(skillId)) return false;
+
+        // 다른 슬롯에 이미 배치되어 있던 스킬이면 그 슬롯은 비운다 (중복 배치 방지)
+        for (int i = 0; i < saveData.equippedSkillSlotIds.Length; i++)
+        {
+            if (saveData.equippedSkillSlotIds[i] == skillId)
+                saveData.equippedSkillSlotIds[i] = PlayerSaveData.EmptySlot;
+        }
+
+        saveData.equippedSkillSlotIds[slotIndex] = skillId;
+        Save();
+        OnSkillEquipChanged?.Invoke();
+        return true;
+    }
+
+    public bool UnequipSkill(int slotIndex)
+    {
+        if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length) return false;
+        if (saveData.equippedSkillSlotIds[slotIndex] == PlayerSaveData.EmptySlot) return false;
+
+        saveData.equippedSkillSlotIds[slotIndex] = PlayerSaveData.EmptySlot;
+        Save();
+        OnSkillEquipChanged?.Invoke();
+        return true;
     }
 
     // ── 저장 ────────────────────────────────────────────────

@@ -19,7 +19,8 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     private PlayerStats stats = new PlayerStats();
     private int currentHp;
 
-    private readonly List<Skill> skills = new List<Skill>();
+    // 슬롯 인덱스 → 장착된 Skill 런타임 인스턴스 (빈 슬롯은 null)
+    private readonly Skill[] equippedSkills = new Skill[PlayerSaveData.SkillSlotCount];
 
     public event Action OnHitEvent;
     public event Action OnAttackEndEvent;
@@ -29,6 +30,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     public StateMachine fsm { get; private set; }
     public bool IsAlive { get; private set; }
+    public Vector3 Position => transform.position;
 
     public int AttackDamage => stats.AttackDamage;
     public float AttackInterval => stats.AttackInterval;
@@ -53,19 +55,22 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         currentHp = stats.MaxHp;
         IsAlive = true;
 
-        if (GameDatabaseManager.Instance != null)
-        {
-            InitializeSkills(new List<SkillEntry>(GameDatabaseManager.Instance.GetAllSkills()));
-        }
+        RefreshEquippedSkills();
+        stats.OnSkillEquipChanged += RefreshEquippedSkills;
+    }
+
+    private void OnDestroy()
+    {
+        stats.OnSkillEquipChanged -= RefreshEquippedSkills;
     }
 
     private void Update()
     {
         fsm.Update();
 
-        for (int i = 0; i < skills.Count; i++)
+        for (int i = 0; i < equippedSkills.Length; i++)
         {
-            skills[i].Tick(Time.deltaTime);
+            equippedSkills[i]?.Tick(Time.deltaTime);
         }
     }
 
@@ -186,23 +191,64 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     // ── 스킬 시스템 ──
 
-    public void InitializeSkills(List<SkillEntry> skillEntries)
+    // 슬롯에 배치된 스킬만 PlayerStats(저장 데이터)을 기준으로 다시 구성한다.
+    // 실제로 바뀐 슬롯만 교체해서, 관련 없는 슬롯의 쿨다운이 같이 초기화되지 않게 한다.
+    public void RefreshEquippedSkills()
     {
-        skills.Clear();
-        foreach (var entry in skillEntries)
+        for (int slot = 0; slot < equippedSkills.Length; slot++)
         {
-            if (entry?.data == null) continue;
-            skills.Add(new Skill(entry));
+            int skillId = stats.GetEquippedSkillId(slot);
+
+            if (skillId == PlayerSaveData.EmptySlot)
+            {
+                equippedSkills[slot] = null;
+                continue;
+            }
+
+            if (equippedSkills[slot] != null && equippedSkills[slot].Data.id == skillId) continue;
+
+            SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
+            equippedSkills[slot] = entry?.data != null ? new Skill(entry) : null;
         }
     }
 
     public Skill GetReadySkill()
     {
-        for (int i = 0; i < skills.Count; i++)
+        for (int i = 0; i < equippedSkills.Length; i++)
         {
-            if (skills[i].IsReady) return skills[i];
+            if (equippedSkills[i] != null && equippedSkills[i].IsReady) return equippedSkills[i];
         }
         return null;
+    }
+
+    private Monster GetSkillTarget()
+    {
+        if (GameManager.Instance == null) return null;
+        return GameManager.Instance.GetClosestMonster(transform.position.x);
+    }
+
+    public Skill GetEquippedSkill(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= equippedSkills.Length) return null;
+        return equippedSkills[slotIndex];
+    }
+
+    // UI(스킬 슬롯 클릭)가 호출. PlayerAttackState.DoAction()의 자동 캐스팅과 동일하게
+    // FSM을 거쳐 PlayerSkillState로 전환한다 — 애니메이션 재생과 히트 타이밍에 맞춘 효과 적용은
+    // PlayerSkillState가 전담하므로 여기서 Skill.Use()를 직접 호출하지 않는다.
+    public bool TryUseSkillSlot(int slotIndex)
+    {
+        if (!IsAlive) return false;
+        if (slotIndex < 0 || slotIndex >= equippedSkills.Length) return false;
+
+        Skill skill = equippedSkills[slotIndex];
+        if (skill == null || !skill.IsReady) return false;
+
+        Monster target = GetSkillTarget();
+        if (target == null) return false;
+
+        fsm.ChangeState(new PlayerSkillState(this, target, skill));
+        return true;
     }
 
     public void Heal(int amount)
