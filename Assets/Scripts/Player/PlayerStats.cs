@@ -1,5 +1,12 @@
-using System;
+﻿using System;
 using UnityEngine;
+
+public enum UpgradeStatType
+{
+    Hp,
+    Attack,
+    Speed
+}
 
 /// <summary>
 /// 플레이어 최종 스탯 계산기
@@ -39,16 +46,6 @@ public class PlayerStats
     public float AttackInterval => Mathf.Max(0.1f, BaseStat.baseAttackInterval);
     public float RunSpeed => BaseStat.baseRunSpeed + (saveData?.speedUpgradeLevel ?? 0) * upgradeConfig.settings.speedPerUpgrade;
 
-    // 업그레이드 다음 비용
-    public int NextHpUpgradeCost => upgradeConfig.GetHpUpgradeCost(saveData?.hpUpgradeLevel ?? 0);
-    public int NextAttackUpgradeCost => upgradeConfig.GetAttackUpgradeCost(saveData?.attackUpgradeLevel ?? 0);
-    public int NextSpeedUpgradeCost => upgradeConfig.GetSpeedUpgradeCost(saveData?.speedUpgradeLevel ?? 0);
-
-    // 최대 업그레이드 도달 여부 (UI에서 "MAX" 표시용)
-    public bool IsHpUpgradeMaxed => upgradeConfig.maxUpgradeLevel > 0 && (saveData?.hpUpgradeLevel ?? 0) >= upgradeConfig.maxUpgradeLevel;
-    public bool IsAttackUpgradeMaxed => upgradeConfig.maxUpgradeLevel > 0 && (saveData?.attackUpgradeLevel ?? 0) >= upgradeConfig.maxUpgradeLevel;
-    public bool IsSpeedUpgradeMaxed => upgradeConfig.maxUpgradeLevel > 0 && (saveData?.speedUpgradeLevel ?? 0) >= upgradeConfig.maxUpgradeLevel;
-
     private PlayerStatData BaseStat => statData.GetByLevel(Level);
 
     // ── 초기화 ──────────────────────────────────────────────
@@ -87,43 +84,70 @@ public class PlayerStats
     }
 
     // ── 업그레이드 (돈 소비는 외부에서 검사 후 호출) ────────
+    // 스탯 종류가 늘어나도 분기 추가 없이 UpgradeStatType 하나로 처리.
+
+    public int GetCurrentUpgradeLevel(UpgradeStatType type)
+    {
+        switch (type)
+        {
+            case UpgradeStatType.Hp: return saveData?.hpUpgradeLevel ?? 0;
+            case UpgradeStatType.Attack: return saveData?.attackUpgradeLevel ?? 0;
+            case UpgradeStatType.Speed: return saveData?.speedUpgradeLevel ?? 0;
+            default: throw new ArgumentOutOfRangeException(nameof(type));
+        }
+    }
+
+    public int GetNextUpgradeCost(UpgradeStatType type)
+    {
+        int level = GetCurrentUpgradeLevel(type);
+        switch (type)
+        {
+            case UpgradeStatType.Hp: return upgradeConfig.GetHpUpgradeCost(level);
+            case UpgradeStatType.Attack: return upgradeConfig.GetAttackUpgradeCost(level);
+            case UpgradeStatType.Speed: return upgradeConfig.GetSpeedUpgradeCost(level);
+            default: throw new ArgumentOutOfRangeException(nameof(type));
+        }
+    }
+
+    public bool IsUpgradeMaxed(UpgradeStatType type)
+    {
+        if (upgradeConfig.maxUpgradeLevel <= 0) return false;
+        return GetCurrentUpgradeLevel(type) >= upgradeConfig.maxUpgradeLevel;
+    }
+
+    // 현재 최종 스탯 수치 (UI에 "현재 → 다음" 식으로 보여줄 때 사용)
+    public float GetCurrentStatValue(UpgradeStatType type)
+    {
+        switch (type)
+        {
+            case UpgradeStatType.Hp: return MaxHp;
+            case UpgradeStatType.Attack: return AttackDamage;
+            case UpgradeStatType.Speed: return RunSpeed;
+            default: throw new ArgumentOutOfRangeException(nameof(type));
+        }
+    }
 
     /// <summary>
-    /// HP 업그레이드. 돈 차감은 호출자(UI 등)에서 먼저 처리 후 호출.
-    /// 업그레이드 가능 여부는 CanUpgrade()로 미리 확인.
+    /// 지정한 스탯을 업그레이드. 돈 차감은 호출자(UI 등)에서 먼저 처리 후 호출.
+    /// 업그레이드 가능 여부는 IsUpgradeMaxed()로 미리 확인.
     /// </summary>
-    public void UpgradeHp()
+    public void Upgrade(UpgradeStatType type)
     {
-        if (!CanUpgrade(saveData.hpUpgradeLevel)) return;
-        saveData.hpUpgradeLevel++;
-        OnUpgraded?.Invoke();
-        Debug.Log($"[PlayerStats] HP 업그레이드 Lv.{saveData.hpUpgradeLevel} → MaxHp:{MaxHp}");
-    }
-
-    public void UpgradeAttack()
-    {
-        if (!CanUpgrade(saveData.attackUpgradeLevel)) return;
-        saveData.attackUpgradeLevel++;
-        OnUpgraded?.Invoke();
-        Debug.Log($"[PlayerStats] 공격력 업그레이드 Lv.{saveData.attackUpgradeLevel} → ATK:{AttackDamage}");
-    }
-
-    public void UpgradeSpeed()
-    {
-        if (!CanUpgrade(saveData.speedUpgradeLevel)) return;
-        saveData.speedUpgradeLevel++;
-        OnUpgraded?.Invoke();
-        Debug.Log($"[PlayerStats] 속도 업그레이드 Lv.{saveData.speedUpgradeLevel} → Speed:{RunSpeed}");
-    }
-
-    private bool CanUpgrade(int currentUpgradeLevel)
-    {
-        if (upgradeConfig.maxUpgradeLevel > 0 && currentUpgradeLevel >= upgradeConfig.maxUpgradeLevel)
+        if (IsUpgradeMaxed(type))
         {
-            Debug.LogWarning("[PlayerStats] 최대 업그레이드 도달");
-            return false;
+            Debug.LogWarning($"[PlayerStats] {type} 최대 업그레이드 도달");
+            return;
         }
-        return true;
+
+        switch (type)
+        {
+            case UpgradeStatType.Hp: saveData.hpUpgradeLevel++; break;
+            case UpgradeStatType.Attack: saveData.attackUpgradeLevel++; break;
+            case UpgradeStatType.Speed: saveData.speedUpgradeLevel++; break;
+        }
+
+        OnUpgraded?.Invoke();
+        Debug.Log($"[PlayerStats] {type} 업그레이드 → Lv.{GetCurrentUpgradeLevel(type)}, 현재값:{GetCurrentStatValue(type)}");
     }
 
     // ── 저장 ────────────────────────────────────────────────

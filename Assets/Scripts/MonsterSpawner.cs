@@ -41,6 +41,7 @@ public class MonsterSpawner : MonoBehaviour
         Vector3 basePosition = firstMonsterPosition;
         if (spawnAnchor != null)
             basePosition += spawnAnchor.position;
+        basePosition.y = GetGroundY(basePosition.y) + monsterEntry.groundOffset;
 
         for (int i = 0; i < stage.monstersPerEncounter; i++)
         {
@@ -147,6 +148,7 @@ public class MonsterSpawner : MonoBehaviour
         }
 
         Vector3 spawnPosition = firstMonsterPosition + (spawnAnchor != null ? spawnAnchor.position : Vector3.zero);
+        spawnPosition.y = GetGroundY(spawnPosition.y) + bossEntry.groundOffset;
         GameObject obj = PoolManager.Instance.Spawn(bossPrefab, spawnPosition, Quaternion.identity, spawnRoot);
 
         // 보스 프리팹엔 BossMonster 컴포넌트가 붙어있어야 함
@@ -166,6 +168,13 @@ public class MonsterSpawner : MonoBehaviour
         activeMonsters.Add(boss);
 
         return boss;
+    }
+
+    // 항상 바닥(GroundY)에 붙어있는 것처럼 보이도록 고정 Y를 반환.
+    // PlayAreaBounds가 없으면(테스트 씬 등) 원래 Y를 그대로 사용 - 안전 가드.
+    private static float GetGroundY(float fallbackY)
+    {
+        return PlayAreaBounds.Instance != null ? PlayAreaBounds.Instance.GroundY : fallbackY;
     }
 
     private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)

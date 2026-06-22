@@ -173,29 +173,13 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     public void SaveProgress() => stats.Save();
 
-    public bool TryUpgradeHp()
+    public bool TryUpgrade(UpgradeStatType type)
     {
         if (GameManager.Instance == null) return false;
-        if (!GameManager.Instance.TrySpendGold(stats.NextHpUpgradeCost)) return false;
-        stats.UpgradeHp();
-        stats.Save();
-        return true;
-    }
+        if (stats.IsUpgradeMaxed(type)) return false;
+        if (!GameManager.Instance.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
 
-    public bool TryUpgradeAttack()
-    {
-        if (GameManager.Instance == null) return false;
-        if (!GameManager.Instance.TrySpendGold(stats.NextAttackUpgradeCost)) return false;
-        stats.UpgradeAttack();
-        stats.Save();
-        return true;
-    }
-
-    public bool TryUpgradeSpeed()
-    {
-        if (GameManager.Instance == null) return false;
-        if (!GameManager.Instance.TrySpendGold(stats.NextSpeedUpgradeCost)) return false;
-        stats.UpgradeSpeed();
+        stats.Upgrade(type);
         stats.Save();
         return true;
     }

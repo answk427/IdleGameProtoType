@@ -20,13 +20,15 @@ public class GameManager : MonoBehaviour
     private int gold;
     private Coroutine currentSpawnLoop;
 
-    [SerializeField] private PlayerController player;
+    private PlayerController player;
     [SerializeField] private MonsterSpawner monsterSpawner;
     [SerializeField] private StageManager stageManager;
 
     [SerializeField] private UVScroller background;
 
     [SerializeField] private float postEncounterDelay = 0.5f;
+
+    public event Action<int> OnGoldChanged;
 
     public int CurrentStageNumber => stageManager != null ? stageManager.CurrentStage.Key : 0;
     public string CurrentState => currentState.ToString();
@@ -54,6 +56,8 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
+        player = PlayerSpawner.Instance != null ? PlayerSpawner.Instance.EnsurePlayer() : null;
+
         //TODO: 저장된 플레이어 스테이지번호(임시)
         int currStage = 1;
         if (!ValidateReferences() || !stageManager.Initialize(currStage))
@@ -64,7 +68,7 @@ public class GameManager : MonoBehaviour
         // 1. 게임 시작! 플레이어는 '달리는' 상태로 시작한다. (알아서 스크롤 켜짐)
         player.fsm.ChangeState(new PlayerRunState(player));
 
-        // 플레이어 HUD(체력/경험치/업그레이드) 표시
+        // 플레이어 HUD(체력/경험치/골드) 표시
         UIManager.Instance.ShowUI<PlayerHud>();
 
         // 2. 몬스터 연속 소환 루프 시작
@@ -157,6 +161,7 @@ public class GameManager : MonoBehaviour
     public void AddGold(int amount)
     {
         this.gold += amount;
+        OnGoldChanged?.Invoke(this.gold);
     }
 
     public bool TrySpendGold(int amount)
@@ -164,6 +169,7 @@ public class GameManager : MonoBehaviour
         if (amount <= 0) return true;
         if (gold < amount) return false;
         gold -= amount;
+        OnGoldChanged?.Invoke(gold);
         return true;
     }
 
