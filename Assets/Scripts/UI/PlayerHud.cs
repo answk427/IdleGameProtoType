@@ -39,6 +39,7 @@ public class PlayerHud : UIBase
         player.OnHpChanged += UpdateHpBar;
         player.Stats.OnExpChanged += UpdateExpBar;
         player.Stats.OnLevelUp += UpdateLevelText;
+        player.Stats.OnUpgraded += RefreshHpBar; // HP 업그레이드는 MaxHp만 바꾸고 OnHpChanged를 안 쏘므로 별도로 구독
 
         if (GameManager.Instance != null)
         {
@@ -58,6 +59,7 @@ public class PlayerHud : UIBase
             player.OnHpChanged -= UpdateHpBar;
             player.Stats.OnExpChanged -= UpdateExpBar;
             player.Stats.OnLevelUp -= UpdateLevelText;
+            player.Stats.OnUpgraded -= RefreshHpBar;
         }
 
         if (GameManager.Instance != null)
@@ -67,6 +69,8 @@ public class PlayerHud : UIBase
 
         base.Hide();
     }
+
+    private void RefreshHpBar() => UpdateHpBar(player.CurrentHp, player.MaxHp);
 
     private void UpdateHpBar(float currentHp, float maxHp)
     {
