@@ -6,7 +6,7 @@ public abstract class PlayerCombatState : IState
     protected IDamageable target;
 
     //애니메이션이 완전히 끝났는지 확인
-    private bool isAnimationFinished = false;
+    protected bool isAnimationFinished = false;
 
     public PlayerCombatState(PlayerController player, IDamageable target)
     {

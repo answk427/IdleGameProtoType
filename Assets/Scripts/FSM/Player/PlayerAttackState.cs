@@ -4,7 +4,7 @@ public class PlayerAttackState : PlayerCombatState
 {
     private float timer;
 
-    public PlayerAttackState(PlayerController playerController, Monster monster) : base(playerController, monster)
+    public PlayerAttackState(PlayerController playerController, IDamageable target) : base(playerController, target)
     {
     }
 
@@ -39,5 +39,8 @@ public class PlayerAttackState : PlayerCombatState
     protected override void OnHitImpact()
     {
         target?.TakeDamage(player.GetCalculatedDamage());
+
+        if (target != null)
+            CombatEffectManager.Instance.SpawnHitParticle(target.Position);
     }
 }

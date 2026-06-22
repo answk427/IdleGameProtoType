@@ -19,6 +19,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     protected int attackDamage;
 
     public bool IsAlive { get; protected set; }
+    public Vector3 Position => transform.position;
     public int GoldReward => goldReward;
     public GameObject OriginPrefab { get; set; }
 
