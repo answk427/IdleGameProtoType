@@ -8,7 +8,7 @@ public class SkillSlotWidget : MonoBehaviour
 {
     [SerializeField] private Button button;
     [SerializeField] private Image iconImage;
-    [SerializeField] private Image cooldownOverlay; // fillAmount로 쿨다운 비율 표시 (Image Type: Filled)
+    [SerializeField] private Image cooldownOverlay; // fillAmount로 쿨다운 비율 표시
 
     private int slotIndex;
     private Action<int> onClick;

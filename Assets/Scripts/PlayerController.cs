@@ -233,9 +233,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         return equippedSkills[slotIndex];
     }
 
-    // UI(스킬 슬롯 클릭)가 호출. PlayerAttackState.DoAction()의 자동 캐스팅과 동일하게
-    // FSM을 거쳐 PlayerSkillState로 전환한다 — 애니메이션 재생과 히트 타이밍에 맞춘 효과 적용은
-    // PlayerSkillState가 전담하므로 여기서 Skill.Use()를 직접 호출하지 않는다.
+    // UI(스킬 슬롯 클릭)가 호출.
     public bool TryUseSkillSlot(int slotIndex)
     {
         if (!IsAlive) return false;

@@ -2,10 +2,8 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-/// <summary>
-/// 플레이어 저장 데이터 (JSON 직렬화 대상)
-/// 레벨/경험치/업그레이드 횟수만 저장 — 최종 스탯은 런타임에 계산
-/// </summary>
+// 플레이어 저장 데이터 (JSON 직렬화 대상)
+// 레벨/경험치/업그레이드 횟수만 저장 — 최종 스탯은 런타임에 계산
 [System.Serializable]
 public class PlayerSaveData
 {

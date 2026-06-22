@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 스킬 관리 팝업: 상단 20% 영역에 5개 슬롯, 하단 80% 영역에 전체 스킬 목록.
-// 목록에서 배운 스킬을 한 번 클릭(선택) → 상단 슬롯을 클릭하면 그 슬롯에 배치 (클릭투클릭).
+// 스킬 관리 팝업
+// 목록에서 배운 스킬을 한 번 클릭(선택) → 상단 슬롯을 클릭하면 그 슬롯에 배치
 // 미학습 스킬은 더블클릭으로 학습 시도 (레벨 조건만 체크).
 public class SkillManagePopup : UIBase
 {
@@ -143,7 +143,7 @@ public class SkillManagePopup : UIBase
         }
     }
 
-    // ── 상단 슬롯 (클릭투클릭 배치) ──
+    // ── 상단 슬롯 ──
 
     private void RefreshSlots()
     {

@@ -4,14 +4,14 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// 스킬 관리 팝업 하단 목록의 항목 1개.
+// 스킬 관리 팝업 하단 목록의 항목 1개
 // 단일 클릭: 배치를 위한 선택. 더블 클릭: 학습 시도.
 public class SkillListItem : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField] private Image iconImage;
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private TextMeshProUGUI requiredLevelText;
-    [SerializeField] private Image selectedHighlight; // 선택 시 테두리 등 강조 (선택, 비워두면 무시)
+    [SerializeField] private Image selectedHighlight; // 선택 시 테두리 등 강조
 
     private static readonly Color LearnedColor = Color.white;
     private static readonly Color UnlearnedColor = Color.gray;

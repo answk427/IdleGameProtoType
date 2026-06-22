@@ -9,18 +9,7 @@ public enum UpgradeStatType
     Speed
 }
 
-/// <summary>
-/// 플레이어 최종 스탯 계산기
-/// 
-/// 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerSaveData)
-/// 
-/// 사용법:
-///   stats.Initialize(statDatabase, upgradeConfig);
-///   stats.LoadSave(saveData);
-///   int hp = stats.MaxHp; // 최종 HP
-///   stats.AddExp(30);     // 경험치 추가 → 레벨업 자동 처리
-///   stats.UpgradeHp();    // 돈 소비 후 호출
-/// </summary>
+// 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerSaveData)
 [System.Serializable]
 public class PlayerStats
 {
@@ -67,7 +56,6 @@ public class PlayerStats
 
     // ── 경험치 / 레벨업 ─────────────────────────────────────
 
-    /// <summary>경험치 추가. 레벨업 조건이면 자동으로 레벨업 처리.</summary>
     public void AddExp(int amount)
     {
         if (IsMaxLevel) return;
@@ -86,7 +74,7 @@ public class PlayerStats
         }
     }
 
-    // ── 업그레이드 (돈 소비는 외부에서 검사 후 호출) ────────
+    // ── 업그레이드 (돈은 외부에서 검사) ────────
     // 스탯 종류가 늘어나도 분기 추가 없이 UpgradeStatType 하나로 처리.
 
     public int GetCurrentUpgradeLevel(UpgradeStatType type)
@@ -118,7 +106,6 @@ public class PlayerStats
         return GetCurrentUpgradeLevel(type) >= upgradeConfig.maxUpgradeLevel;
     }
 
-    // 현재 최종 스탯 수치 (UI에 "현재 → 다음" 식으로 보여줄 때 사용)
     public float GetCurrentStatValue(UpgradeStatType type)
     {
         switch (type)
@@ -130,10 +117,6 @@ public class PlayerStats
         }
     }
 
-    /// <summary>
-    /// 지정한 스탯을 업그레이드. 돈 차감은 호출자(UI 등)에서 먼저 처리 후 호출.
-    /// 업그레이드 가능 여부는 IsUpgradeMaxed()로 미리 확인.
-    /// </summary>
     public void Upgrade(UpgradeStatType type)
     {
         if (IsUpgradeMaxed(type))
@@ -154,7 +137,7 @@ public class PlayerStats
     }
 
     // ── 스킬 학습 / 장착 ────────────────────────────────────
-    // 학습 조건은 플레이어 레벨만 체크 (골드 비용 없음).
+    // 학습 조건은 플레이어 레벨만 체크
 
     public bool IsSkillLearned(int skillId) => saveData?.learnedSkillIds.Contains(skillId) ?? false;
 

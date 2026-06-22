@@ -3,9 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 플레이어 체력/경험치/레벨/골드만 보여주는 상시 HUD.
-// 업그레이드는 StatUpgradePanel(탭 전용)로 분리됨.
-// UIManager가 Awake 시점에 자동 등록하므로, GameManager.Start()에서
-// UIManager.Instance.ShowUI<PlayerHud>()를 호출해서 켜준다.
 public class PlayerHud : UIBase
 {
     [Header("HP")]
@@ -39,7 +36,7 @@ public class PlayerHud : UIBase
         player.OnHpChanged += UpdateHpBar;
         player.Stats.OnExpChanged += UpdateExpBar;
         player.Stats.OnLevelUp += UpdateLevelText;
-        player.Stats.OnUpgraded += RefreshHpBar; // HP 업그레이드는 MaxHp만 바꾸고 OnHpChanged를 안 쏘므로 별도로 구독
+        player.Stats.OnUpgraded += RefreshHpBar;
 
         if (GameManager.Instance != null)
         {

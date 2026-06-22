@@ -2,8 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 전투 탭: 5개의 스킬 슬롯을 표시한다. 장착된 스킬은 준비되는 즉시 자동으로 사용되고,
-// 슬롯을 클릭하면 그 자리에서 바로 사용할 수도 있다(PlayerController.TryUseSkillSlot이 IsReady만 체크).
 public class SkillSlotBar : UIBase
 {
     [SerializeField] private Transform slotContainer;
@@ -24,7 +22,6 @@ public class SkillSlotBar : UIBase
     }
 
     // PlayerSaveData.SkillSlotCount 개수만큼 슬롯 위젯을 런타임에 생성한다.
-    // 슬롯 개수가 바뀌어도 씬에서 수동으로 맞춰줄 필요가 없다.
     private void BuildSlots()
     {
         if (slotContainer == null || slotWidgetPrefab == null) return;

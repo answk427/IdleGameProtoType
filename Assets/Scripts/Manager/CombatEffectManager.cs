@@ -44,10 +44,7 @@ public class CombatEffectManager : MonoBehaviour
         GlobalCombatEvents.OnMonsterDied -= SpawnRewardDrop;
     }
 
-    // 데미지 숫자는 출처와 무관하게 항상 표시한다.
-    // 히트 파티클(칼빛 슬래시 등)은 출처마다 다른 비주얼이 필요하므로 여기서 일괄 재생하지 않고,
-    // 각 공격 로직(PlayerAttackState, BossAttackState 등)이 직접 SpawnHitParticle을 호출해 선택한다.
-    // (스킬은 자신만의 castVfx/hitVfx를 PlayerSkillState에서 따로 재생하므로 일반 히트 파티클을 받지 않는다.)
+    // 데미지 숫자는 출처와 무관하게 항상 표시.
     private void HandleAnyTargetDamaged(IDamageable target, int damage, Vector3 position)
     {
         SpawnDamageText(damage, position);
