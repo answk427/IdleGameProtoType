@@ -44,7 +44,6 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     protected virtual void OnEnable()
     {
-        Debug.Log("Monster OnEnable");
         IsAlive = true;
         HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
         fsm.ChangeState(new MonsterIdleState(this));
@@ -91,9 +90,8 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     protected virtual void Die()
     {
-        Debug.Log("Monster Die");
         IsAlive = false;
-        GameManager.Instance.AddGold(goldReward);
+        GameManager.Instance.Wallet.AddGold(goldReward);
         fsm?.ChangeState(new MonsterDieState(this));
     }
 

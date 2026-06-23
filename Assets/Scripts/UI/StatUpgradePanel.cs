@@ -57,7 +57,7 @@ public class StatUpgradePanel : UIBase
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.OnGoldChanged += OnGoldChanged;
+            GameManager.Instance.Wallet.OnGoldChanged += OnGoldChanged;
         }
 
         RefreshAll();
@@ -72,7 +72,7 @@ public class StatUpgradePanel : UIBase
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.OnGoldChanged -= OnGoldChanged;
+            GameManager.Instance.Wallet.OnGoldChanged -= OnGoldChanged;
         }
 
         base.Hide();
@@ -84,7 +84,7 @@ public class StatUpgradePanel : UIBase
     {
         if (player == null) return;
 
-        int gold = GameManager.Instance != null ? GameManager.Instance.Gold : 0;
+        int gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0;
 
         var stats = player.Stats;
         foreach (var slot in slots)

@@ -4,16 +4,15 @@ public class StateMachine
 {
     public IState CurrentState { get; private set; }
 
-    // ╩Себ╦╕ ╠Ёц╪го╢б гт╪Ж
+    // О©╫О©╫О©╫б╦О©╫ О©╫О©╫ц╪О©╫о╢О©╫ О©╫т╪О©╫
     public void ChangeState(IState newState)
     {
-        Debug.Log($"ChangeState, newState : {newState}");
-        CurrentState?.Exit();    // ╠Ба╦ ╩Себ а╬╥А
-        CurrentState = newState; // ╩У ╩Себ╥н ╠Ёц╪
-        CurrentState?.Enter();   // ╩У ╩Себ ╫цюш
+        CurrentState?.Exit();    // О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫
+        CurrentState = newState; // О©╫О©╫ О©╫О©╫О©╫б╥О©╫ О©╫О©╫ц╪
+        CurrentState?.Enter();   // О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫
     }
 
-    // ╦е га╥╧юс ╫ггЮ
+    // О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫
     public void Update()
     {
         CurrentState?.Execute();

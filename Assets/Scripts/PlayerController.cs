@@ -142,7 +142,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     public void TakeDamage(int damage)
     {
-        Debug.Log($"Player TakeDamage {damage}, currentHp : {currentHp}");
         if (!IsAlive) return;
 
         currentHp = Mathf.Max(currentHp - damage, 0);
@@ -188,7 +187,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     {
         if (GameManager.Instance == null) return false;
         if (stats.IsUpgradeMaxed(type)) return false;
-        if (!GameManager.Instance.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
+        if (!GameManager.Instance.Wallet.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
 
         stats.Upgrade(type);
         stats.Save();
