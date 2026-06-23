@@ -1,42 +1,71 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 하단 탭바(캐릭터/스킬/장비/동료/모험/상점) 버튼들을 UIManager.ToggleTab과 연결.
-// 각 슬롯은 버튼 + 탭 타입 + (선택) 잠금 오버레이로 구성됨.
+// 하단 탭바 버튼들을 tabs 리스트(데이터) 기반으로 런타임에 생성해서 UIManager.ToggleTab과 연결.
+// 탭 추가/삭제는 tabs 리스트 항목만 늘리거나 줄이면 됨 (씬 하이어라키 편집 불필요).
+// 버튼 개수에 따른 균등 배치는 tabContainer에 붙은 HorizontalLayoutGroup이 처리.
 public class TabBarController : MonoBehaviour
 {
     [Serializable]
-    public class TabSlot
+    public class TabDefinition
+    {
+        public UITabType tabType;
+        public string label;
+        public Sprite icon;
+        public bool isUnlockedByDefault = true;
+    }
+
+    private class RuntimeTabSlot
     {
         public UITabType tabType;
         public Button button;
-        public GameObject lockOverlay; // 미해금 상태일 때 표시 (이미지의 자물쇠 아이콘)
-        public bool isUnlocked = true;
+        public GameObject lockOverlay;
+        public bool isUnlocked;
     }
 
-    [SerializeField] private List<TabSlot> tabSlots = new List<TabSlot>();
+    [SerializeField] private GameObject tabButtonPrefab;
+    [SerializeField] private Transform tabContainer;
+    [SerializeField] private List<TabDefinition> tabs = new List<TabDefinition>();
+
+    private readonly List<RuntimeTabSlot> runtimeSlots = new List<RuntimeTabSlot>();
 
     private void Start()
     {
-        foreach (var slot in tabSlots)
+        foreach (var def in tabs)
         {
-            if (slot.button == null) continue;
+            GameObject instance = Instantiate(tabButtonPrefab, tabContainer);
 
-            UITabType capturedType = slot.tabType;
-            slot.button.onClick.AddListener(() => OnTabClicked(capturedType));
+            TextMeshProUGUI label = instance.transform.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            if (label != null) label.text = def.label;
 
-            if (slot.lockOverlay != null)
+            Image icon = instance.transform.Find("Icon")?.GetComponent<Image>();
+            if (icon != null && def.icon != null) icon.sprite = def.icon;
+
+            GameObject lockOverlay = instance.transform.Find("LockOverlay")?.gameObject;
+            if (lockOverlay != null) lockOverlay.SetActive(!def.isUnlockedByDefault);
+
+            Button button = instance.GetComponent<Button>();
+            UITabType capturedType = def.tabType;
+            button.onClick.AddListener(() => OnTabClicked(capturedType));
+
+            runtimeSlots.Add(new RuntimeTabSlot
             {
-                slot.lockOverlay.SetActive(!slot.isUnlocked);
-            }
+                tabType = capturedType,
+                button = button,
+                lockOverlay = lockOverlay,
+                isUnlocked = def.isUnlockedByDefault
+            });
         }
     }
 
     private void OnTabClicked(UITabType tabType)
     {
-        TabSlot slot = tabSlots.Find(s => s.tabType == tabType);
+        Debug.Log($"[TabBarController] 클릭됨: {tabType}"); // 임시 디버그용 - 원인 찾으면 제거
+
+        RuntimeTabSlot slot = runtimeSlots.Find(s => s.tabType == tabType);
         if (slot != null && !slot.isUnlocked)
         {
             Debug.Log($"[TabBarController] {tabType} 탭은 아직 잠겨있습니다.");
@@ -48,7 +77,7 @@ public class TabBarController : MonoBehaviour
 
     public void SetUnlocked(UITabType tabType, bool unlocked)
     {
-        TabSlot slot = tabSlots.Find(s => s.tabType == tabType);
+        RuntimeTabSlot slot = runtimeSlots.Find(s => s.tabType == tabType);
         if (slot == null) return;
 
         slot.isUnlocked = unlocked;
