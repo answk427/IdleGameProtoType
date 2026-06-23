@@ -21,4 +21,11 @@ public static class CombatRangeUtility
 
         return 0f;
     }
+
+    // 두 캐릭터의 중심점 거리에서 각자의 반너비를 뺀 "표면 사이 거리"가 사거리 이하인지 판단
+    public static bool IsWithinAttackRange(Vector3 selfPosition, float selfHalfWidth, float attackRange, Vector3 targetPosition, float targetHalfWidth)
+    {
+        float edgeGap = Mathf.Abs(targetPosition.x - selfPosition.x) - selfHalfWidth - targetHalfWidth;
+        return edgeGap <= attackRange;
+    }
 }

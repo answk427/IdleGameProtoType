@@ -19,13 +19,9 @@ public class PlayerRunState : IState
     {
         Monster target = GameManager.Instance.GetClosestMonster(playerController.transform.position.x);
 
-        // 중심점 사이 거리에서 각자의 반너비를 빼서, 덩치가 큰 몬스터일수록
-        // 몸 속으로 들어가지 않고 그 몫만큼 미리 멈춰서 공격하게 한다.
-        float edgeGap = (target != null)
-            ? (target.transform.position.x - playerController.transform.position.x) - target.HalfWidth - playerController.HalfWidth
-            : float.MaxValue;
-
-        if (target != null && edgeGap <= playerController.AttackRange)
+        if (target != null && CombatRangeUtility.IsWithinAttackRange(
+                playerController.transform.position, playerController.HalfWidth, playerController.AttackRange,
+                target.transform.position, target.HalfWidth))
         {
             playerController.fsm.ChangeState(new PlayerAttackState(playerController, target));
         }
