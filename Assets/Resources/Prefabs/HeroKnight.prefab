@@ -222,7 +222,8 @@ MonoBehaviour:
   attackTriggerName: Attack
   deathTriggerName: Death
   reviveTriggerName: Revive
-  attackRange: 1
+  attackRange: 0.1
+  halfWidthOverride: 0.3
 --- !u!114 &7381849167385634018
 MonoBehaviour:
   m_ObjectHideFlags: 0

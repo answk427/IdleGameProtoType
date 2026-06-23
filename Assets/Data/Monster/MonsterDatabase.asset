@@ -39,7 +39,7 @@ MonoBehaviour:
       _maxHp: 100
       _goldReward: 1000
       _attackDamage: 218
-      _attackInterval: 1
-      _attackRange: 1
+      _attackInterval: 0.64
+      _attackRange: 0.1
     prefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
     groundOffset: 0.5

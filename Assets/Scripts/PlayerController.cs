@@ -16,6 +16,10 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     [SerializeField] private string reviveTriggerName = "Revive";
     [SerializeField] private float attackRange = 0.5f;
 
+    // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
+    // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
+    [SerializeField] private float halfWidthOverride = 0f;
+
     private PlayerStats stats = new PlayerStats();
     private int currentHp;
 
@@ -31,6 +35,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     public StateMachine fsm { get; private set; }
     public bool IsAlive { get; private set; }
     public Vector3 Position => transform.position;
+    public float HalfWidth { get; private set; }
 
     public int AttackDamage => stats.AttackDamage;
     public float AttackInterval => stats.AttackInterval;
@@ -48,6 +53,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         }
 
         fsm = new StateMachine();
+        HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
 
         stats.Initialize(statData, upgradeConfig);
         stats.LoadSave(PlayerSaveData.Load());
