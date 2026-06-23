@@ -16,7 +16,7 @@ public class PlayerSaveData
     // 업그레이드 횟수 (돈으로 구매한 누적 횟수)
     public int hpUpgradeLevel = 0;
     public int attackUpgradeLevel = 0;
-    public int speedUpgradeLevel = 0;
+    public int attackSpeedUpgradeLevel = 0;
 
     // 학습한 스킬 id 목록
     public List<int> learnedSkillIds = new List<int>();

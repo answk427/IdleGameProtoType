@@ -14,8 +14,8 @@ public class PlayerUpgradeConfigTests
         config.settings.hpCostMultiplier = 1.15f;
         config.settings.attackBaseCost = 80;
         config.settings.attackCostMultiplier = 1.18f;
-        config.settings.speedBaseCost = 100;
-        config.settings.speedCostMultiplier = 1.20f;
+        config.settings.attackSpeedBaseCost = 80;
+        config.settings.attackSpeedCostMultiplier = 1.18f;
     }
 
     [TearDown]
@@ -44,9 +44,9 @@ public class PlayerUpgradeConfigTests
     }
 
     [Test]
-    public void SpeedUpgradeCost_AtLevelZero_EqualsBaseCost()
+    public void AttackSpeedUpgradeCost_AtLevelZero_EqualsBaseCost()
     {
-        Assert.AreEqual(100, config.GetSpeedUpgradeCost(0));
+        Assert.AreEqual(80, config.GetAttackSpeedUpgradeCost(0));
     }
 
     [Test]

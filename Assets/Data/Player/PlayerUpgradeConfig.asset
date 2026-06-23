@@ -16,10 +16,10 @@ MonoBehaviour:
   settings:
     hpPerUpgrade: 20
     attackPerUpgrade: 3
-    speedPerUpgrade: 0.1
+    attackSpeedPerUpgrade: 0.02
     hpBaseCost: 50
     hpCostMultiplier: 1.15
     attackBaseCost: 80
     attackCostMultiplier: 1.18
-    speedBaseCost: 100
-    speedCostMultiplier: 1.2
+    attackSpeedBaseCost: 80
+    attackSpeedCostMultiplier: 1.18

@@ -13,7 +13,7 @@ public class PlayerUpgradeConfig : ScriptableObject
         [Header("업그레이드당 증가량")]
         public int hpPerUpgrade = 20;
         public int attackPerUpgrade = 3;
-        public float speedPerUpgrade = 0.1f;
+        public float attackSpeedPerUpgrade = 0.02f; // 공격 간격(초) 감소량
 
         [Header("비용 공식: cost = baseCost * (costMultiplier ^ level)")]
         public int hpBaseCost = 50;
@@ -22,8 +22,8 @@ public class PlayerUpgradeConfig : ScriptableObject
         public int attackBaseCost = 80;
         public float attackCostMultiplier = 1.18f;
 
-        public int speedBaseCost = 100;
-        public float speedCostMultiplier = 1.20f;
+        public int attackSpeedBaseCost = 80;
+        public float attackSpeedCostMultiplier = 1.18f;
     }
 
     [Header("최대 업그레이드 횟수 (0 = 무제한)")]
@@ -37,6 +37,6 @@ public class PlayerUpgradeConfig : ScriptableObject
     public int GetAttackUpgradeCost(int currentLevel)
         => Mathf.RoundToInt(settings.attackBaseCost * Mathf.Pow(settings.attackCostMultiplier, currentLevel));
 
-    public int GetSpeedUpgradeCost(int currentLevel)
-        => Mathf.RoundToInt(settings.speedBaseCost * Mathf.Pow(settings.speedCostMultiplier, currentLevel));
+    public int GetAttackSpeedUpgradeCost(int currentLevel)
+        => Mathf.RoundToInt(settings.attackSpeedBaseCost * Mathf.Pow(settings.attackSpeedCostMultiplier, currentLevel));
 }

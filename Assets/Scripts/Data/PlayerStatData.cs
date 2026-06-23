@@ -13,7 +13,6 @@ public class PlayerStatData : IData
     [SerializeField] private int _baseMaxHp;
     [SerializeField] private int _baseAttackDamage;
     [SerializeField] private float _baseAttackInterval;
-    [SerializeField] private float _baseRunSpeed;
 
     [JsonProperty("level")]
     public int level { get => _level; private set => _level = value; }
@@ -25,6 +24,4 @@ public class PlayerStatData : IData
     public int baseAttackDamage { get => _baseAttackDamage; private set => _baseAttackDamage = value; }
     [JsonProperty("baseAttackInterval")]
     public float baseAttackInterval { get => _baseAttackInterval; private set => _baseAttackInterval = value; }
-    [JsonProperty("baseRunSpeed")]
-    public float baseRunSpeed { get => _baseRunSpeed; private set => _baseRunSpeed = value; }
 }

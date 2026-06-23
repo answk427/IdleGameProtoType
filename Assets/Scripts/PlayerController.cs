@@ -16,6 +16,10 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     [SerializeField] private string reviveTriggerName = "Revive";
     [SerializeField] private float attackRange = 0.5f;
 
+    [Header("이동")]
+    [Tooltip("고정 이동속도. 버프/스킬로만 일시적으로 변경됨")]
+    [SerializeField] private float baseRunSpeed = 2f;
+
     // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
     // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
     [SerializeField] private float halfWidthOverride = 0f;
@@ -55,7 +59,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         fsm = new StateMachine();
         HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
 
-        stats.Initialize(statData, upgradeConfig);
+        stats.Initialize(statData, upgradeConfig, baseRunSpeed);
         stats.LoadSave(PlayerSaveData.Load());
 
         currentHp = stats.MaxHp;
