@@ -1,6 +1,4 @@
-﻿using UnityEngine;
-
-public class BossRunState : MonsterRunState
+﻿public class BossRunState : MonsterRunState
 {
     protected BossMonster boss;
 
@@ -11,7 +9,6 @@ public class BossRunState : MonsterRunState
 
     public override void Enter()
     {
-        Debug.Log("BossRunState Enter()");
     }
 
     public override void Execute()
@@ -33,6 +30,5 @@ public class BossRunState : MonsterRunState
 
     public override void Exit()
     {
-        Debug.Log("BossRunState Exit()");
     }
 }

@@ -10,7 +10,6 @@ public class BossAttackState : BossCombatState
 
     public override void Enter()
     {
-        Debug.Log("BossAttackState Enter()");
         base.Enter();
 
         // 들어오자마자 바로 공격할 수 있게

@@ -10,7 +10,6 @@ public class PlayerAttackState : PlayerCombatState
 
     public override void Enter()
     {
-        Debug.Log("PlayerAttackState Enter()");
         base.Enter();
 
         // 들어오자마자 바로 공격할 수 있게

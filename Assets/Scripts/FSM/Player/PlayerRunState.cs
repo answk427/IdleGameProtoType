@@ -27,7 +27,6 @@ public class PlayerRunState : IState
 
         if (target != null && edgeGap <= playerController.AttackRange)
         {
-            Debug.Log("사거리 안에 들어옴");
             playerController.fsm.ChangeState(new PlayerAttackState(playerController, target));
         }
     }

@@ -142,7 +142,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     public void TakeDamage(int damage)
     {
-        Debug.Log($"Player TakeDamage {damage}, currentHp : {currentHp}");
         if (!IsAlive) return;
 
         currentHp = Mathf.Max(currentHp - damage, 0);

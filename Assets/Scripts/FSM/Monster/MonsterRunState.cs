@@ -1,6 +1,4 @@
-﻿using UnityEngine;
-
-public class MonsterRunState : IState
+﻿public class MonsterRunState : IState
 {
     protected Monster monster;
 
@@ -11,7 +9,6 @@ public class MonsterRunState : IState
 
     public virtual void Enter()
     {
-        Debug.Log("MonsterRunState Enter()");
         GlobalGameEvents.OnScrollChanged += HandleScrollChanged;
     }
 
