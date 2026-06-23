@@ -216,13 +216,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   statData: {fileID: 11400000, guid: 6eb66ad1c84d5cf42babc73c0ea2837c, type: 2}
-  upgradeConfig: {fileID: 0}
+  upgradeConfig: {fileID: 11400000, guid: f994c30e3f6d11f4daa312febea87fbc, type: 2}
   animator: {fileID: 0}
   runBoolName: Run
   attackTriggerName: Attack
   deathTriggerName: Death
   reviveTriggerName: Revive
-  attackRange: 1
+  attackRange: 0.1
 --- !u!114 &7381849167385634018
 MonoBehaviour:
   m_ObjectHideFlags: 0

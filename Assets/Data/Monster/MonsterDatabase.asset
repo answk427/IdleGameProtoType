@@ -22,6 +22,7 @@ MonoBehaviour:
       _attackInterval: 0
       _attackRange: 0
     prefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
+    groundOffset: 0.5
   - data:
       _id: 1002
       _monsterName: BlueSlime2
@@ -31,12 +32,14 @@ MonoBehaviour:
       _attackInterval: 0
       _attackRange: 0
     prefab: {fileID: 4813688462502952101, guid: 05968968a0bcf4245a9b6c7874fa1c4f, type: 3}
+    groundOffset: 0.5
   - data:
       _id: 2001
       _monsterName: BossSlime
-      _maxHp: 10000
+      _maxHp: 100
       _goldReward: 1000
       _attackDamage: 218
-      _attackInterval: 1
-      _attackRange: 1
+      _attackInterval: 0.64
+      _attackRange: 0.1
     prefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
+    groundOffset: 0.5

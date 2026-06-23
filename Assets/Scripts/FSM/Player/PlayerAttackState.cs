@@ -4,7 +4,7 @@ public class PlayerAttackState : PlayerCombatState
 {
     private float timer;
 
-    public PlayerAttackState(PlayerController playerController, Monster monster) : base(playerController, monster)
+    public PlayerAttackState(PlayerController playerController, IDamageable target) : base(playerController, target)
     {
     }
 
@@ -21,6 +21,13 @@ public class PlayerAttackState : PlayerCombatState
 
     protected override void DoAction()
     {
+        Skill readySkill = player.GetReadySkill();
+        if (readySkill != null)
+        {
+            player.fsm.ChangeState(new PlayerSkillState(player, target, readySkill));
+            return;
+        }
+
         timer += Time.deltaTime;
         if (timer >= player.AttackInterval)
         {
@@ -32,5 +39,8 @@ public class PlayerAttackState : PlayerCombatState
     protected override void OnHitImpact()
     {
         target?.TakeDamage(player.GetCalculatedDamage());
+
+        if (target != null)
+            CombatEffectManager.Instance.SpawnHitParticle(target.Position);
     }
 }

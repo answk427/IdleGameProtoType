@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class GameDatabaseManager : MonoBehaviour
 {   
@@ -30,6 +30,7 @@ public class GameDatabaseManager : MonoBehaviour
 
     [SerializeField] private MonsterDatabase monsterDatabase;
     [SerializeField] private StageDatabase stageDatabase;
+    [SerializeField] private SkillDatabase skillDatabase;
 
     private bool isInitialized;
 
@@ -54,6 +55,7 @@ public class GameDatabaseManager : MonoBehaviour
 
         if (monsterDatabase != null) monsterDatabase.EnsureLookup();
         if (stageDatabase != null) stageDatabase.EnsureLookup();
+        if (skillDatabase != null) skillDatabase.EnsureLookup();
     }
 
     public MonsterEntry GetMonster(int id)
@@ -74,5 +76,25 @@ public class GameDatabaseManager : MonoBehaviour
             return null;
         }
         return stageDatabase.GetByNumber(stageNumber);
+    }
+
+    public SkillEntry GetSkill(int id)
+    {
+        if (skillDatabase == null)
+        {
+            Debug.LogError("[GameDatabaseManager] SkillDatabase가 연결되어 있지 않습니다.");
+            return null;
+        }
+        return skillDatabase.GetById(id);
+    }
+
+    public System.Collections.Generic.IReadOnlyList<SkillEntry> GetAllSkills()
+    {
+        if (skillDatabase == null)
+        {
+            Debug.LogError("[GameDatabaseManager] SkillDatabase가 연결되어 있지 않습니다.");
+            return new System.Collections.Generic.List<SkillEntry>();
+        }
+        return skillDatabase.GetAll();
     }
 }

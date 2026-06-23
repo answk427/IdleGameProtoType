@@ -134,6 +134,7 @@ MonoBehaviour:
   maxHp: 10
   goldReward: 1
   moveSpeed: 3
+  halfWidthOverride: 0.4
 --- !u!114 &3184703108519338795
 MonoBehaviour:
   m_ObjectHideFlags: 0

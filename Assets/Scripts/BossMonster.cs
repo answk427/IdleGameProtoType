@@ -17,6 +17,7 @@ public class BossMonster : Monster
     {
         Debug.Log("BossMonster OnEnable");
         IsAlive = true;
+        HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
         fsm.ChangeState(new BossRunState(this));
     }
 

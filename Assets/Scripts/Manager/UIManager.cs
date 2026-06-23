@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,7 +7,7 @@ public class UIManager : MonoBehaviour
     public static UIManager Instance;
 
     private readonly Dictionary<Type, UIBase> uiDict = new();
-    
+
     // 그룹 제어용 Dictionary
     private readonly Dictionary<UILayer, List<UIBase>> layerGroup = new()
     {
@@ -15,6 +15,10 @@ public class UIManager : MonoBehaviour
         { UILayer.Dynamic, new List<UIBase>() },
         { UILayer.Top,     new List<UIBase>() }
     };
+
+    // 탭 전환용: None이 아닌 TabType을 가진 UI들만 별도 관리
+    private readonly Dictionary<UITabType, UIBase> tabDict = new();
+    public UITabType CurrentTab { get; private set; } = UITabType.None;
 
     private void Awake()
     {
@@ -40,6 +44,18 @@ public class UIManager : MonoBehaviour
 
             uiDict.Add(type, ui);
             layerGroup[ui.Layer].Add(ui);
+
+            if (ui.TabType != UITabType.None)
+            {
+                if (tabDict.ContainsKey(ui.TabType))
+                {
+                    Debug.LogWarning($"[UIManager] 탭 중복 등록: {ui.TabType}");
+                }
+                else
+                {
+                    tabDict.Add(ui.TabType, ui);
+                }
+            }
 
             ui.Hide();
         }
@@ -72,5 +88,44 @@ public class UIManager : MonoBehaviour
         {
             ui.Hide();
         }
+    }
+
+    // ── 탭 전환 (배타적 — 한 번에 하나만 열림) ──
+
+    // 같은 탭을 다시 누르면 닫히고(토글), 다른 탭을 누르면 이전 탭은 닫히고 새 탭이 열림.
+    public void ToggleTab(UITabType tabType)
+    {
+        if (CurrentTab == tabType)
+        {
+            CloseCurrentTab();
+            return;
+        }
+
+        if (CurrentTab != UITabType.None && tabDict.TryGetValue(CurrentTab, out UIBase prevUi))
+        {
+            prevUi.Hide();
+        }
+
+        if (tabDict.TryGetValue(tabType, out UIBase nextUi))
+        {
+            nextUi.Show();
+            CurrentTab = tabType;
+        }
+        else
+        {
+            Debug.LogError($"[UIManager] 탭 UI를 찾을 수 없습니다: {tabType}");
+            CurrentTab = UITabType.None;
+        }
+    }
+
+    public void CloseCurrentTab()
+    {
+        if (CurrentTab == UITabType.None) return;
+
+        if (tabDict.TryGetValue(CurrentTab, out UIBase ui))
+        {
+            ui.Hide();
+        }
+        CurrentTab = UITabType.None;
     }
 }

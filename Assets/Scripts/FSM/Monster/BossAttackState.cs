@@ -30,5 +30,8 @@ public class BossAttackState : BossCombatState
     protected override void OnHitImpact()
     {
         target?.TakeDamage(boss.GetCalculatedDamage());
+
+        if (target != null)
+            CombatEffectManager.Instance.SpawnHitParticle(target.Position);
     }
 }
