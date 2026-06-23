@@ -18,178 +18,148 @@ MonoBehaviour:
     _baseMaxHp: 100
     _baseAttackDamage: 500
     _baseAttackInterval: 1
-    _baseRunSpeed: 2
   - _level: 2
     _requiredExp: 80
     _baseMaxHp: 120
     _baseAttackDamage: 7
     _baseAttackInterval: 0.98
-    _baseRunSpeed: 2.05
   - _level: 3
     _requiredExp: 110
     _baseMaxHp: 140
     _baseAttackDamage: 9
     _baseAttackInterval: 0.96
-    _baseRunSpeed: 2.1
   - _level: 4
     _requiredExp: 140
     _baseMaxHp: 160
     _baseAttackDamage: 11
     _baseAttackInterval: 0.94
-    _baseRunSpeed: 2.15
   - _level: 5
     _requiredExp: 170
     _baseMaxHp: 180
     _baseAttackDamage: 13
     _baseAttackInterval: 0.92
-    _baseRunSpeed: 2.2
   - _level: 6
     _requiredExp: 200
     _baseMaxHp: 200
     _baseAttackDamage: 15
     _baseAttackInterval: 0.9
-    _baseRunSpeed: 2.25
   - _level: 7
     _requiredExp: 230
     _baseMaxHp: 220
     _baseAttackDamage: 17
     _baseAttackInterval: 0.88
-    _baseRunSpeed: 2.3
   - _level: 8
     _requiredExp: 260
     _baseMaxHp: 240
     _baseAttackDamage: 19
     _baseAttackInterval: 0.86
-    _baseRunSpeed: 2.35
   - _level: 9
     _requiredExp: 290
     _baseMaxHp: 260
     _baseAttackDamage: 21
     _baseAttackInterval: 0.84000003
-    _baseRunSpeed: 2.4
   - _level: 10
     _requiredExp: 320
     _baseMaxHp: 280
     _baseAttackDamage: 23
     _baseAttackInterval: 0.82
-    _baseRunSpeed: 2.45
   - _level: 11
     _requiredExp: 350
     _baseMaxHp: 300
     _baseAttackDamage: 25
     _baseAttackInterval: 0.8
-    _baseRunSpeed: 2.5
   - _level: 12
     _requiredExp: 380
     _baseMaxHp: 320
     _baseAttackDamage: 27
     _baseAttackInterval: 0.78000003
-    _baseRunSpeed: 2.55
   - _level: 13
     _requiredExp: 410
     _baseMaxHp: 340
     _baseAttackDamage: 29
     _baseAttackInterval: 0.76
-    _baseRunSpeed: 2.6
   - _level: 14
     _requiredExp: 440
     _baseMaxHp: 360
     _baseAttackDamage: 31
     _baseAttackInterval: 0.74
-    _baseRunSpeed: 2.65
   - _level: 15
     _requiredExp: 470
     _baseMaxHp: 380
     _baseAttackDamage: 33
     _baseAttackInterval: 0.72
-    _baseRunSpeed: 2.7
   - _level: 16
     _requiredExp: 500
     _baseMaxHp: 400
     _baseAttackDamage: 35
     _baseAttackInterval: 0.7
-    _baseRunSpeed: 2.75
   - _level: 17
     _requiredExp: 530
     _baseMaxHp: 420
     _baseAttackDamage: 37
     _baseAttackInterval: 0.68
-    _baseRunSpeed: 2.8
   - _level: 18
     _requiredExp: 560
     _baseMaxHp: 440
     _baseAttackDamage: 39
     _baseAttackInterval: 0.66
-    _baseRunSpeed: 2.85
   - _level: 19
     _requiredExp: 590
     _baseMaxHp: 460
     _baseAttackDamage: 41
     _baseAttackInterval: 0.64
-    _baseRunSpeed: 2.9
   - _level: 20
     _requiredExp: 620
     _baseMaxHp: 480
     _baseAttackDamage: 43
     _baseAttackInterval: 0.62
-    _baseRunSpeed: 2.95
   - _level: 21
     _requiredExp: 650
     _baseMaxHp: 500
     _baseAttackDamage: 45
     _baseAttackInterval: 0.6
-    _baseRunSpeed: 3
   - _level: 22
     _requiredExp: 680
     _baseMaxHp: 520
     _baseAttackDamage: 47
     _baseAttackInterval: 0.58
-    _baseRunSpeed: 3.05
   - _level: 23
     _requiredExp: 710
     _baseMaxHp: 540
     _baseAttackDamage: 49
     _baseAttackInterval: 0.56
-    _baseRunSpeed: 3.1
   - _level: 24
     _requiredExp: 740
     _baseMaxHp: 560
     _baseAttackDamage: 51
     _baseAttackInterval: 0.54
-    _baseRunSpeed: 3.15
   - _level: 25
     _requiredExp: 770
     _baseMaxHp: 580
     _baseAttackDamage: 53
     _baseAttackInterval: 0.52
-    _baseRunSpeed: 3.2
   - _level: 26
     _requiredExp: 800
     _baseMaxHp: 600
     _baseAttackDamage: 55
     _baseAttackInterval: 0.5
-    _baseRunSpeed: 3.25
   - _level: 27
     _requiredExp: 830
     _baseMaxHp: 620
     _baseAttackDamage: 57
     _baseAttackInterval: 0.48000002
-    _baseRunSpeed: 3.3
   - _level: 28
     _requiredExp: 860
     _baseMaxHp: 640
     _baseAttackDamage: 59
     _baseAttackInterval: 0.46
-    _baseRunSpeed: 3.35
   - _level: 29
     _requiredExp: 890
     _baseMaxHp: 660
     _baseAttackDamage: 61
     _baseAttackInterval: 0.44
-    _baseRunSpeed: 3.4
   - _level: 30
     _requiredExp: 920
     _baseMaxHp: 680
     _baseAttackDamage: 63
     _baseAttackInterval: 0.42000002
-    _baseRunSpeed: 3.45

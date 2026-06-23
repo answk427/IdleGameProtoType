@@ -926,7 +926,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: SPD+
+  m_text: AS+
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -6064,7 +6064,7 @@ GameObject:
   - component: {fileID: 1868174751}
   - component: {fileID: 1868174750}
   m_Layer: 0
-  m_Name: SpeedUpgradeButton
+  m_Name: AttackSpeedUpgradeButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6482,7 +6482,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f536b0044e61a34aaeec95f50522c67, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UVScroller
-  speed: 0.5
+  scrollScale: 0.25
 --- !u!64 &1909895861
 MeshCollider:
   m_ObjectHideFlags: 0

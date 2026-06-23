@@ -6,7 +6,7 @@ public enum UpgradeStatType
 {
     Hp,
     Attack,
-    Speed
+    AttackSpeed
 }
 
 // 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerSaveData)
@@ -25,6 +25,9 @@ public class PlayerStats
     private PlayerUpgradeConfig upgradeConfig;
     private PlayerSaveData saveData;
 
+    // 고정 이동속도. 버프/스킬로만 일시적으로 바뀐다
+    private float baseRunSpeed;
+
     // ── 읽기 전용 프로퍼티 ──────────────────────────────────
 
     public int Level => saveData?.level ?? 1;
@@ -35,17 +38,20 @@ public class PlayerStats
     // 최종 스탯 = 기본 + 업그레이드 보너스
     public int MaxHp => BaseStat.baseMaxHp + (saveData?.hpUpgradeLevel ?? 0) * upgradeConfig.settings.hpPerUpgrade;
     public int AttackDamage => BaseStat.baseAttackDamage + (saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade;
-    public float AttackInterval => Mathf.Max(0.1f, BaseStat.baseAttackInterval);
-    public float RunSpeed => BaseStat.baseRunSpeed + (saveData?.speedUpgradeLevel ?? 0) * upgradeConfig.settings.speedPerUpgrade;
+    public float AttackInterval => Mathf.Max(0.1f, BaseStat.baseAttackInterval - (saveData?.attackSpeedUpgradeLevel ?? 0) * upgradeConfig.settings.attackSpeedPerUpgrade);
+
+    // 레벨/업그레이드의 영향을 받지 않는 고정값. 버프/스킬이 생기면 여기에 배율만 곱하면 된다.
+    public float RunSpeed => baseRunSpeed;
 
     private PlayerStatData BaseStat => statData.GetByLevel(Level);
 
     // ── 초기화 ──────────────────────────────────────────────
 
-    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig)
+    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig, float baseRunSpeed)
     {
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
+        this.baseRunSpeed = baseRunSpeed;
         this.saveData = new PlayerSaveData(); // 기본값
     }
 
@@ -83,7 +89,7 @@ public class PlayerStats
         {
             case UpgradeStatType.Hp: return saveData?.hpUpgradeLevel ?? 0;
             case UpgradeStatType.Attack: return saveData?.attackUpgradeLevel ?? 0;
-            case UpgradeStatType.Speed: return saveData?.speedUpgradeLevel ?? 0;
+            case UpgradeStatType.AttackSpeed: return saveData?.attackSpeedUpgradeLevel ?? 0;
             default: throw new ArgumentOutOfRangeException(nameof(type));
         }
     }
@@ -95,7 +101,7 @@ public class PlayerStats
         {
             case UpgradeStatType.Hp: return upgradeConfig.GetHpUpgradeCost(level);
             case UpgradeStatType.Attack: return upgradeConfig.GetAttackUpgradeCost(level);
-            case UpgradeStatType.Speed: return upgradeConfig.GetSpeedUpgradeCost(level);
+            case UpgradeStatType.AttackSpeed: return upgradeConfig.GetAttackSpeedUpgradeCost(level);
             default: throw new ArgumentOutOfRangeException(nameof(type));
         }
     }
@@ -112,7 +118,9 @@ public class PlayerStats
         {
             case UpgradeStatType.Hp: return MaxHp;
             case UpgradeStatType.Attack: return AttackDamage;
-            case UpgradeStatType.Speed: return RunSpeed;
+            // 공격 간격(초)은 작을수록 강해지는 값이라 그대로 보여주면 직관과 반대로 읽힌다.
+            // 다른 스탯들과 동일하게 "클수록 좋다"가 되도록 초당 공격 횟수로 환산해서 보여준다.
+            case UpgradeStatType.AttackSpeed: return 1f / AttackInterval;
             default: throw new ArgumentOutOfRangeException(nameof(type));
         }
     }
@@ -129,7 +137,7 @@ public class PlayerStats
         {
             case UpgradeStatType.Hp: saveData.hpUpgradeLevel++; break;
             case UpgradeStatType.Attack: saveData.attackUpgradeLevel++; break;
-            case UpgradeStatType.Speed: saveData.speedUpgradeLevel++; break;
+            case UpgradeStatType.AttackSpeed: saveData.attackSpeedUpgradeLevel++; break;
         }
 
         OnUpgraded?.Invoke();

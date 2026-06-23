@@ -8,7 +8,6 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     [SerializeField] private int maxHp = 10;
     [SerializeField] private int goldReward = 1;
-    [SerializeField] protected float moveSpeed = 1.0f;
 
     // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
     // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
@@ -113,6 +112,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     public void moveToPlayer()
     {
-        transform.Translate(Vector3.left * moveSpeed * Time.deltaTime);
+        float runSpeed = GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f;
+        transform.Translate(Vector3.left * runSpeed * Time.deltaTime);
     }
 }

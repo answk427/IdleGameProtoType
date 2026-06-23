@@ -16,8 +16,7 @@ public class PlayerStatsTests
             $"\"requiredExp\":{requiredExp}," +
             $"\"baseMaxHp\":{baseMaxHp}," +
             $"\"baseAttackDamage\":{baseAttackDamage}," +
-            "\"baseAttackInterval\":1.0," +
-            "\"baseRunSpeed\":2.0" +
+            "\"baseAttackInterval\":1.0" +
             "}";
         return JsonConvert.DeserializeObject<PlayerStatData>(json);
     }
@@ -40,7 +39,7 @@ public class PlayerStatsTests
         upgradeConfig.maxUpgradeLevel = 0;
 
         stats = new PlayerStats();
-        stats.Initialize(statDatabase, upgradeConfig);
+        stats.Initialize(statDatabase, upgradeConfig, baseRunSpeed: 2f);
     }
 
     [TearDown]
@@ -115,13 +114,13 @@ public class PlayerStatsTests
     {
         upgradeConfig.maxUpgradeLevel = 2;
 
-        stats.Upgrade(UpgradeStatType.Speed);
-        stats.Upgrade(UpgradeStatType.Speed);
+        stats.Upgrade(UpgradeStatType.AttackSpeed);
+        stats.Upgrade(UpgradeStatType.AttackSpeed);
 
-        Assert.IsTrue(stats.IsUpgradeMaxed(UpgradeStatType.Speed));
+        Assert.IsTrue(stats.IsUpgradeMaxed(UpgradeStatType.AttackSpeed));
 
-        float before = stats.RunSpeed;
-        stats.Upgrade(UpgradeStatType.Speed); // 캡 도달 후 호출 - 무시되어야 함
-        Assert.AreEqual(before, stats.RunSpeed);
+        float before = stats.AttackInterval;
+        stats.Upgrade(UpgradeStatType.AttackSpeed); // 캡 도달 후 호출 - 무시되어야 함
+        Assert.AreEqual(before, stats.AttackInterval);
     }
 }
