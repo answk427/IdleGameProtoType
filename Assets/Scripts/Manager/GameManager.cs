@@ -1,23 +1,13 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
-    private enum GameState
-    {
-        Running,
-        Fighting,
-        StageLoopComplete
-    }
-
     public static GameManager Instance;
 
     private bool isScrolling = true;
 
-    private GameState currentState;
-    private int gold;
     private Coroutine currentSpawnLoop;
 
     private PlayerController player;
@@ -28,13 +18,8 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private float postEncounterDelay = 0.5f;
 
-    public event Action<int> OnGoldChanged;
-
-    public int CurrentStageNumber => stageManager != null ? stageManager.CurrentStage.Key : 0;
-    public string CurrentState => currentState.ToString();
-    public int EncounterProgress => stageManager != null ? stageManager.EncounterProgress : 0;
-    public int EncountersToComplete => stageManager != null ? stageManager.CurrentStage.encountersToComplete : 0;
-    public int Gold => gold;
+    private readonly GoldWallet wallet = new GoldWallet();
+    public GoldWallet Wallet => wallet;
 
     public bool IsScrolling
     {
@@ -102,8 +87,6 @@ public class GameManager : MonoBehaviour
     {
         while (true)
         {
-            currentState = GameState.Running;
-
             monsterSpawner.SpawnEncounter(stageManager.CurrentStage);
 
             while (!monsterSpawner.AllDie())
@@ -158,22 +141,6 @@ public class GameManager : MonoBehaviour
         return monsterSpawner.GetMonstersInRange(originX, radius);
     }
 
-    public void AddGold(int amount)
-    {
-        this.gold += amount;
-        OnGoldChanged?.Invoke(this.gold);
-    }
-
-    public bool TrySpendGold(int amount)
-    {
-        if (amount <= 0) return true;
-        if (gold < amount) return false;
-        gold -= amount;
-        OnGoldChanged?.Invoke(gold);
-        return true;
-    }
-
-
     public void EnterBossBattle()
     {
         if (currentSpawnLoop != null)
@@ -186,7 +153,6 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator BossBattleRoutine()
     {
-        currentState = GameState.Fighting;
         Debug.Log("보스전 시작!!!");
 
         monsterSpawner.ClearEncounter();

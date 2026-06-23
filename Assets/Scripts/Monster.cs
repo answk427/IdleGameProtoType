@@ -93,7 +93,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     {
         Debug.Log("Monster Die");
         IsAlive = false;
-        GameManager.Instance.AddGold(goldReward);
+        GameManager.Instance.Wallet.AddGold(goldReward);
         fsm?.ChangeState(new MonsterDieState(this));
     }
 

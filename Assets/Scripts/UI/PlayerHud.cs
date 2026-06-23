@@ -40,13 +40,13 @@ public class PlayerHud : UIBase
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.OnGoldChanged += UpdateGoldText;
+            GameManager.Instance.Wallet.OnGoldChanged += UpdateGoldText;
         }
 
         UpdateHpBar(player.CurrentHp, player.MaxHp);
         UpdateExpBar(player.Stats.CurrentExp, player.Stats.RequiredExp);
         UpdateLevelText(player.Stats.Level);
-        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Gold : 0);
+        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0);
     }
 
     public override void Hide()
@@ -61,7 +61,7 @@ public class PlayerHud : UIBase
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.OnGoldChanged -= UpdateGoldText;
+            GameManager.Instance.Wallet.OnGoldChanged -= UpdateGoldText;
         }
 
         base.Hide();

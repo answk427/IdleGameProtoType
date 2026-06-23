@@ -188,7 +188,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     {
         if (GameManager.Instance == null) return false;
         if (stats.IsUpgradeMaxed(type)) return false;
-        if (!GameManager.Instance.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
+        if (!GameManager.Instance.Wallet.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
 
         stats.Upgrade(type);
         stats.Save();
