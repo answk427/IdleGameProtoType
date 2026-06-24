@@ -1,40 +1,46 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 하단 탭(스킬/스탯) 클릭 시에만 보여지는 스탯 업그레이드 패널.
-// 골드 표시는 PlayerHud가 전담(상시 노출 정보이므로 여기서는 다루지 않음).
-// 이 패널은 골드 변경 시 버튼 활성/비용 텍스트만 갱신.
-// 슬롯을 데이터(List<UpgradeSlot>)로 관리해서, 업그레이드 종류가 늘어나도
-// 코드 수정 없이 Inspector에서 슬롯 추가만 하면 되도록 구성.
+// 캐릭터 탭: 레벨/경험치/레벨업 버튼 + 스탯 업그레이드 목록.
+// 업그레이드 항목은 upgrades 리스트(데이터) 기반으로 런타임에 생성되므로,
+// 업그레이드 가능한 스탯이 늘어나도 코드 수정 없이 리스트 항목만 추가하면 된다.
 public class StatUpgradePanel : UIBase
 {
     [Serializable]
-    public class UpgradeSlot
+    public class UpgradeDefinition
     {
         public UpgradeStatType statType;
-        public Button upgradeButton;
-        public TextMeshProUGUI costText;
-        public TextMeshProUGUI currentValueText; // 현재 스탯 수치 표시 (선택, 비워두면 무시)
+        public string displayName;
+        public Sprite icon;
     }
 
-    [SerializeField] private List<UpgradeSlot> slots = new List<UpgradeSlot>();
+    [Header("레벨 / 경험치")]
+    [SerializeField] private Image characterPortraitImage;
+    [SerializeField] private TextMeshProUGUI levelText;
+    [SerializeField] private Image expFillImage;
+    [SerializeField] private TextMeshProUGUI expText;
+    [SerializeField] private TextMeshProUGUI expPercentText;
+    [SerializeField] private Button levelUpButton;
+    [SerializeField] private GameObject levelUpNotification; // 레벨업 가능할 때만 표시되는 알림 점
 
+    [Header("업그레이드 목록")]
+    [SerializeField] private Transform listContent;
+    [SerializeField] private UpgradeListItem listItemPrefab;
+    [SerializeField] private List<UpgradeDefinition> upgrades = new List<UpgradeDefinition>();
+
+    private readonly List<UpgradeListItem> spawnedItems = new List<UpgradeListItem>();
     private PlayerController player;
-    private bool listenersBound;
 
     private void Awake()
     {
-        if (listenersBound) return;
-        listenersBound = true;
+        BuildList();
 
-        foreach (var slot in slots)
+        if (levelUpButton != null)
         {
-            if (slot.upgradeButton == null) continue;
-            UpgradeStatType capturedType = slot.statType;
-            slot.upgradeButton.onClick.AddListener(() => OnClickUpgrade(capturedType));
+            levelUpButton.onClick.AddListener(OnClickLevelUp);
         }
     }
 
@@ -54,6 +60,8 @@ public class StatUpgradePanel : UIBase
         }
 
         player.Stats.OnUpgraded += RefreshAll;
+        player.Stats.OnExpChanged += OnExpChanged;
+        player.Stats.OnLevelUp += OnLevelUp;
 
         if (GameManager.Instance != null)
         {
@@ -68,6 +76,8 @@ public class StatUpgradePanel : UIBase
         if (player != null)
         {
             player.Stats.OnUpgraded -= RefreshAll;
+            player.Stats.OnExpChanged -= OnExpChanged;
+            player.Stats.OnLevelUp -= OnLevelUp;
         }
 
         if (GameManager.Instance != null)
@@ -79,28 +89,64 @@ public class StatUpgradePanel : UIBase
     }
 
     private void OnGoldChanged(int _) => RefreshAll();
+    private void OnExpChanged(int current, int required) => RefreshHeader();
+    private void OnLevelUp(int newLevel) => RefreshAll();
+
+    private void BuildList()
+    {
+        if (listContent == null || listItemPrefab == null) return;
+
+        foreach (var def in upgrades)
+        {
+            UpgradeListItem item = Instantiate(listItemPrefab, listContent);
+            item.Bind(def.statType, def.displayName, def.icon, OnClickUpgrade);
+            spawnedItems.Add(item);
+        }
+    }
 
     private void RefreshAll()
     {
         if (player == null) return;
 
-        int gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0;
+        RefreshHeader();
 
         var stats = player.Stats;
-        foreach (var slot in slots)
+        int gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0;
+
+        foreach (var item in spawnedItems)
         {
-            bool isMaxed = stats.IsUpgradeMaxed(slot.statType);
-            int cost = stats.GetNextUpgradeCost(slot.statType);
+            UpgradeStatType type = item.StatType;
+            bool isMaxed = stats.IsUpgradeMaxed(type);
+            int cost = stats.GetNextUpgradeCost(type);
+            int upgradeLevel = stats.GetCurrentUpgradeLevel(type);
+            float currentValue = stats.GetCurrentStatValue(type);
+            float nextValue = isMaxed ? currentValue : stats.GetNextStatValue(type);
 
-            if (slot.costText != null)
-                slot.costText.text = isMaxed ? "MAX" : cost.ToString();
-
-            if (slot.upgradeButton != null)
-                slot.upgradeButton.interactable = !isMaxed && gold >= cost;
-
-            if (slot.currentValueText != null)
-                slot.currentValueText.text = stats.GetCurrentStatValue(slot.statType).ToString("0");
+            item.Refresh(upgradeLevel, currentValue, nextValue, cost, isMaxed, gold >= cost);
         }
+    }
+
+    private void RefreshHeader()
+    {
+        if (player == null) return;
+
+        var stats = player.Stats;
+
+        if (levelText != null) levelText.text = $"Lv. {stats.Level}";
+
+        if (expFillImage != null)
+            expFillImage.fillAmount = stats.RequiredExp > 0 ? Mathf.Min(1f, (float)stats.CurrentExp / stats.RequiredExp) : 0f;
+
+        if (expText != null) expText.text = $"EXP {stats.CurrentExp} / {stats.RequiredExp}";
+
+        if (expPercentText != null)
+        {
+            float percent = stats.RequiredExp > 0 ? (float)stats.CurrentExp / stats.RequiredExp * 100f : 0f;
+            expPercentText.text = $"{percent:0.00}%";
+        }
+
+        if (levelUpButton != null) levelUpButton.interactable = stats.CanLevelUp;
+        if (levelUpNotification != null) levelUpNotification.SetActive(stats.CanLevelUp);
     }
 
     private void OnClickUpgrade(UpgradeStatType type)
@@ -108,5 +154,12 @@ public class StatUpgradePanel : UIBase
         if (player == null) return;
         player.TryUpgrade(type);
         // RefreshAll()은 OnUpgraded/OnGoldChanged 이벤트로 자동 호출됨
+    }
+
+    private void OnClickLevelUp()
+    {
+        if (player == null) return;
+        player.Stats.TryLevelUp();
+        // RefreshAll()은 OnLevelUp 이벤트로 자동 호출됨
     }
 }

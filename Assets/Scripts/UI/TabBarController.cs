@@ -63,8 +63,6 @@ public class TabBarController : MonoBehaviour
 
     private void OnTabClicked(UITabType tabType)
     {
-        Debug.Log($"[TabBarController] 클릭됨: {tabType}"); // 임시 디버그용 - 원인 찾으면 제거
-
         RuntimeTabSlot slot = runtimeSlots.Find(s => s.tabType == tabType);
         if (slot != null && !slot.isUnlocked)
         {
