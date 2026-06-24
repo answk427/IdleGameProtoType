@@ -18,6 +18,7 @@ MonoBehaviour:
       _monsterName: BlueSlime
       _maxHp: 30
       _goldReward: 111
+      _expReward: 5
       _attackDamage: 0
       _attackInterval: 0
       _attackRange: 0
@@ -28,6 +29,7 @@ MonoBehaviour:
       _monsterName: BlueSlime2
       _maxHp: 50
       _goldReward: 222
+      _expReward: 8
       _attackDamage: 0
       _attackInterval: 0
       _attackRange: 0
@@ -38,6 +40,7 @@ MonoBehaviour:
       _monsterName: BossSlime
       _maxHp: 10000
       _goldReward: 1000
+      _expReward: 50
       _attackDamage: 218
       _attackInterval: 0.64
       _attackRange: 0.1

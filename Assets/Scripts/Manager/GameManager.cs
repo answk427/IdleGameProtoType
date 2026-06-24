@@ -37,6 +37,7 @@ public class GameManager : MonoBehaviour
         Instance = this;
         GlobalGameEvents.OnStageCleared += StartStageTransition;
         GlobalGameEvents.OnPlayerDied += HandlePlayerDied;
+        GlobalCombatEvents.OnMonsterDied += HandleMonsterDied;
     }
 
     private void Start()
@@ -69,6 +70,15 @@ public class GameManager : MonoBehaviour
 
         GlobalGameEvents.OnStageCleared -= StartStageTransition;
         GlobalGameEvents.OnPlayerDied -= HandlePlayerDied;
+        GlobalCombatEvents.OnMonsterDied -= HandleMonsterDied;
+    }
+
+    // 몬스터 처치 보상(골드/경험치) 지급. Monster는 죽었다는 사실만 이벤트로 알리고,
+    // 보상을 어떻게 지급할지는 모른다.
+    private void HandleMonsterDied(Monster monster, int goldReward, Vector3 position)
+    {
+        wallet.AddGold(goldReward);
+        player?.AddExp(monster.ExpReward);
     }
 
     private void StartStageTransition()

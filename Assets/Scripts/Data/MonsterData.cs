@@ -10,6 +10,7 @@ public class MonsterData : IData
     [SerializeField] private string _monsterName;
     [SerializeField] private int _maxHp;
     [SerializeField] private int _goldReward;
+    [SerializeField] private int _expReward;
     [SerializeField] private int _attackDamage;
     [SerializeField] private float _attackInterval;
     [SerializeField] private float _attackRange;
@@ -18,6 +19,8 @@ public class MonsterData : IData
     public int id { get => _id; private set => _id = value; }
     [JsonProperty("goldReward")]
     public int goldReward { get => _goldReward; private set => _goldReward = value; }
+    [JsonProperty("expReward")]
+    public int expReward { get => _expReward; private set => _expReward = value; }
     [JsonProperty("monsterName")]
     public string monsterName { get => _monsterName; private set => _monsterName = value; }
     [JsonProperty("maxHp")]
