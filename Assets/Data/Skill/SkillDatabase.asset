@@ -45,14 +45,14 @@ MonoBehaviour:
       _id: 3
       _skillName: "\uD790\uB9C1"
       _cooldown: 8
-      _animationTrigger: Skill
+      _animationTrigger: Healing
       _effectType: 2
       _value1: 30
       _value2: 0
       _requiredLevel: 5
     icon: {fileID: 21300000, guid: 9cf3ac0b624168545975e8923bfe94e3, type: 3}
     castVfxPrefab: {fileID: 0}
-    hitVfxPrefab: {fileID: 8194992990867289339, guid: 3f78a770afb06514498e9290f5f225d7, type: 3}
+    hitVfxPrefab: {fileID: 8771972552311404799, guid: aecbcee09aff3f54cac809fbdee0c03d, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
   - data:

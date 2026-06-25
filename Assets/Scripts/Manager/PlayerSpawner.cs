@@ -45,7 +45,9 @@ public class PlayerSpawner : MonoBehaviour
         Vector3 spawnPos = defaultSpawnPoint != null ? defaultSpawnPoint.position : Vector3.zero;
         if (PlayAreaBounds.Instance != null)
         {
-            spawnPos.y = PlayAreaBounds.Instance.GroundY;
+            // 프리팹 자체(인스턴스화 전)에서 캐릭터별 보정값을 읽어온다.
+            float characterGroundOffset = playerPrefab.GetComponent<PlayerController>()?.GroundOffset ?? 0f;
+            spawnPos.y = PlayAreaBounds.Instance.GroundY + characterGroundOffset;
         }
 
         GameObject obj = Instantiate(playerPrefab, spawnPos, Quaternion.identity);

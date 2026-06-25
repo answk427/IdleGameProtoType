@@ -8,6 +8,11 @@ public class CombatEffectManager : MonoBehaviour
     [SerializeField] private GameObject hitParticlePrefab;
     [SerializeField] private Canvas dynamicCanvas;
 
+    [Header("Floating Text Colors")]
+    [SerializeField] private Color playerDamageColor = Color.red;
+    [SerializeField] private Color monsterDamageColor = Color.white;
+    [SerializeField] private Color healColor = Color.green;
+
     [Header("Reward Drop")]
     [SerializeField] private GameObject rewardDropPrefab;
     [SerializeField] private Sprite coinSprite;
@@ -36,21 +41,30 @@ public class CombatEffectManager : MonoBehaviour
     {
         GlobalCombatEvents.OnAnyTargetDamaged += HandleAnyTargetDamaged;
         GlobalCombatEvents.OnMonsterDied += SpawnRewardDrop;
+        GlobalCombatEvents.OnHealed += HandleHealed;
     }
 
     private void OnDisable()
     {
         GlobalCombatEvents.OnAnyTargetDamaged -= HandleAnyTargetDamaged;
         GlobalCombatEvents.OnMonsterDied -= SpawnRewardDrop;
+        GlobalCombatEvents.OnHealed -= HandleHealed;
     }
 
-    // 데미지 숫자는 출처와 무관하게 항상 표시.
+    // 데미지 숫자는 출처와 무관하게 항상 표시하되, 맞은 대상이 플레이어인지에 따라
+    // 색만 다르게 한다 (플레이어가 맞으면 빨강, 몬스터가 맞으면 기존 흰색 유지).
     private void HandleAnyTargetDamaged(IDamageable target, int damage, Vector3 position)
     {
-        SpawnDamageText(damage, position);
+        Color color = target is PlayerController ? playerDamageColor : monsterDamageColor;
+        SpawnDamageText(damage, position, color);
     }
 
-    public void SpawnDamageText(int damage, Vector3 worldPos)
+    private void HandleHealed(int amount, Vector3 position)
+    {
+        SpawnDamageText(amount, position, healColor, "+");
+    }
+
+    public void SpawnDamageText(int amount, Vector3 worldPos, Color color, string prefix = "")
     {
         GameObject obj = PoolManager.Instance.Spawn(
             damageTextPrefab,
@@ -67,7 +81,7 @@ public class CombatEffectManager : MonoBehaviour
         }
 
         RectTransform canvasRect = dynamicCanvas.transform as RectTransform;
-        damageText.Play(damage, worldPos, dynamicCanvas, canvasRect, ReturnDamageText);
+        damageText.Play(amount, worldPos, dynamicCanvas, canvasRect, ReturnDamageText, color, prefix);
     }
 
     public void SpawnHitParticle(Vector3 worldPos)
