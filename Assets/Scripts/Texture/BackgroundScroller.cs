@@ -23,7 +23,11 @@ public class BackgroundScroller : MonoBehaviour
         GlobalGameEvents.OnScrollChanged += UpdateScrollState;
     }
 
-    private void HandleStageChanged(Texture2D newBg) => SetBackground(newBg);
+    private void HandleStageChanged(int stageNumber)
+    {
+        StageEntry entry = GameDatabaseManager.Instance != null ? GameDatabaseManager.Instance.GetStage(stageNumber) : null;
+        if (entry != null) SetBackground(entry.backgroundTexture);
+    }
 
     public void SetBackground(Texture2D newBg)
     {
