@@ -48,6 +48,9 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         IsAlive = true;
         HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
         fsm.ChangeState(new MonsterIdleState(this));
+
+        // 죽으면서 숨겼던 체력바를 풀에서 재사용될 때 다시 보이게 한다.
+        if (hpBar != null) hpBar.gameObject.SetActive(true);
     }
 
     private void OnDisable()
@@ -95,6 +98,10 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         IsAlive = false;
         // 골드/경험치 지급은 GlobalCombatEvents.OnMonsterDied 구독자(GameManager)가 처리한다.
         fsm?.ChangeState(new MonsterDieState(this));
+
+        // 시체는 인카운터가 끝날 때까지(ClearEncounter) 풀로 안 돌아가고 화면에 남아있는데,
+        // 체력바까지 같이 떠있으면 죽은 몬스터 위에 빈 체력바가 계속 보이는 문제가 있었다.
+        if (hpBar != null) hpBar.gameObject.SetActive(false);
     }
 
     protected void PlayTrigger(string triggerName)
