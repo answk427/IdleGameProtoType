@@ -45,15 +45,15 @@ public class UIManager : MonoBehaviour
             uiDict.Add(type, ui);
             layerGroup[ui.Layer].Add(ui);
 
-            if (ui.TabType != UITabType.None)
+            if (ui is UITabPanel tabPanel && tabPanel.TabType != UITabType.None)
             {
-                if (tabDict.ContainsKey(ui.TabType))
+                if (tabDict.ContainsKey(tabPanel.TabType))
                 {
-                    Debug.LogWarning($"[UIManager] 탭 중복 등록: {ui.TabType}");
+                    Debug.LogWarning($"[UIManager] 탭 중복 등록: {tabPanel.TabType}");
                 }
                 else
                 {
-                    tabDict.Add(ui.TabType, ui);
+                    tabDict.Add(tabPanel.TabType, ui);
                 }
             }
 

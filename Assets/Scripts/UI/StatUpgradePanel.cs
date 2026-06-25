@@ -7,7 +7,7 @@ using UnityEngine.UI;
 // 캐릭터 탭: 레벨/경험치/레벨업 버튼 + 스탯 업그레이드 목록.
 // 업그레이드 항목은 upgrades 리스트(데이터) 기반으로 런타임에 생성되므로,
 // 업그레이드 가능한 스탯이 늘어나도 코드 수정 없이 리스트 항목만 추가하면 된다.
-public class StatUpgradePanel : UIBase
+public class StatUpgradePanel : UITabPanel
 {
     [Serializable]
     public class UpgradeDefinition

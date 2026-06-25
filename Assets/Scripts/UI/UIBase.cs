@@ -25,9 +25,6 @@ public abstract class UIBase : MonoBehaviour
     [Header("UI Layer")]
     public UILayer Layer = UILayer.Static;
 
-    [Header("Tab 연동 (탭 UI가 아니면 None)")]
-    public UITabType TabType = UITabType.None;
-
     public virtual void Show()
     {
         gameObject.SetActive(true);
@@ -37,4 +34,13 @@ public abstract class UIBase : MonoBehaviour
     {
         gameObject.SetActive(false);
     }
+}
+
+// 하단 탭바와 연동되는, 서로 배타적으로 전환되는 UI 전용 베이스.
+// 탭과 무관한 일반 UI(HUD, 안내 토스트, 1회성 버튼 등)는 UIBase를 그대로 쓰고
+// 이 클래스를 상속하지 않는다.
+public abstract class UITabPanel : UIBase
+{
+    [Header("Tab 연동")]
+    public UITabType TabType = UITabType.None;
 }
