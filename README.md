@@ -8,16 +8,25 @@
 ## 목차
 
 - [플레이영상](#플레이영상)
-- [핵심 설계](#핵심설계)
+- [핵심 설계](#핵심-설계)
 - [핵심 게임플레이](#핵심-게임플레이)
 - [아키텍처](#아키텍처)
 - [프로젝트 구조](#프로젝트-구조)
 
 ## 플레이영상
 
-![gameplay screenshot](Assets/Screenshots/screenshot-20260616-183806.png)
+### 전체 게임 흐름
+<video src="https://github.com/user-attachments/assets/57aa869b-a915-4c2d-8710-8e1918ef657a" width="100%" controls></video>
+> 플레이어가 계속 이동 -> 마주치는 적과 전투 -> 보스 처치 후 다음 스테이지
 
-> 위 이미지는 에디터 Scene 뷰 캡처입니다. 추후 실제 플레이 화면으로 교체할 예정입니다.
+### 자동 스킬 사용
+<video src="https://github.com/user-attachments/assets/767b076e-f7cc-4e4f-8195-f6aa5fb51c03" width="100%" controls></video>
+> 스킬 배치 -> 배치된 스킬 자동 사용
+
+### 사망 시 재시작
+<video src="https://github.com/user-attachments/assets/12351cfa-88f5-491b-9cdf-7cd9a5ca42fc" width="100%" controls></video>
+> 실패한 스테이지를 반복
+
 
 ## 핵심 설계
 
