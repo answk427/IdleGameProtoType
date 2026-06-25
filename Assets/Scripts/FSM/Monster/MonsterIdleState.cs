@@ -16,7 +16,7 @@ public class MonsterIdleState : IState
         GlobalGameEvents.OnScrollChanged += HandleScrollChanged;
 
         // 현재 스크롤 상태 즉시 반영
-        HandleScrollChanged(GameManager.Instance.IsScrolling);
+        if (GameManager.Instance != null) HandleScrollChanged(GameManager.Instance.IsScrolling);
     }
 
     public void Execute()

@@ -70,7 +70,7 @@ public class TabBarController : MonoBehaviour
             return;
         }
 
-        UIManager.Instance.ToggleTab(tabType);
+        if (UIManager.Instance != null) UIManager.Instance.ToggleTab(tabType);
     }
 
     public void SetUnlocked(UITabType tabType, bool unlocked)

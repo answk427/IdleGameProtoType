@@ -115,7 +115,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     public void moveToPlayer()
     {
-        float runSpeed = GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f;
+        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f : 0f;
         transform.Translate(Vector3.left * runSpeed * Time.deltaTime);
     }
 }
