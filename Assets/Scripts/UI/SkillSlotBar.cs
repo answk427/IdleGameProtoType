@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class SkillSlotBar : UIBase
+public class SkillSlotBar : UITabPanel
 {
     [SerializeField] private Transform slotContainer;
     [SerializeField] private SkillSlotWidget slotWidgetPrefab;
