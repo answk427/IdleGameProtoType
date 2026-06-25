@@ -1234,6 +1234,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8bc655d50ecd4bd44afc652b7166c985, type: 3}
   m_Name: 
   m_EditorClassIdentifier: IdleGameProtoType.Runtime::StageAnnouncement
+  Layer: 0
   label: {fileID: 793252708}
   canvasGroup: {fileID: 1176470796}
   visibleDuration: 1.5

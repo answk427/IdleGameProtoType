@@ -16,6 +16,12 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     [SerializeField] private string reviveTriggerName = "Revive";
     [SerializeField] private float attackRange = 0.5f;
 
+    // Attack 애니메이터 스테이트의 Speed가 이 파라미터를 참조하도록 설정돼 있어야 한다.
+    // 공격속도 업그레이드로 AttackInterval이 짧아져도 애니메이션 자체가 안 빨라지면
+    // 클립 길이에 막혀서 더 이상 안 빨라지는 것처럼 보이는 문제가 있었다.
+    private const string AttackSpeedParam = "AttackSpeedMultiplier";
+    private float attackClipLength = 0f;
+
     [Header("이동")]
     [Tooltip("고정 이동속도. 버프/스킬로만 일시적으로 변경됨")]
     [SerializeField] private float baseRunSpeed = 2f;
@@ -23,6 +29,12 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
     // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
     [SerializeField] private float halfWidthOverride = 0f;
+
+    [Tooltip("스프라이트 피벗이 발 기준이 아닐 때, 발이 바닥(PlayAreaBounds.GroundY)에 닿아 보이도록 " +
+             "보정하는 값(월드 유닛). MonsterEntry.groundOffset과 동일한 역할 — 캐릭터(직업)별로 다른 " +
+             "스프라이트를 쓸 수 있으므로 PlayAreaBounds 쪽 전역값이 아니라 여기서 캐릭터별로 보정한다.")]
+    [SerializeField] private float groundOffset = 0f;
+    public float GroundOffset => groundOffset;
 
     private PlayerStats stats = new PlayerStats();
     private int currentHp;
@@ -55,6 +67,8 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         {
             animator = GetComponent<Animator>();
         }
+
+        attackClipLength = FindClipLength(attackTriggerName);
 
         fsm = new StateMachine();
         HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
@@ -96,7 +110,27 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
 
     public void Attack()
     {
+        if (animator != null && attackClipLength > 0f)
+        {
+            // 애니메이션이 정확히 AttackInterval 안에 끝나도록 재생 속도를 매번 다시 맞춘다.
+            float multiplier = attackClipLength / Mathf.Max(0.01f, stats.AttackInterval);
+            animator.SetFloat(AttackSpeedParam, multiplier);
+        }
+
         PlayTrigger(attackTriggerName);
+    }
+
+    // 런타임 컨트롤러에 들어있는 애니메이션 클립 중 이름이 일치하는 것의 길이(초)를 찾는다.
+    private float FindClipLength(string clipName)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null) return 0f;
+
+        foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+        {
+            if (clip != null && clip.name == clipName) return clip.length;
+        }
+
+        return 0f;
     }
 
     private void SetRunAnimation(bool value)
@@ -269,5 +303,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     {
         currentHp = Mathf.Min(currentHp + amount, stats.MaxHp);
         OnHpChanged?.Invoke(currentHp, stats.MaxHp);
+        GlobalCombatEvents.TriggerHealed(amount, transform.position);
     }
 }
