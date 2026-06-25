@@ -15,7 +15,7 @@ public class PlayerAttackState : PlayerCombatState
         // 들어오자마자 바로 공격할 수 있게
         timer = player.AttackInterval;
 
-        GameManager.Instance.IsScrolling = false;
+        if (GameManager.Instance != null) GameManager.Instance.IsScrolling = false;
     }
 
     protected override void DoAction()

@@ -16,7 +16,7 @@
         base.Execute();
 
         // 플레이어가 사거리 안에 들어오면 공격 상태로 전환
-        PlayerController player = GameManager.Instance.GetPlayer();
+        PlayerController player = GameManager.Instance != null ? GameManager.Instance.GetPlayer() : null;
         if (player == null) return;
 
         if (CombatRangeUtility.IsWithinAttackRange(

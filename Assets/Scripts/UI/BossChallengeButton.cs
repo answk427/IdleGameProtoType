@@ -6,6 +6,6 @@ public class BossChallengeButton : UIBase
     public void OnClickChallenge()
     {
         Hide();
-        GameManager.Instance.EnterBossBattle();
+        if (GameManager.Instance != null) GameManager.Instance.EnterBossBattle();
     }
 }

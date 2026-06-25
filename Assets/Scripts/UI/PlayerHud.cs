@@ -77,7 +77,13 @@ public class PlayerHud : UIBase
 
     private void UpdateExpBar(int currentExp, int requiredExp)
     {
-        if (expFillImage != null && requiredExp > 0) expFillImage.fillAmount = (float)currentExp / requiredExp;
+        // 레벨업이 버튼으로 수동 처리되면서 currentExp가 requiredExp를 넘어선 채로 머무를 수 있어 클램프.
+        Debug.Log($"UpdateExpBar, currentExp:{currentExp}, requiredExp:{requiredExp}");
+        if (expFillImage != null && requiredExp > 0)
+        {
+            expFillImage.fillAmount = Mathf.Min(1f, (float)currentExp / requiredExp);
+            Debug.Log("UpdateExpBar in if");
+        }
     }
 
     private void UpdateLevelText(int level)
@@ -87,6 +93,6 @@ public class PlayerHud : UIBase
 
     private void UpdateGoldText(int gold)
     {
-        if (goldText != null) goldText.text = $"Gold: {gold}";
+        if (goldText != null) goldText.text = gold.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
     }
 }

@@ -13,7 +13,7 @@ public class AoeDamageSkillBehavior : ISkillBehavior
 
     public UnityEngine.Vector3 Execute(PlayerController caster, IDamageable target)
     {
-        List<Monster> monsters = GameManager.Instance.GetMonstersInRange(caster.transform.position.x, radius);
+        List<Monster> monsters = caster.GetMonstersInRange(radius);
         int damage = caster.GetCalculatedDamage(damageMultiplier);
 
         for (int i = 0; i < monsters.Count; i++)

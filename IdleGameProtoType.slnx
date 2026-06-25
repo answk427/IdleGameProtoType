@@ -1,9 +1,9 @@
 ﻿<Solution>
-  <Project Path="IdleGameProtoType.Runtime.csproj" />
   <Project Path="IdleGameProtoType.EditModeTests.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="CFXRRuntime.csproj" />
   <Project Path="CFXRDemo.csproj" />
+  <Project Path="IdleGameProtoType.Runtime.csproj" />
   <Project Path="CFXREditor.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="KinoBloom.Runtime.csproj" />

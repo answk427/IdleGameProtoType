@@ -12,12 +12,12 @@ public class PlayerRunState : IState
     public void Enter()
     {
         playerController.Run();
-        GameManager.Instance.IsScrolling = true;
+        if (GameManager.Instance != null) GameManager.Instance.IsScrolling = true;
     }
 
     public void Execute()
     {
-        Monster target = GameManager.Instance.GetClosestMonster(playerController.transform.position.x);
+        Monster target = GameManager.Instance != null ? GameManager.Instance.GetClosestMonster(playerController.transform.position.x) : null;
 
         if (target != null && CombatRangeUtility.IsWithinAttackRange(
                 playerController.transform.position, playerController.HalfWidth, playerController.AttackRange,

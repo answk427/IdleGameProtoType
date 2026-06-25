@@ -236,6 +236,13 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
         return GameManager.Instance.GetClosestMonster(transform.position.x);
     }
 
+    // 범위 스킬(AOE)이 GameManager를 직접 몰라도 되도록 caster를 통해서만 몬스터 목록을 받아간다.
+    public List<Monster> GetMonstersInRange(float radius)
+    {
+        if (GameManager.Instance == null) return new List<Monster>();
+        return GameManager.Instance.GetMonstersInRange(transform.position.x, radius);
+    }
+
     public Skill GetEquippedSkill(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= equippedSkills.Length) return null;

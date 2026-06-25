@@ -8,6 +8,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     [SerializeField] private int maxHp = 10;
     [SerializeField] private int goldReward = 1;
+    [SerializeField] private int expReward = 0;
 
     // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
     // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
@@ -25,6 +26,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     public Vector3 Position => transform.position;
     public float HalfWidth { get; protected set; }
     public int GoldReward => goldReward;
+    public int ExpReward => expReward;
     public GameObject OriginPrefab { get; set; }
 
     protected virtual void Awake()
@@ -66,6 +68,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         this.currentHp = this.maxHp;
         this.attackDamage = Mathf.RoundToInt(monsterData.attackDamage * dmgMultiplier);
         this.goldReward = Mathf.RoundToInt(monsterData.goldReward * goldMultiplier);
+        this.expReward = monsterData.expReward;
 
         IsAlive = true;
         OnHpChanged?.Invoke(currentHp, maxHp);
@@ -90,7 +93,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     protected virtual void Die()
     {
         IsAlive = false;
-        GameManager.Instance.Wallet.AddGold(goldReward);
+        // 골드/경험치 지급은 GlobalCombatEvents.OnMonsterDied 구독자(GameManager)가 처리한다.
         fsm?.ChangeState(new MonsterDieState(this));
     }
 
@@ -112,7 +115,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     public void moveToPlayer()
     {
-        float runSpeed = GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f;
+        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f : 0f;
         transform.Translate(Vector3.left * runSpeed * Time.deltaTime);
     }
 }
