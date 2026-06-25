@@ -20,9 +20,9 @@ MonoBehaviour:
       _monstersPerEncounter: 2
       _encountersToComplete: 2
       _monsterSpacing: 3
-      _bgTexturePath: stage1
+      _bgTexturePath: Textures/Backgrounds/Stage1
       _clearType: 0
-    backgroundTexture: {fileID: 2800000, guid: 8d41f9d58b934474d8b205ab9d9d0e66, type: 3}
+    backgroundTexture: {fileID: 2800000, guid: 36097b5693c0714478ffc6273a352644, type: 3}
   - data:
       _stageNumber: 2
       _normalMonsterId: 1002
@@ -30,9 +30,9 @@ MonoBehaviour:
       _monstersPerEncounter: 3
       _encountersToComplete: 2
       _monsterSpacing: 3
-      _bgTexturePath: 
+      _bgTexturePath: Textures/Backgrounds/Stage2
       _clearType: 0
-    backgroundTexture: {fileID: 0}
+    backgroundTexture: {fileID: 2800000, guid: b147266f8e2d8e849ad06136e78d4e77, type: 3}
   - data:
       _stageNumber: 3
       _normalMonsterId: 1001
@@ -42,4 +42,4 @@ MonoBehaviour:
       _monsterSpacing: 3
       _bgTexturePath: 
       _clearType: 0
-    backgroundTexture: {fileID: 0}
+    backgroundTexture: {fileID: 2800000, guid: 6a8a8fb6953cc4f45a25c7b27f799696, type: 3}

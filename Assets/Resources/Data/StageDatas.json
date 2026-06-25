@@ -8,7 +8,7 @@
     "monstersPerEncounter": 2,
     "encountersToComplete": 2,
     "monsterSpacing": 3.0,
-    "bgTexturePath": "stage1"
+    "bgTexturePath": "Textures/Backgrounds/Stage1"
   },
   {
     "Key": 2,
@@ -19,7 +19,7 @@
     "monstersPerEncounter": 3,
     "encountersToComplete": 2,
     "monsterSpacing": 3.0,
-    "bgTexturePath": null
+    "bgTexturePath": "Textures/Backgrounds/Stage2"
   },
   {
     "Key": 3,

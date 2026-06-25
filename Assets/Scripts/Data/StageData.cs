@@ -37,6 +37,8 @@ public class StageData : IData
     public int encountersToComplete { get => _encountersToComplete; private set => _encountersToComplete = value; }
     [JsonProperty("monsterSpacing")]
     public float monsterSpacing { get => _monsterSpacing; private set => _monsterSpacing = value; }
+    // 게임플레이 코드에서는 쓰지 않음 — StageDatabaseSyncer가 이 경로로 텍스처를 찾아
+    // StageEntry.backgroundTexture에 채워주는 동기화용 입력값.
     [JsonProperty("bgTexturePath")]
     public string bgTexturePath { get => _bgTexturePath; private set => _bgTexturePath = value; }
 }

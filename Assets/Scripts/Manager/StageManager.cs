@@ -4,12 +4,14 @@ public class StageManager : MonoBehaviour
 {
     [SerializeField] private StageData stage;
 
+    private Texture2D currentBackgroundTexture;
     private int currentStageIndex;
     private int encounterProgress;
     private bool bossAvailable;
     private bool isStageCleared;
 
     public StageData CurrentStage => stage;
+    public Texture2D CurrentBackgroundTexture => currentBackgroundTexture;
     public int EncounterProgress => encounterProgress;
     public bool BossAvailable => bossAvailable;
 
@@ -40,9 +42,13 @@ public class StageManager : MonoBehaviour
         }
 
         stage = nextStageEntry.data;
+        currentBackgroundTexture = nextStageEntry.backgroundTexture;
         currentStageIndex = stageNumber;
 
         Initialize();
+        // 최초 진입(GameManager.Start)과 전환(TryAdvanceStage) 양쪽 모두 여기를
+        // 거치므로, 배경 갱신 트리거를 한 곳으로 모은다.
+        GlobalGameEvents.TriggerStageChanged(currentBackgroundTexture);
         return true;
     }
 
@@ -87,7 +93,6 @@ public class StageManager : MonoBehaviour
             return false;
         }
 
-        GlobalGameEvents.TriggerStageChanged(stage);
         return true;
     }
 
