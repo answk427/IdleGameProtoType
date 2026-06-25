@@ -14,7 +14,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private MonsterSpawner monsterSpawner;
     [SerializeField] private StageManager stageManager;
 
-    [SerializeField] private UVScroller background;
+    [SerializeField] private BackgroundScroller background;
 
     [SerializeField] private float postEncounterDelay = 0.5f;
 

@@ -1,10 +1,13 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DataManager : MonoBehaviour
+// 현재 게임플레이 경로에서는 사용되지 않음 (GameDatabaseManager의 ScriptableObject
+// 파이프라인이 실제 데이터 소스). Resources/Data의 JSON을 직접 읽어와야 하는 상황을
+// 위해 남겨둔 유틸리티. 씬에 붙어있지 않으면 동작하지 않는다.
+public class JsonDataLoader : MonoBehaviour
 {
-    public static DataManager Instance;
+    public static JsonDataLoader Instance;
 
     public Dictionary<int, MonsterData> MonsterDict { get; private set; }
     public Dictionary<int, StageData> StageDict { get; private set; }
@@ -35,7 +38,7 @@ public class DataManager : MonoBehaviour
 
         if (jsonText == null)
         {
-            Debug.LogError($"[DataManager] {path} 파일을 찾을 수 없습니다!");
+            Debug.LogError($"[JsonDataLoader] {path} 파일을 찾을 수 없습니다!");
             return new Dictionary<int, T>();
         }
 
@@ -49,17 +52,5 @@ public class DataManager : MonoBehaviour
 
         Debug.Log($"<color=cyan>[로딩 완료]</color> {path} -> {dictionary.Count}개");
         return dictionary;
-    }
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-
     }
 }

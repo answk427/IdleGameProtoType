@@ -1,6 +1,7 @@
 using UnityEngine;
 
-public class UVScroller : MonoBehaviour
+// 배경 텍스처 스크롤(러닝 중 UV 오프셋 이동) + 스테이지 전환 시 배경 텍스처 교체를 함께 담당.
+public class BackgroundScroller : MonoBehaviour
 {
     // 플레이어 RunSpeed(월드 단위/초)를 UV 오프셋(0~1) 변화량으로 환산하는 배율.
     // 텍스처/쿼드 크기에 따라 달라지므로 배경마다 튜닝 가능하게 남겨둔다.
