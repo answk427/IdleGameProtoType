@@ -36,6 +36,7 @@ public class GameManager : MonoBehaviour
         GlobalGameEvents.OnStageCleared += StartStageTransition;
         GlobalGameEvents.OnPlayerDied += HandlePlayerDied;
         GlobalCombatEvents.OnMonsterDied += HandleMonsterDied;
+        GlobalGameEvents.OnStageChanged += HandleStageChanged;
     }
 
     private void Start()
@@ -69,6 +70,13 @@ public class GameManager : MonoBehaviour
         GlobalGameEvents.OnStageCleared -= StartStageTransition;
         GlobalGameEvents.OnPlayerDied -= HandlePlayerDied;
         GlobalCombatEvents.OnMonsterDied -= HandleMonsterDied;
+        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
+    }
+
+    // 스테이지 안내 UI 표시도 다른 패널들처럼 UIManager.ShowUI 경로로 통일한다.
+    private void HandleStageChanged(int stageNumber)
+    {
+        UIManager.Instance.ShowUI<StageAnnouncement>(announcement => announcement.SetStageNumber(stageNumber));
     }
 
     // 몬스터 처치 보상(골드/경험치) 지급. Monster는 죽었다는 사실만 이벤트로 알리고,
