@@ -23,6 +23,10 @@
 <video src="https://github.com/user-attachments/assets/12351cfa-88f5-491b-9cdf-7cd9a5ca42fc" width="100%" controls></video>
 > 실패한 스테이지를 반복
 
+### 스탯 업그레이드
+<video src="https://github.com/user-attachments/assets/3f65d934-b512-4791-ba4c-0366af8dd589" width="100%" controls></video>
+> 골드를 소모해 스탯 업그레이드
+
 ## 핵심 설계
 
 1. **엑셀 → JSON → ScriptableObject 데이터 파이프라인을 설계 / 변환 툴 구현**: 기획자가 엑셀만 수정해도 게임 데이터가 자동 반영되고, 프리팹/텍스처 등 외부 참조는 이름 기반으로 자동 매칭하며, 수동으로 연결한 아이콘/VFX 참조는 재동기화해도 보존됩니다.
