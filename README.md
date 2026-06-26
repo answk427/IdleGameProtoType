@@ -19,17 +19,9 @@
 <video src="https://github.com/user-attachments/assets/57aa869b-a915-4c2d-8710-8e1918ef657a" width="100%" controls></video>
 > 플레이어가 계속 이동 -> 마주치는 적과 전투 -> 보스 처치 후 다음 스테이지
 
-### 자동 스킬 사용
-<video src="https://github.com/user-attachments/assets/767b076e-f7cc-4e4f-8195-f6aa5fb51c03" width="100%" controls></video>
-> 스킬 배치 -> 배치된 스킬 자동 사용
-
 ### 사망 시 재시작
 <video src="https://github.com/user-attachments/assets/12351cfa-88f5-491b-9cdf-7cd9a5ca42fc" width="100%" controls></video>
 > 실패한 스테이지를 반복
-
-### Excel -> Json, ScriptableObject 변환
-<video src="https://github.com/user-attachments/assets/86fc8e3e-2afe-4501-b435-67a08636b12a" width="100%" controls></video>
-> 엑셀 시트 기준 변환, IData를 상속한 클래스로 변환 가
 
 ## 핵심 설계
 
@@ -48,7 +40,9 @@
 
 ## 아키텍처
 
-### 1. 데이터 파이프라인: Excel → JSON → ScriptableObject
+### 1. 데이터 파이프라인: Excel → JSON/ScriptableObject
+<video src="https://github.com/user-attachments/assets/86fc8e3e-2afe-4501-b435-67a08636b12a" width="100%" controls></video>
+> 엑셀 시트 기준 변환, IData를 상속한 클래스로 변환 가능
 
 ```
 기획자가 작성한 .xlsx
@@ -70,17 +64,26 @@ GameDatabaseManager → 런타임 게임 로직
 새로운 데이터 테이블을 추가해도 변환기 본체 코드는 수정하지 않고, `IDataSyncer` 구현 클래스 하나만 추가하면 자동으로 인식됩니다.
 ([ExcelToJsonConverter.cs](Assets/Editor/DataImporter/ExcelToJsonConverter.cs), [IDataSyncer.cs](Assets/Editor/DataImporter/IDataSyncer.cs))
 
+---
+
 ### 2. 전투 FSM (State Pattern + Template Method)
 
 `IState`(Enter / Execute / Exit 메서드)와 `StateMachine`만으로 플레이어·일반 몬스터·보스의 이동·전투·사망을 전부 같은 방식으로 제어합니다. 엔티티마다 자신만의 `StateMachine` 인스턴스를 가져서, 화면에 몬스터가 여러 마리 있어도 서로 간섭 없이 독립적으로 동작합니다. 전이 방식도 상황에 맞게 나누는데, 스크롤 on/off 같은 전역 흐름 변화는 `GlobalGameEvents` 구독으로 반응하고(Idle ↔ Run), 사거리 진입처럼 매 프레임 바뀌는 조건은 `Execute()`에서 직접 검사합니다(Run → Attack). 보스는 `BossRunState : MonsterRunState`로 기존 이동 로직을 상속해 재사용하면서 공격 사거리 판정만 추가하고, 전투 상태는 `PlayerCombatState` / `BossCombatState` 추상 클래스가 쿨타임 계산과 타격 처리를 메서드로 공유합니다.
 
 ([StateMachine.cs](Assets/Scripts/FSM/StateMachine.cs), [PlayerCombatState.cs](Assets/Scripts/FSM/Player/PlayerCombatState.cs), [BossCombatState.cs](Assets/Scripts/FSM/Monster/BossCombatState.cs))
 
+---
+
 ### 3. 스킬 시스템 (Strategy Pattern)
+
+<video src="https://github.com/user-attachments/assets/767b076e-f7cc-4e4f-8195-f6aa5fb51c03" width="100%" controls></video>
+> 스킬 배치 -> 배치된 스킬 자동 사용
 
 스킬의 실제 동작(`ISkillBehavior`)은 코드가 아니라 데이터(`SkillData.effectType`)로 결정되므로, 같은 효과 타입의 새 스킬을 추가할 때는 수치(`value1` / `value2`), (EffectFX / SoundFX)등만 다른 데이터로 추가하고 코드는 건드리지 않습니다. `Skill` 클래스가 쿨다운 계산과 실행을 함께 감싸서, FSM(PlayerSkillState)는 스킬이 피해 · 광역 · 회복 중 무엇인지 몰라도 `IsReady` / `Use()` 만으로 동일하게 다룹니다.
 
 ([Skill.cs](Assets/Scripts/Skill/Skill.cs), [ISkillBehavior.cs](Assets/Scripts/Skill/ISkillBehavior.cs))
+
+---
 
 ### 4. 이벤트 기반 결합도 분리
 
@@ -88,11 +91,15 @@ GameDatabaseManager → 런타임 게임 로직
 
 ([GlobalCombatEvents.cs](Assets/Scripts/Event/GlobalCombatEvents.cs), [GameManager.cs](Assets/Scripts/Manager/GameManager.cs))
 
+---
+
 ### 5. 오브젝트 풀링
 
 몬스터, 데미지 텍스트, 히트 파티클, 보상 드랍 이펙트를 모두 `PoolManager`가 Unity 내장 `ObjectPool<GameObject>`로 관리합니다. 스테이지 전환 시 해당 프리팹의 풀만 선택적으로 비우는 방식으로 메모리를 관리합니다.
 
 ([PoolManager.cs](Assets/Scripts/Manager/PoolManager.cs))
+
+---
 
 ## 프로젝트 구조
 
