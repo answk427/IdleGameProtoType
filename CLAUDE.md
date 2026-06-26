@@ -52,9 +52,8 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 엔지니어링 스타일 (이 프로젝트에서 합의된 방향)
 
-- **단일 진실 소스를 선호함.** 여러 곳에 분산된 땜질보다 한 군데를 고치는 근본 수정을 선호. 예: `PlayerCombatState.isAnimationFinished` 단일 플래그로 정착하기 전에, Animator `AnyState` 전이 방식과 별도 `hasHitLanded` 플래그 방식을 둘 다 시도했다가 "주먹구구식"이라는 이유로 명시적으로 반려됨.
+- 예: `PlayerCombatState.isAnimationFinished` 단일 플래그로 정착하기 전에, Animator `AnyState` 전이 방식과 별도 `hasHitLanded` 플래그 방식을 둘 다 시도했다가 "주먹구구식"이라는 이유로 명시적으로 반려됨.
 - 새 기능을 freestanding `MonoBehaviour`로 만들기보다, 기존 패턴(`UIBase` 상속 등)에 맞춰 들어가는 설계를 선호함 (`StageAnnouncement`가 그 사례).
-- 과한 추상화/사전 설계보다 지금 필요한 만큼만 — 가설적 미래 요구사항을 위한 설계를 하지 않음.
 
 ## UI 구조
 
