@@ -36,8 +36,11 @@ public class UpgradeListItem : MonoBehaviour
     {
         if (levelText != null) levelText.text = $"Lv.{upgradeLevel + 1}";
 
+        string format = StatType == UpgradeStatType.AttackSpeed ? "0.00" : "0";
         if (valueText != null)
-            valueText.text = isMaxed ? $"{currentValue:0}" : $"{currentValue:0} → {nextValue:0}";
+            valueText.text = isMaxed
+                ? currentValue.ToString(format)
+                : $"{currentValue.ToString(format)} → {nextValue.ToString(format)}";
 
         if (costText != null)
             costText.text = isMaxed ? "MAX" : cost.ToString();

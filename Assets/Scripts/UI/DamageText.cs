@@ -2,7 +2,6 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 
-// 이 녀석도 풀(Pool)에서 꺼내 쓸 거니까 풀링 매니저가 부르는 함수가 필요함
 public class DamageText : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI text;

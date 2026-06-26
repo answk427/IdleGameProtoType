@@ -25,14 +25,14 @@ public class StageDatabaseSyncer : IDataSyncer
         {
             Texture2D bg = null;
 
-            if (!string.IsNullOrEmpty(data.bgTexturePath))
+            if (!string.IsNullOrEmpty(data.BgTexturePath))
             {
-                string directPath = $"Assets/Resources/{data.bgTexturePath}.png";
+                string directPath = $"Assets/Resources/{data.BgTexturePath}.png";
                 bg = AssetDatabase.LoadAssetAtPath<Texture2D>(directPath);
 
                 if (bg == null)
                 {
-                    string fileName = Path.GetFileName(data.bgTexturePath);
+                    string fileName = Path.GetFileName(data.BgTexturePath);
                     string[] guids = AssetDatabase.FindAssets($"{fileName} t:Texture2D");
                     if (guids.Length > 0)
                     {
@@ -42,7 +42,7 @@ public class StageDatabaseSyncer : IDataSyncer
             }
 
             if (bg != null) matchedTexture++;
-            else log?.Invoke($"[SO 동기화 경고] Stage {data.stageNumber}의 배경 텍스처 '{data.bgTexturePath}'를 찾지 못했습니다.");
+            else log?.Invoke($"[SO 동기화 경고] Stage {data.StageNumber}의 배경 텍스처 '{data.BgTexturePath}'를 찾지 못했습니다.");
 
             newEntries.Add(new StageEntry
             {

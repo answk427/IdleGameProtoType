@@ -11,6 +11,8 @@ public class AttackSpeedUpgradeStat : IUpgradeStat
         this.config = config;
     }
 
+    public UpgradeStatType Type => UpgradeStatType.AttackSpeed;
+
     public int GetLevel() => stats.GetSaveData().attackSpeedUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().attackSpeedUpgradeLevel++;
     public int GetCost(int level) => config.GetAttackSpeedUpgradeCost(level);

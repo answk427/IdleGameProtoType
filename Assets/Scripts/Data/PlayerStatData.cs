@@ -2,26 +2,25 @@ using Newtonsoft.Json;
 using UnityEngine;
 
 // 플레이어 레벨 1개에 대한 기본 스탯 엔트리 (SO 전용, MonsterData/StageData와 동일 패턴).
-// Excel → ExcelToJsonConverter → PlayerStatDatabaseSyncer 경로로 채워진다.
 [System.Serializable]
 public class PlayerStatData : IData
 {
-    public int Key => _level;
+    public int Key => level;
 
-    [SerializeField] private int _level;
-    [SerializeField] private int _requiredExp;
-    [SerializeField] private int _baseMaxHp;
-    [SerializeField] private int _baseAttackDamage;
-    [SerializeField] private float _baseAttackInterval;
+    [SerializeField] private int level;
+    [SerializeField] private int requiredExp;
+    [SerializeField] private int baseMaxHp;
+    [SerializeField] private int baseAttackDamage;
+    [SerializeField] private float baseAttackInterval;
 
     [JsonProperty("level")]
-    public int level { get => _level; private set => _level = value; }
+    public int Level { get => level; private set => level = value; }
     [JsonProperty("requiredExp")]
-    public int requiredExp { get => _requiredExp; private set => _requiredExp = value; }
+    public int RequiredExp { get => requiredExp; private set => requiredExp = value; }
     [JsonProperty("baseMaxHp")]
-    public int baseMaxHp { get => _baseMaxHp; private set => _baseMaxHp = value; }
+    public int BaseMaxHp { get => baseMaxHp; private set => baseMaxHp = value; }
     [JsonProperty("baseAttackDamage")]
-    public int baseAttackDamage { get => _baseAttackDamage; private set => _baseAttackDamage = value; }
+    public int BaseAttackDamage { get => baseAttackDamage; private set => baseAttackDamage = value; }
     [JsonProperty("baseAttackInterval")]
-    public float baseAttackInterval { get => _baseAttackInterval; private set => _baseAttackInterval = value; }
+    public float BaseAttackInterval { get => baseAttackInterval; private set => baseAttackInterval = value; }
 }

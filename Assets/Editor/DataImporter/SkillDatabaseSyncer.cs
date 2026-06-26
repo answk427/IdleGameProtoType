@@ -22,7 +22,7 @@ public class SkillDatabaseSyncer : IDataSyncer
         var existingById = new Dictionary<int, SkillEntry>();
         foreach (var e in db.entries)
         {
-            if (e?.data != null) existingById[e.data.id] = e;
+            if (e?.data != null) existingById[e.data.Id] = e;
         }
 
         var newEntries = new List<SkillEntry>();
@@ -31,7 +31,7 @@ public class SkillDatabaseSyncer : IDataSyncer
 
         foreach (SkillData data in dataList)
         {
-            if (existingById.TryGetValue(data.id, out var existing))
+            if (existingById.TryGetValue(data.Id, out var existing))
             {
                 // 참조 필드(icon, vfx, sfx)는 그대로 유지하고 data만 최신화
                 existing.data = data;
@@ -45,7 +45,7 @@ public class SkillDatabaseSyncer : IDataSyncer
                 created++;
             }
         }
-        newEntries.Sort((a, b) => a.data.id.CompareTo(b.data.id));
+        newEntries.Sort((a, b) => a.data.Id.CompareTo(b.data.Id));
 
         db.entries = newEntries;
         EditorUtility.SetDirty(db);

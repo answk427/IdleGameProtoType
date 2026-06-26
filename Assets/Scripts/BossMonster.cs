@@ -34,8 +34,8 @@ public class BossMonster : Monster
     public override void Initialize(MonsterData monsterData, float goldMultiplier, float hpMultiplier, float dmgMultiplier)
     {
         base.Initialize(monsterData, goldMultiplier, hpMultiplier, dmgMultiplier);
-        this.attackRange = monsterData.attackRange;
-        this.attackInterval = monsterData.attackInterval;
+        this.attackRange = monsterData.AttackRange;
+        this.attackInterval = monsterData.AttackInterval;
     }
 
     public int GetCalculatedDamage()

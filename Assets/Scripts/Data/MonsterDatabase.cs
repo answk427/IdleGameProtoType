@@ -22,7 +22,7 @@ public class MonsterDatabase : ScriptableObject
         foreach (var e in entries)
         {
             if (e?.data == null) continue;
-            lookup[e.data.id] = e;
+            lookup[e.data.Id] = e;
         }
     }
 

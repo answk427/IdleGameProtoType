@@ -10,7 +10,7 @@ public class PlayerStatDatabase : ScriptableObject
 
     public int MaxLevel => entries.Count;
 
-    /// <summary>레벨에 해당하는 스탯 반환. 못 찾으면 가장 가까운 레벨로 clamp.</summary>
+    // 레벨에 해당하는 스탯 반환. 못 찾으면 가장 가까운 레벨로 clamp.
     public PlayerStatData GetByLevel(int level)
     {
         EnsureLookup();
@@ -22,10 +22,10 @@ public class PlayerStatDatabase : ScriptableObject
         return entries[clampedIndex];
     }
 
-    /// <summary>레벨업에 필요한 경험치 반환</summary>
+    // 레벨업에 필요한 경험치 반환
     public int GetRequiredExp(int level)
     {
-        return GetByLevel(level)?.requiredExp ?? 0;
+        return GetByLevel(level)?.RequiredExp ?? 0;
     }
 
     public void EnsureLookup()
@@ -36,7 +36,7 @@ public class PlayerStatDatabase : ScriptableObject
         foreach (var e in entries)
         {
             if (e == null) continue;
-            lookup[e.level] = e;
+            lookup[e.Level] = e;
         }
     }
 

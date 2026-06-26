@@ -23,7 +23,7 @@ public class MonsterDatabaseSyncer : IDataSyncer
         var existingById = new Dictionary<int, MonsterEntry>();
         foreach (var e in db.entries)
         {
-            if (e?.data != null) existingById[e.data.id] = e;
+            if (e?.data != null) existingById[e.data.Id] = e;
         }
 
         var newEntries = new List<MonsterEntry>();
@@ -32,14 +32,14 @@ public class MonsterDatabaseSyncer : IDataSyncer
 
         foreach (MonsterData data in dataList)
         {
-            string prefabPath = $"Assets/Resources/Prefabs/Monsters/{data.monsterName}.prefab";
+            string prefabPath = $"Assets/Resources/Prefabs/Monsters/{data.MonsterName}.prefab";
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
 
             if (prefab != null) matchedPrefab++;
-            else log?.Invoke($"[SO 동기화 경고] '{data.monsterName}' 프리팹을 {prefabPath} 에서 찾지 못했습니다.");
+            else log?.Invoke($"[SO 동기화 경고] '{data.MonsterName}' 프리팹을 {prefabPath} 에서 찾지 못했습니다.");
 
             float groundOffset = 0f;
-            if (existingById.TryGetValue(data.id, out var existing))
+            if (existingById.TryGetValue(data.Id, out var existing))
             {
                 groundOffset = existing.groundOffset;
                 preserved++;

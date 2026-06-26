@@ -16,8 +16,7 @@ public class UIManager : MonoBehaviour
         { UILayer.Top,     new List<UIBase>() }
     };
 
-    // 탭 전환용: None이 아닌 TabType을 가진 UI들만 별도 관리
-    private readonly Dictionary<UITabType, UIBase> tabDict = new();
+    private readonly Dictionary<UITabType, UITabPanel> tabDict = new();
     public UITabType CurrentTab { get; private set; } = UITabType.None;
 
     private void Awake()
@@ -53,7 +52,7 @@ public class UIManager : MonoBehaviour
                 }
                 else
                 {
-                    tabDict.Add(tabPanel.TabType, ui);
+                    tabDict.Add(tabPanel.TabType, tabPanel);
                 }
             }
 
@@ -90,7 +89,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // ── 탭 전환 (배타적 — 한 번에 하나만 열림) ──
 
     // 같은 탭을 다시 누르면 닫히고(토글), 다른 탭을 누르면 이전 탭은 닫히고 새 탭이 열림.
     public void ToggleTab(UITabType tabType)
@@ -101,12 +99,12 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        if (CurrentTab != UITabType.None && tabDict.TryGetValue(CurrentTab, out UIBase prevUi))
+        if (CurrentTab != UITabType.None && tabDict.TryGetValue(CurrentTab, out UITabPanel prevUi))
         {
             prevUi.Hide();
         }
 
-        if (tabDict.TryGetValue(tabType, out UIBase nextUi))
+        if (tabDict.TryGetValue(tabType, out UITabPanel nextUi))
         {
             nextUi.Show();
             CurrentTab = tabType;
@@ -122,7 +120,7 @@ public class UIManager : MonoBehaviour
     {
         if (CurrentTab == UITabType.None) return;
 
-        if (tabDict.TryGetValue(CurrentTab, out UIBase ui))
+        if (tabDict.TryGetValue(CurrentTab, out UITabPanel ui))
         {
             ui.Hide();
         }

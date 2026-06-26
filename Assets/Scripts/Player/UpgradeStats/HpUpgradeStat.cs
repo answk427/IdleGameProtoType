@@ -9,6 +9,8 @@ public class HpUpgradeStat : IUpgradeStat
         this.config = config;
     }
 
+    public UpgradeStatType Type => UpgradeStatType.Hp;
+
     public int GetLevel() => stats.GetSaveData().hpUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().hpUpgradeLevel++;
     public int GetCost(int level) => config.GetHpUpgradeCost(level);

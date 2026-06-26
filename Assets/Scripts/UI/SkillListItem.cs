@@ -23,7 +23,7 @@ public class SkillListItem : MonoBehaviour, IPointerClickHandler
 
     public void Bind(SkillEntry entry, bool isLearned, Action<int> singleClickCallback, Action<int> doubleClickCallback)
     {
-        SkillId = entry.data.id;
+        SkillId = entry.data.Id;
         onSingleClick = singleClickCallback;
         onDoubleClick = doubleClickCallback;
 
@@ -32,8 +32,8 @@ public class SkillListItem : MonoBehaviour, IPointerClickHandler
             iconImage.sprite = entry.icon;
             iconImage.color = isLearned ? LearnedColor : UnlearnedColor;
         }
-        if (nameText != null) nameText.text = entry.data.skillName;
-        if (requiredLevelText != null) requiredLevelText.text = $"Lv.{entry.data.requiredLevel}";
+        if (nameText != null) nameText.text = entry.data.SkillName;
+        if (requiredLevelText != null) requiredLevelText.text = $"Lv.{entry.data.RequiredLevel}";
 
         SetSelected(false);
     }
