@@ -16,7 +16,7 @@ public class UIManager : MonoBehaviour
         { UILayer.Top,     new List<UIBase>() }
     };
 
-    private readonly Dictionary<UITabType, UIBase> tabDict = new();
+    private readonly Dictionary<UITabType, UITabPanel> tabDict = new();
     public UITabType CurrentTab { get; private set; } = UITabType.None;
 
     private void Awake()
@@ -52,7 +52,7 @@ public class UIManager : MonoBehaviour
                 }
                 else
                 {
-                    tabDict.Add(tabPanel.TabType, ui);
+                    tabDict.Add(tabPanel.TabType, tabPanel);
                 }
             }
 
@@ -99,12 +99,12 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        if (CurrentTab != UITabType.None && tabDict.TryGetValue(CurrentTab, out UIBase prevUi))
+        if (CurrentTab != UITabType.None && tabDict.TryGetValue(CurrentTab, out UITabPanel prevUi))
         {
             prevUi.Hide();
         }
 
-        if (tabDict.TryGetValue(tabType, out UIBase nextUi))
+        if (tabDict.TryGetValue(tabType, out UITabPanel nextUi))
         {
             nextUi.Show();
             CurrentTab = tabType;
@@ -120,7 +120,7 @@ public class UIManager : MonoBehaviour
     {
         if (CurrentTab == UITabType.None) return;
 
-        if (tabDict.TryGetValue(CurrentTab, out UIBase ui))
+        if (tabDict.TryGetValue(CurrentTab, out UITabPanel ui))
         {
             ui.Hide();
         }
