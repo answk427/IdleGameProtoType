@@ -5,7 +5,7 @@ public abstract class BossCombatState : IState
     protected BossMonster boss;
     protected IDamageable target;
 
-    private bool isAnimationFinished = false;
+    protected bool isAnimationFinished = false;
 
     public BossCombatState(BossMonster boss, IDamageable target)
     {

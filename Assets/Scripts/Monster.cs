@@ -20,7 +20,6 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     public StateMachine fsm { get; private set; }
 
     private int currentHp;
-    protected int attackDamage;
 
     public bool IsAlive { get; protected set; }
     public Vector3 Position => transform.position;
@@ -60,7 +59,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
             fsm.ChangeState(null);
     }
 
-    private void Update()
+    protected virtual void Update()
     {
         fsm.Update();
     }
@@ -69,7 +68,6 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     {
         this.maxHp = Mathf.RoundToInt(monsterData.MaxHp * hpMultiplier);
         this.currentHp = this.maxHp;
-        this.attackDamage = Mathf.RoundToInt(monsterData.AttackDamage * dmgMultiplier);
         this.goldReward = Mathf.RoundToInt(monsterData.GoldReward * goldMultiplier);
         this.expReward = monsterData.ExpReward;
 
@@ -91,6 +89,15 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
             Die();
             return;
         }
+    }
+
+    // 회복이 필요한 서브클래스(BossMonster 등)가 이 메서드를 통해서만 currentHp를 건드리게 한다.
+    protected void HealInternal(int amount)
+    {
+        if (!IsAlive) return;
+
+        currentHp = Mathf.Min(currentHp + amount, maxHp);
+        OnHpChanged?.Invoke(currentHp, maxHp);
     }
 
     protected virtual void Die()
