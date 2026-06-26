@@ -100,7 +100,7 @@ public class SkillManagePopup : UIBase
             if (entry?.data == null) continue;
 
             SkillListItem item = Instantiate(listItemPrefab, listContent);
-            bool isLearned = player.Stats.IsSkillLearned(entry.data.id);
+            bool isLearned = player.Stats.IsSkillLearned(entry.data.Id);
             item.Bind(entry, isLearned, OnListItemSingleClick, OnListItemDoubleClick);
             spawnedItems.Add(item);
         }
@@ -114,7 +114,7 @@ public class SkillManagePopup : UIBase
         {
             SkillEntry entry = GameDatabaseManager.Instance.GetSkill(item.SkillId);
             if (entry?.data == null) continue;
-            bool isLearned = player.Stats.IsSkillLearned(entry.data.id);
+            bool isLearned = player.Stats.IsSkillLearned(entry.data.Id);
             item.Bind(entry, isLearned, OnListItemSingleClick, OnListItemDoubleClick);
         }
         ApplySelectionHighlight();

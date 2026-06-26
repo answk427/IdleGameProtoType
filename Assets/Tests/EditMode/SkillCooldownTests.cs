@@ -30,7 +30,7 @@ public class SkillCooldownTests
     // 떼어서 검증하기 위해 private 필드를 직접 조작해 "방금 사용한 직후" 상태를 재현한다.
     private void SimulateUse(Skill skill)
     {
-        float cooldown = skill.Data.cooldown;
+        float cooldown = skill.Data.Cooldown;
         CooldownField.SetValue(skill, cooldown);
     }
 

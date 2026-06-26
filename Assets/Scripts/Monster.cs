@@ -67,11 +67,11 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     public virtual void Initialize(MonsterData monsterData, float goldMultiplier, float hpMultiplier, float dmgMultiplier)
     {
-        this.maxHp = Mathf.RoundToInt(monsterData.maxHp * hpMultiplier);
+        this.maxHp = Mathf.RoundToInt(monsterData.MaxHp * hpMultiplier);
         this.currentHp = this.maxHp;
-        this.attackDamage = Mathf.RoundToInt(monsterData.attackDamage * dmgMultiplier);
-        this.goldReward = Mathf.RoundToInt(monsterData.goldReward * goldMultiplier);
-        this.expReward = monsterData.expReward;
+        this.attackDamage = Mathf.RoundToInt(monsterData.AttackDamage * dmgMultiplier);
+        this.goldReward = Mathf.RoundToInt(monsterData.GoldReward * goldMultiplier);
+        this.expReward = monsterData.ExpReward;
 
         IsAlive = true;
         OnHpChanged?.Invoke(currentHp, maxHp);

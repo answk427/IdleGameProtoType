@@ -13,7 +13,7 @@ public class PlayerSkillState : PlayerCombatState
     public override void Enter()
     {
         base.Enter();
-        player.PlayAnimationTrigger(skill.Data.animationTrigger);
+        player.PlayAnimationTrigger(skill.Data.AnimationTrigger);
 
         SkillEntry entry = skill.Entry;
         if (entry == null) return;

@@ -36,9 +36,9 @@ public class PlayerStats
     public bool IsMaxLevel => Level >= (statData?.MaxLevel ?? 1);
 
     // 최종 스탯 = 기본 + 업그레이드 보너스
-    public int MaxHp => BaseStat.baseMaxHp + (saveData?.hpUpgradeLevel ?? 0) * upgradeConfig.settings.hpPerUpgrade;
-    public int AttackDamage => BaseStat.baseAttackDamage + (saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade;
-    public float AttackInterval => Mathf.Max(0.1f, BaseStat.baseAttackInterval - (saveData?.attackSpeedUpgradeLevel ?? 0) * upgradeConfig.settings.attackSpeedPerUpgrade);
+    public int MaxHp => BaseStat.BaseMaxHp + (saveData?.hpUpgradeLevel ?? 0) * upgradeConfig.settings.hpPerUpgrade;
+    public int AttackDamage => BaseStat.BaseAttackDamage + (saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade;
+    public float AttackInterval => Mathf.Max(0.1f, BaseStat.BaseAttackInterval - (saveData?.attackSpeedUpgradeLevel ?? 0) * upgradeConfig.settings.attackSpeedPerUpgrade);
 
     // 레벨/업그레이드의 영향을 받지 않는 고정값. 버프/스킬이 생기면 여기에 배율만 곱하면 된다.
     public float RunSpeed => baseRunSpeed;
@@ -152,7 +152,7 @@ public class PlayerStats
         SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
         if (entry?.data == null) return false;
 
-        return Level >= entry.data.requiredLevel;
+        return Level >= entry.data.RequiredLevel;
     }
 
     public bool LearnSkill(int skillId)

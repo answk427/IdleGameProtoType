@@ -11,34 +11,34 @@ public enum StageClearType
 [System.Serializable]
 public class StageData : IData
 {
-    public int Key => stageNumber;
+    public int Key => StageNumber;
 
-    [SerializeField] private int _stageNumber;
-    [SerializeField] private int _normalMonsterId;
-    [SerializeField] private int _bossMonsterId;
-    [SerializeField] private int _monstersPerEncounter;
-    [SerializeField] private int _encountersToComplete;
-    [SerializeField] private float _monsterSpacing;
-    [SerializeField] private string _bgTexturePath;
-    [SerializeField] private StageClearType _clearType;
+    [SerializeField] private int stageNumber;
+    [SerializeField] private int normalMonsterId;
+    [SerializeField] private int bossMonsterId;
+    [SerializeField] private int monstersPerEncounter;
+    [SerializeField] private int encountersToComplete;
+    [SerializeField] private float monsterSpacing;
+    [SerializeField] private string bgTexturePath;
+    [SerializeField] private StageClearType clearType;
     
     
     [JsonProperty("clearType")]
-    public StageClearType clearType { get => _clearType; private set => _clearType = value; }
+    public StageClearType ClearType { get => clearType; private set => clearType = value; }
     [JsonProperty("stageNumber")]
-    public int stageNumber { get => _stageNumber; private set => _stageNumber = value; }
+    public int StageNumber { get => stageNumber; private set => stageNumber = value; }
     [JsonProperty("normalMonsterId")]
-    public int normalMonsterId { get => _normalMonsterId; private set => _normalMonsterId = value; }
+    public int NormalMonsterId { get => normalMonsterId; private set => normalMonsterId = value; }
     [JsonProperty("bossMonsterId")]
-    public int bossMonsterId { get => _bossMonsterId; private set => _bossMonsterId = value; }
+    public int BossMonsterId { get => bossMonsterId; private set => bossMonsterId = value; }
     [JsonProperty("monstersPerEncounter")]
-    public int monstersPerEncounter { get => _monstersPerEncounter; private set => _monstersPerEncounter = value; }
+    public int MonstersPerEncounter { get => monstersPerEncounter; private set => monstersPerEncounter = value; }
     [JsonProperty("encountersToComplete")]
-    public int encountersToComplete { get => _encountersToComplete; private set => _encountersToComplete = value; }
+    public int EncountersToComplete { get => encountersToComplete; private set => encountersToComplete = value; }
     [JsonProperty("monsterSpacing")]
-    public float monsterSpacing { get => _monsterSpacing; private set => _monsterSpacing = value; }
+    public float MonsterSpacing { get => monsterSpacing; private set => monsterSpacing = value; }
     // 게임플레이 코드에서는 쓰지 않음 — StageDatabaseSyncer가 이 경로로 텍스처를 찾아
     // StageEntry.backgroundTexture에 채워주는 동기화용 입력값.
     [JsonProperty("bgTexturePath")]
-    public string bgTexturePath { get => _bgTexturePath; private set => _bgTexturePath = value; }
+    public string BgTexturePath { get => bgTexturePath; private set => bgTexturePath = value; }
 }

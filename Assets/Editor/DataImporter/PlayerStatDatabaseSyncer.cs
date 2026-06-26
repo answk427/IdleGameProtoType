@@ -22,7 +22,7 @@ public class PlayerStatDatabaseSyncer : IDataSyncer
         {
             newEntries.Add(data);
         }
-        newEntries.Sort((a, b) => a.level.CompareTo(b.level));
+        newEntries.Sort((a, b) => a.Level.CompareTo(b.Level));
 
         db.entries = newEntries;
         EditorUtility.SetDirty(db);

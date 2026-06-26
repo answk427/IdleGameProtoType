@@ -248,7 +248,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
                 continue;
             }
 
-            if (equippedSkills[slot] != null && equippedSkills[slot].Data.id == skillId) continue;
+            if (equippedSkills[slot] != null && equippedSkills[slot].Data.Id == skillId) continue;
 
             SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
             equippedSkills[slot] = entry?.data != null ? new Skill(entry) : null;

@@ -25,7 +25,7 @@ public class PlayerStatDatabase : ScriptableObject
     /// <summary>레벨업에 필요한 경험치 반환</summary>
     public int GetRequiredExp(int level)
     {
-        return GetByLevel(level)?.requiredExp ?? 0;
+        return GetByLevel(level)?.RequiredExp ?? 0;
     }
 
     public void EnsureLookup()
@@ -36,7 +36,7 @@ public class PlayerStatDatabase : ScriptableObject
         foreach (var e in entries)
         {
             if (e == null) continue;
-            lookup[e.level] = e;
+            lookup[e.Level] = e;
         }
     }
 

@@ -199,8 +199,8 @@ public class GameManager : MonoBehaviour
 
         if (canNext)
         {
-            int monsterId = stageManager.CurrentStage.normalMonsterId;
-            int bossId = stageManager.CurrentStage.bossMonsterId;
+            int monsterId = stageManager.CurrentStage.NormalMonsterId;
+            int bossId = stageManager.CurrentStage.BossMonsterId;
 
             MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
             if (monsterEntry?.prefab != null)

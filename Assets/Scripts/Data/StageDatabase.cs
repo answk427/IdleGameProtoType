@@ -22,7 +22,7 @@ public class StageDatabase : ScriptableObject
         foreach (var e in entries)
         {
             if (e == null) continue;
-            lookup[e.data.stageNumber] = e;
+            lookup[e.data.StageNumber] = e;
         }
     }
 

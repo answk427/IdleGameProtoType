@@ -49,7 +49,7 @@ public class StageManager : MonoBehaviour
 
     private void HandleBossKilled()
     {
-        if (stage.clearType == StageClearType.KillBoss && !isStageCleared)
+        if (stage.ClearType == StageClearType.KillBoss && !isStageCleared)
         {
             CompleteStage();
         }
@@ -66,7 +66,7 @@ public class StageManager : MonoBehaviour
     public bool RecordEncounterCompleted()
     {
         encounterProgress++;
-        if (encounterProgress < CurrentStage.encountersToComplete)
+        if (encounterProgress < CurrentStage.EncountersToComplete)
         {
             return false;
         }

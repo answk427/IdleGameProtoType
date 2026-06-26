@@ -22,7 +22,7 @@ public class MonsterSpawner : MonoBehaviour
             return new List<Monster>();
         }
 
-        int monsterId = stage.normalMonsterId;
+        int monsterId = stage.NormalMonsterId;
         MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
         if (monsterEntry == null || monsterEntry.data == null)
         {
@@ -34,7 +34,7 @@ public class MonsterSpawner : MonoBehaviour
         GameObject monsterPrefab = monsterEntry.prefab;
         if (monsterPrefab == null)
         {
-            Debug.LogError($"MonsterSpawner needs a monster prefab. monsterID:{monsterId}, monsterName:{monsterData.monsterName}");
+            Debug.LogError($"MonsterSpawner needs a monster prefab. monsterID:{monsterId}, monsterName:{monsterData.MonsterName}");
             return new List<Monster>();
         }
 
@@ -43,9 +43,9 @@ public class MonsterSpawner : MonoBehaviour
             basePosition += spawnAnchor.position;
         basePosition.y = GetGroundY(basePosition.y) + monsterEntry.groundOffset;
 
-        for (int i = 0; i < stage.monstersPerEncounter; i++)
+        for (int i = 0; i < stage.MonstersPerEncounter; i++)
         {
-            Vector3 spawnPosition = basePosition + Vector3.right * stage.monsterSpacing * i;
+            Vector3 spawnPosition = basePosition + Vector3.right * stage.MonsterSpacing * i;
             Monster monster = SpawnMonster(monsterData, stage, monsterPrefab, spawnPosition, Quaternion.identity);
             activeMonsters.Add(monster);
         }
@@ -132,10 +132,10 @@ public class MonsterSpawner : MonoBehaviour
     {
         ClearEncounter();
 
-        MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(stage.bossMonsterId);
+        MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(stage.BossMonsterId);
         if (bossEntry == null || bossEntry.data == null)
         {
-            Debug.LogError($"BossMonsterData is not found, stageNumber:{stage.stageNumber}");
+            Debug.LogError($"BossMonsterData is not found, stageNumber:{stage.StageNumber}");
             return null;
         }
 
@@ -143,7 +143,7 @@ public class MonsterSpawner : MonoBehaviour
         GameObject bossPrefab = bossEntry.prefab;
         if (bossPrefab == null)
         {
-            Debug.LogError($"MonsterSpawner needs a boss prefab. bossID:{stage.bossMonsterId}");
+            Debug.LogError($"MonsterSpawner needs a boss prefab. bossID:{stage.BossMonsterId}");
             return null;
         }
 
@@ -179,8 +179,8 @@ public class MonsterSpawner : MonoBehaviour
 
     private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)
     {
-        hpMult = Mathf.Pow(1.15f, stageData.stageNumber);
-        dmgMult = Mathf.Pow(1.10f, stageData.stageNumber);
-        goldMult = Mathf.Pow(1.05f, stageData.stageNumber);
+        hpMult = Mathf.Pow(1.15f, stageData.StageNumber);
+        dmgMult = Mathf.Pow(1.10f, stageData.StageNumber);
+        goldMult = Mathf.Pow(1.05f, stageData.StageNumber);
     }
 }
