@@ -1,0 +1,234 @@
+[
+  {
+    "Key": 1,
+    "level": 1,
+    "requiredExp": 100,
+    "baseMaxHp": 100,
+    "baseAttackDamage": 10,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 2,
+    "level": 2,
+    "requiredExp": 110,
+    "baseMaxHp": 200,
+    "baseAttackDamage": 12,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 3,
+    "level": 3,
+    "requiredExp": 120,
+    "baseMaxHp": 300,
+    "baseAttackDamage": 14,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 4,
+    "level": 4,
+    "requiredExp": 130,
+    "baseMaxHp": 400,
+    "baseAttackDamage": 16,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 5,
+    "level": 5,
+    "requiredExp": 140,
+    "baseMaxHp": 500,
+    "baseAttackDamage": 18,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 6,
+    "level": 6,
+    "requiredExp": 150,
+    "baseMaxHp": 600,
+    "baseAttackDamage": 20,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 7,
+    "level": 7,
+    "requiredExp": 160,
+    "baseMaxHp": 700,
+    "baseAttackDamage": 22,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 8,
+    "level": 8,
+    "requiredExp": 170,
+    "baseMaxHp": 800,
+    "baseAttackDamage": 24,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 9,
+    "level": 9,
+    "requiredExp": 180,
+    "baseMaxHp": 900,
+    "baseAttackDamage": 26,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 10,
+    "level": 10,
+    "requiredExp": 190,
+    "baseMaxHp": 1000,
+    "baseAttackDamage": 28,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 11,
+    "level": 11,
+    "requiredExp": 200,
+    "baseMaxHp": 1100,
+    "baseAttackDamage": 30,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 12,
+    "level": 12,
+    "requiredExp": 210,
+    "baseMaxHp": 1200,
+    "baseAttackDamage": 32,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 13,
+    "level": 13,
+    "requiredExp": 220,
+    "baseMaxHp": 1300,
+    "baseAttackDamage": 34,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 14,
+    "level": 14,
+    "requiredExp": 230,
+    "baseMaxHp": 1400,
+    "baseAttackDamage": 36,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 15,
+    "level": 15,
+    "requiredExp": 240,
+    "baseMaxHp": 1500,
+    "baseAttackDamage": 38,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 16,
+    "level": 16,
+    "requiredExp": 250,
+    "baseMaxHp": 1600,
+    "baseAttackDamage": 40,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 17,
+    "level": 17,
+    "requiredExp": 260,
+    "baseMaxHp": 1700,
+    "baseAttackDamage": 42,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 18,
+    "level": 18,
+    "requiredExp": 270,
+    "baseMaxHp": 1800,
+    "baseAttackDamage": 44,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 19,
+    "level": 19,
+    "requiredExp": 280,
+    "baseMaxHp": 1900,
+    "baseAttackDamage": 46,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 20,
+    "level": 20,
+    "requiredExp": 290,
+    "baseMaxHp": 2000,
+    "baseAttackDamage": 48,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 21,
+    "level": 21,
+    "requiredExp": 300,
+    "baseMaxHp": 2100,
+    "baseAttackDamage": 50,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 22,
+    "level": 22,
+    "requiredExp": 310,
+    "baseMaxHp": 2200,
+    "baseAttackDamage": 52,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 23,
+    "level": 23,
+    "requiredExp": 320,
+    "baseMaxHp": 2300,
+    "baseAttackDamage": 54,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 24,
+    "level": 24,
+    "requiredExp": 330,
+    "baseMaxHp": 2400,
+    "baseAttackDamage": 56,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 25,
+    "level": 25,
+    "requiredExp": 340,
+    "baseMaxHp": 2500,
+    "baseAttackDamage": 58,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 26,
+    "level": 26,
+    "requiredExp": 350,
+    "baseMaxHp": 2600,
+    "baseAttackDamage": 60,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 27,
+    "level": 27,
+    "requiredExp": 360,
+    "baseMaxHp": 2700,
+    "baseAttackDamage": 62,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 28,
+    "level": 28,
+    "requiredExp": 370,
+    "baseMaxHp": 2800,
+    "baseAttackDamage": 64,
+    "baseAttackInterval": 1.0
+  },
+  {
+    "Key": 29,
+    "level": 29,
+    "requiredExp": 380,
+    "baseMaxHp": 2900,
+    "baseAttackDamage": 66,
+    "baseAttackInterval": 1.0
+  }
+]

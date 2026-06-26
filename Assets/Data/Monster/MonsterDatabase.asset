@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff31e4859a072034e97c032fdca8aa56, type: 3}
+  m_Name: MonsterDatabase
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::MonsterDatabase
+  entries:
+  - data:
+      id: 1001
+      monsterName: BlueSlime
+      maxHp: 30
+      goldReward: 111
+      expReward: 0
+      attackDamage: 0
+      attackInterval: 0
+      attackRange: 0
+    prefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
+    groundOffset: 0
+  - data:
+      id: 1002
+      monsterName: BlueSlime2
+      maxHp: 50
+      goldReward: 222
+      expReward: 0
+      attackDamage: 0
+      attackInterval: 0
+      attackRange: 0
+    prefab: {fileID: 4813688462502952101, guid: 05968968a0bcf4245a9b6c7874fa1c4f, type: 3}
+    groundOffset: 0
+  - data:
+      id: 2001
+      monsterName: BossSlime
+      maxHp: 100
+      goldReward: 1000
+      expReward: 0
+      attackDamage: 20
+      attackInterval: 1
+      attackRange: 1
+    prefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
+    groundOffset: 0

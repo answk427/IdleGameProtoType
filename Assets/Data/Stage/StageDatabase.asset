@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4499494f09cccae4c980f9fa40193b88, type: 3}
+  m_Name: StageDatabase
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::StageDatabase
+  entries:
+  - data:
+      stageNumber: 1
+      normalMonsterId: 1001
+      bossMonsterId: 2001
+      monstersPerEncounter: 2
+      encountersToComplete: 2
+      monsterSpacing: 3
+      bgTexturePath: 
+      clearType: 0
+    backgroundTexture: {fileID: 0}
+  - data:
+      stageNumber: 2
+      normalMonsterId: 1002
+      bossMonsterId: 2001
+      monstersPerEncounter: 3
+      encountersToComplete: 2
+      monsterSpacing: 3
+      bgTexturePath: 
+      clearType: 0
+    backgroundTexture: {fileID: 0}
+  - data:
+      stageNumber: 3
+      normalMonsterId: 1001
+      bossMonsterId: 2001
+      monstersPerEncounter: 1
+      encountersToComplete: 2
+      monsterSpacing: 3
+      bgTexturePath: 
+      clearType: 0
+    backgroundTexture: {fileID: 0}

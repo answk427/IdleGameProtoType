@@ -1,0 +1,57 @@
+[
+  {
+    "Key": 1,
+    "id": 1,
+    "skillName": "강타",
+    "cooldown": 5.0,
+    "animationTrigger": "Skill",
+    "effectType": 0,
+    "value1": 2.5,
+    "value2": 0.0,
+    "requiredLevel": 1
+  },
+  {
+    "Key": 2,
+    "id": 2,
+    "skillName": "지진",
+    "cooldown": 8.0,
+    "animationTrigger": "Skill",
+    "effectType": 1,
+    "value1": 1.5,
+    "value2": 3.0,
+    "requiredLevel": 3
+  },
+  {
+    "Key": 3,
+    "id": 3,
+    "skillName": "힐링",
+    "cooldown": 10.0,
+    "animationTrigger": "Healing",
+    "effectType": 2,
+    "value1": 30.0,
+    "value2": 0.0,
+    "requiredLevel": 5
+  },
+  {
+    "Key": 4,
+    "id": 4,
+    "skillName": "혼신의일격",
+    "cooldown": 7.0,
+    "animationTrigger": "Skill",
+    "effectType": 0,
+    "value1": 4.0,
+    "value2": 0.0,
+    "requiredLevel": 6
+  },
+  {
+    "Key": 5,
+    "id": 5,
+    "skillName": "때리기",
+    "cooldown": 12.0,
+    "animationTrigger": "Skill",
+    "effectType": 1,
+    "value1": 3.0,
+    "value2": 5.0,
+    "requiredLevel": 7
+  }
+]
