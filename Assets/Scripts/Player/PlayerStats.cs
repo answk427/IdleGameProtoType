@@ -58,12 +58,17 @@ public class PlayerStats
         this.baseRunSpeed = baseRunSpeed;
         this.saveData = new PlayerSaveData(); // 기본값
 
-        upgradeStats = new Dictionary<UpgradeStatType, IUpgradeStat>
-        {
-            [UpgradeStatType.Hp] = new HpUpgradeStat(this, upgradeConfig),
-            [UpgradeStatType.Attack] = new AttackUpgradeStat(this, upgradeConfig),
-            [UpgradeStatType.AttackSpeed] = new AttackSpeedUpgradeStat(this, upgradeConfig),
+        IUpgradeStat[] stats = {
+            new HpUpgradeStat(this, upgradeConfig),
+            new AttackUpgradeStat(this, upgradeConfig),
+            new AttackSpeedUpgradeStat(this, upgradeConfig),
         };
+
+        upgradeStats = new Dictionary<UpgradeStatType, IUpgradeStat>();
+        foreach (IUpgradeStat stat in stats)
+        {
+            upgradeStats[stat.Type] = stat;
+        }
     }
 
     public void LoadSave(PlayerSaveData data)

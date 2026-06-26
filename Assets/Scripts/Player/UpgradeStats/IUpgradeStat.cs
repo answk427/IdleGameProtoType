@@ -3,6 +3,7 @@
 // PlayerStats의 등록 목록에 추가하면 된다
 public interface IUpgradeStat
 {
+    UpgradeStatType Type { get; }
     int GetLevel();
     void IncrementLevel();
     int GetCost(int level);

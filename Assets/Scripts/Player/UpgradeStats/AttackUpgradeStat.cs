@@ -9,6 +9,8 @@ public class AttackUpgradeStat : IUpgradeStat
         this.config = config;
     }
 
+    public UpgradeStatType Type => UpgradeStatType.Attack;
+
     public int GetLevel() => stats.GetSaveData().attackUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().attackUpgradeLevel++;
     public int GetCost(int level) => config.GetAttackUpgradeCost(level);
