@@ -7,7 +7,7 @@
 
 ## 목차
 
-- [플레이영상](#플레이영상)
+- [플레이 영상](#플레이-영상)
 - [핵심 설계](#핵심-설계)
 - [핵심 게임플레이](#핵심-게임플레이)
 - [아키텍처](#아키텍처)
@@ -49,11 +49,11 @@
 
 ```
 기획자가 작성한 .xlsx
-        │  ExcelToJsonConverter (Editor 전용 윈도우)
+        │  ExcelToJsonConverter (Editor 전용 윈도우, ExcelDataReader로 파싱)
         │  - IData 구현 클래스를 리플렉션으로 자동 탐색
         │  - 엑셀 헤더 ↔ 클래스 필드를 매칭, 불일치 시 변환 자체를 중단
         ▼
-Resources/Data/*.json
+Resources/Data/*.json (Newtonsoft.Json으로 직렬화)
         │  IDataSyncer 구현체를 리플렉션으로 자동 탐색해 타입별로 디스패치
         │  (Monster / Skill / Stage / PlayerStat 전용 Syncer)
         ▼
