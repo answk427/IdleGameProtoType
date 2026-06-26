@@ -27,6 +27,9 @@
 <video src="https://github.com/user-attachments/assets/12351cfa-88f5-491b-9cdf-7cd9a5ca42fc" width="100%" controls></video>
 > 실패한 스테이지를 반복
 
+### Excel -> Json, ScriptableObject 변환
+<video src="https://github.com/user-attachments/assets/86fc8e3e-2afe-4501-b435-67a08636b12a" width="100%" controls></video>
+> 엑셀 시트 기준 변환, IData를 상속한 클래스로 변환 가
 
 ## 핵심 설계
 
