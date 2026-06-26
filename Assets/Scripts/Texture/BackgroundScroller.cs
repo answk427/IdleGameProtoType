@@ -15,9 +15,8 @@ public class BackgroundScroller : MonoBehaviour
 
     void Awake()
     {
-        // 같은 프레임의 모든 Awake()는 어떤 스크립트의 Start()보다도 먼저 끝나는 게
-        // 보장되므로, GameManager.Start()가 최초 스테이지 진입 시 이벤트를 쏴도
-        // 이 구독이 이미 끝나있는 상태임이 보장된다 (Start() 간 순서는 보장 안 됨).
+        // GameManager.Start()가 최초 스테이지 진입 시 이벤트를 쏴도
+        // Awake에서 이미 구독을 완료한 상태가 보장
         mat = GetComponent<Renderer>().material;
         GlobalGameEvents.OnStageChanged += HandleStageChanged;
         GlobalGameEvents.OnScrollChanged += UpdateScrollState;

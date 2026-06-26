@@ -16,7 +16,6 @@ public class UIManager : MonoBehaviour
         { UILayer.Top,     new List<UIBase>() }
     };
 
-    // 탭 전환용: None이 아닌 TabType을 가진 UI들만 별도 관리
     private readonly Dictionary<UITabType, UIBase> tabDict = new();
     public UITabType CurrentTab { get; private set; } = UITabType.None;
 
@@ -90,7 +89,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // ── 탭 전환 (배타적 — 한 번에 하나만 열림) ──
 
     // 같은 탭을 다시 누르면 닫히고(토글), 다른 탭을 누르면 이전 탭은 닫히고 새 탭이 열림.
     public void ToggleTab(UITabType tabType)

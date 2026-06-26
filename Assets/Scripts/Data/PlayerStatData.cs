@@ -2,7 +2,6 @@ using Newtonsoft.Json;
 using UnityEngine;
 
 // 플레이어 레벨 1개에 대한 기본 스탯 엔트리 (SO 전용, MonsterData/StageData와 동일 패턴).
-// Excel → ExcelToJsonConverter → PlayerStatDatabaseSyncer 경로로 채워진다.
 [System.Serializable]
 public class PlayerStatData : IData
 {

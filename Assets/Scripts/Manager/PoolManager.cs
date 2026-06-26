@@ -6,7 +6,7 @@ public class PoolManager : MonoBehaviour
 {
     public static PoolManager Instance;
 
-    // 프리팹(고유 ID)을 키값으로, 해당 프리팹의 전용 '유니티 풀'을 값으로 가지는 딕셔너리
+    // 프리팹을 키값으로, 해당 프리팹의 전용 '유니티 풀'을 값으로 가지는 딕셔너리
     private Dictionary<GameObject, IObjectPool<GameObject>> poolDict = new Dictionary<GameObject, IObjectPool<GameObject>>();
 
     private void Awake()

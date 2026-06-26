@@ -50,7 +50,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 1. 게임 시작! 플레이어는 '달리는' 상태로 시작한다. (알아서 스크롤 켜짐)
+        // 1. 게임 시작! 플레이어는 '달리는' 상태로 시작한다.
         player.fsm.ChangeState(new PlayerRunState(player));
 
         // 플레이어 HUD(체력/경험치/골드) 표시
@@ -73,14 +73,11 @@ public class GameManager : MonoBehaviour
         GlobalGameEvents.OnStageChanged -= HandleStageChanged;
     }
 
-    // 스테이지 안내 UI 표시도 다른 패널들처럼 UIManager.ShowUI 경로로 통일한다.
     private void HandleStageChanged(int stageNumber)
     {
         UIManager.Instance.ShowUI<StageAnnouncement>(announcement => announcement.SetStageNumber(stageNumber));
     }
 
-    // 몬스터 처치 보상(골드/경험치) 지급. Monster는 죽었다는 사실만 이벤트로 알리고,
-    // 보상을 어떻게 지급할지는 모른다.
     private void HandleMonsterDied(Monster monster, int goldReward, Vector3 position)
     {
         wallet.AddGold(goldReward);

@@ -1,9 +1,7 @@
 using UnityEngine;
 
-/// <summary>
-/// 업그레이드 설정 (ScriptableObject)
-/// 각 스탯 업그레이드의 효과량과 비용 공식 정의
-/// </summary>
+// 업그레이드 설정
+// 각 스탯 업그레이드의 효과량과 비용 공식 정의
 [CreateAssetMenu(fileName = "PlayerUpgradeConfig", menuName = "IdleGame/Player Upgrade Config")]
 public class PlayerUpgradeConfig : ScriptableObject
 {

@@ -40,12 +40,12 @@ public class PlayerStats
     public int AttackDamage => BaseStat.BaseAttackDamage + (saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade;
     public float AttackInterval => Mathf.Max(0.1f, BaseStat.BaseAttackInterval - (saveData?.attackSpeedUpgradeLevel ?? 0) * upgradeConfig.settings.attackSpeedPerUpgrade);
 
-    // 레벨/업그레이드의 영향을 받지 않는 고정값. 버프/스킬이 생기면 여기에 배율만 곱하면 된다.
+    // 버프/스킬이 생기면 여기에 배율만 곱하면 된다.
     public float RunSpeed => baseRunSpeed;
 
     private PlayerStatData BaseStat => statData.GetByLevel(Level);
 
-    // 스탯 종류별 동작(레벨 읽기/올리기, 비용, 현재·다음 값)을 한 곳에 등록.
+    // 스탯 종류별 동작(IUpgradeStat)을 한 곳에 등록.
     // 새 스탯을 추가하려면 IUpgradeStat 구현 클래스 하나 만들고 여기에 등록만 하면 된다.
     private Dictionary<UpgradeStatType, IUpgradeStat> upgradeStats;
 
@@ -85,7 +85,7 @@ public class PlayerStats
         OnExpChanged?.Invoke(saveData.currentExp, RequiredExp);
     }
 
-    // 버튼 클릭 등으로 호출. 밀린 경험치가 여러 레벨 분량이면 한 번에 다 처리한다.
+    // 밀린 경험치가 여러 레벨 분량이면 한 번에 다 처리한다.
     public bool TryLevelUp()
     {
         if (!CanLevelUp) return false;
@@ -103,8 +103,6 @@ public class PlayerStats
     }
 
     // ── 업그레이드 (돈은 외부에서 검사) ────────
-    // 스탯 종류별 실제 동작은 upgradeStats에 등록된 IUpgradeStat 구현체가 담당.
-
     public int GetCurrentUpgradeLevel(UpgradeStatType type) => upgradeStats[type].GetLevel();
 
     public int GetNextUpgradeCost(UpgradeStatType type)
