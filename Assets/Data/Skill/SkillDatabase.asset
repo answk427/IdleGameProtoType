@@ -24,7 +24,7 @@ MonoBehaviour:
       requiredLevel: 1
     icon: {fileID: 0}
     castVfxPrefab: {fileID: 0}
-    hitVfxPrefab: {fileID: 0}
+    hitVfxPrefab: {fileID: 2433282508537954060, guid: 52da95424df5f2d4c83d5709e54aeda7, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
   - data:
@@ -38,7 +38,7 @@ MonoBehaviour:
       requiredLevel: 3
     icon: {fileID: 0}
     castVfxPrefab: {fileID: 0}
-    hitVfxPrefab: {fileID: 0}
+    hitVfxPrefab: {fileID: 4021103657954561961, guid: c6ecfe5ab071cb0438c118570e17e2da, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
   - data:
@@ -50,9 +50,9 @@ MonoBehaviour:
       value1: 30
       value2: 0
       requiredLevel: 5
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 0869b1e96aac6d34cb086976dc7af826, type: 3}
     castVfxPrefab: {fileID: 0}
-    hitVfxPrefab: {fileID: 0}
+    hitVfxPrefab: {fileID: 8771972552311404799, guid: aecbcee09aff3f54cac809fbdee0c03d, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
   - data:
@@ -66,7 +66,7 @@ MonoBehaviour:
       requiredLevel: 6
     icon: {fileID: 0}
     castVfxPrefab: {fileID: 0}
-    hitVfxPrefab: {fileID: 0}
+    hitVfxPrefab: {fileID: 8194992990867289339, guid: 3f78a770afb06514498e9290f5f225d7, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
   - data:
@@ -80,6 +80,6 @@ MonoBehaviour:
       requiredLevel: 7
     icon: {fileID: 0}
     castVfxPrefab: {fileID: 0}
-    hitVfxPrefab: {fileID: 0}
+    hitVfxPrefab: {fileID: 3432958286849152088, guid: 4efd0d2f6e864b74394e07c99efb3946, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
