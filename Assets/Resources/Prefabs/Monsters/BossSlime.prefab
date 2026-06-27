@@ -104,7 +104,7 @@ Animator:
   m_GameObject: {fileID: 4813688462502952101}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 3367be1250e7f0b42bcbdf9086dd9bb4, type: 2}
+  m_Controller: {fileID: 9100000, guid: bdfbf2d98df959f44a6164c7de2aaffd, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -132,7 +132,7 @@ MonoBehaviour:
   animator: {fileID: 0}
   maxHp: 10
   goldReward: 1
-  moveSpeed: 1
+  expReward: 0
   halfWidthOverride: 1.5
   attackRange: 1.5
   attackInterval: 2

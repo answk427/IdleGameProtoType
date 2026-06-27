@@ -14,7 +14,8 @@ public class MonsterData : IData
     [SerializeField] private int attackDamage;
     [SerializeField] private float attackInterval;
     [SerializeField] private float attackRange;
-    
+    [SerializeField] private int skillId;
+
     [JsonProperty("id")]
     public int Id { get => id; private set => id = value; }
     [JsonProperty("goldReward")]
@@ -31,5 +32,7 @@ public class MonsterData : IData
     public float AttackInterval { get => attackInterval; private set => attackInterval = value; }
     [JsonProperty("attackRange")]
     public float AttackRange { get => attackRange; private set => attackRange = value; }
+    [JsonProperty("skillId")]
+    public int SkillId { get => skillId; private set => skillId = value; }
 }
 

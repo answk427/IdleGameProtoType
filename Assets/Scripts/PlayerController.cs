@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour, IHasHp, IDamageable
+public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 {
     [Header("스탯 설정 (ScriptableObject)")]
     [SerializeField] private PlayerStatDatabase statData;
@@ -275,6 +275,17 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable
     {
         if (GameManager.Instance == null) return new List<Monster>();
         return GameManager.Instance.GetMonstersInRange(transform.position.x, radius);
+    }
+
+    public List<IDamageable> GetOpponentsInRange(float radius)
+    {
+        List<Monster> monsters = GetMonstersInRange(radius);
+        List<IDamageable> result = new List<IDamageable>(monsters.Count);
+        for (int i = 0; i < monsters.Count; i++)
+        {
+            result.Add(monsters[i]);
+        }
+        return result;
     }
 
     public Skill GetEquippedSkill(int slotIndex)

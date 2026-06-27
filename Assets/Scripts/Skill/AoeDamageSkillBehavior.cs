@@ -11,17 +11,18 @@ public class AoeDamageSkillBehavior : ISkillBehavior
         this.radius = radius;
     }
 
-    public UnityEngine.Vector3 Execute(PlayerController caster, IDamageable target)
+    public UnityEngine.Vector3[] Execute(ISkillCaster caster, IDamageable target)
     {
-        List<Monster> monsters = caster.GetMonstersInRange(radius);
+        List<IDamageable> targets = caster.GetOpponentsInRange(radius);
         int damage = caster.GetCalculatedDamage(damageMultiplier);
 
-        for (int i = 0; i < monsters.Count; i++)
+        UnityEngine.Vector3[] hitPositions = new UnityEngine.Vector3[targets.Count];
+        for (int i = 0; i < targets.Count; i++)
         {
-            monsters[i].TakeDamage(damage);
+            targets[i].TakeDamage(damage);
+            hitPositions[i] = targets[i].Position;
         }
 
-        // 범위 공격은 캐스터를 중심으로 퍼지므로 캐스터 위치를 이펙트 기준점으로 삼는다.
-        return caster.transform.position;
+        return hitPositions;
     }
 }

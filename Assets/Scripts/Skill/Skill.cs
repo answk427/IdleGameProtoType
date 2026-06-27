@@ -22,7 +22,7 @@
             currentCooldown -= deltaTime;
     }
 
-    public UnityEngine.Vector3 Use(PlayerController caster, IDamageable target)
+    public UnityEngine.Vector3[] Use(ISkillCaster caster, IDamageable target)
     {
         currentCooldown = Data.Cooldown;
         return behavior.Execute(caster, target);

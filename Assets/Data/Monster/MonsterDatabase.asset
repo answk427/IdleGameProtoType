@@ -16,14 +16,15 @@ MonoBehaviour:
   - data:
       id: 1001
       monsterName: BlueSlime
-      maxHp: 30
-      goldReward: 111
-      expReward: 0
+      maxHp: 100
+      goldReward: 10000
+      expReward: 100
       attackDamage: 0
       attackInterval: 0
       attackRange: 0
+      skillId: 0
     prefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
-    groundOffset: 0
+    groundOffset: 0.5
   - data:
       id: 1002
       monsterName: BlueSlime2
@@ -33,16 +34,30 @@ MonoBehaviour:
       attackDamage: 0
       attackInterval: 0
       attackRange: 0
+      skillId: 0
     prefab: {fileID: 4813688462502952101, guid: 05968968a0bcf4245a9b6c7874fa1c4f, type: 3}
-    groundOffset: 0
+    groundOffset: 0.5
   - data:
       id: 2001
       monsterName: BossSlime
-      maxHp: 100
+      maxHp: 10000
       goldReward: 1000
       expReward: 0
-      attackDamage: 20
+      attackDamage: 1
       attackInterval: 1
-      attackRange: 1
+      attackRange: 0.1
+      skillId: 1
     prefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
-    groundOffset: 0
+    groundOffset: 1.2
+  - data:
+      id: 2002
+      monsterName: BossUndead
+      maxHp: 1000
+      goldReward: 1000
+      expReward: 0
+      attackDamage: 100
+      attackInterval: 1
+      attackRange: 0.1
+      skillId: 1
+    prefab: {fileID: 4813688462502952101, guid: cb04ea20ab6f88b42ab65829f1994016, type: 3}
+    groundOffset: 1.2
