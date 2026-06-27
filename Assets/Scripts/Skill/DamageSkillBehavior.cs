@@ -7,9 +7,9 @@ public class DamageSkillBehavior : ISkillBehavior
         this.damageMultiplier = damageMultiplier;
     }
 
-    public UnityEngine.Vector3 Execute(ISkillCaster caster, IDamageable target)
+    public UnityEngine.Vector3[] Execute(ISkillCaster caster, IDamageable target)
     {
         target?.TakeDamage(caster.GetCalculatedDamage(damageMultiplier));
-        return target != null ? target.Position : caster.Position;
+        return new[] { target != null ? target.Position : caster.Position };
     }
 }

@@ -7,9 +7,9 @@ public class HealSkillBehavior : ISkillBehavior
         this.healAmount = healAmount;
     }
 
-    public UnityEngine.Vector3 Execute(ISkillCaster caster, IDamageable target)
+    public UnityEngine.Vector3[] Execute(ISkillCaster caster, IDamageable target)
     {
         caster.Heal(healAmount);
-        return caster.Position;
+        return new[] { caster.Position };
     }
 }

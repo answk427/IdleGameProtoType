@@ -35,16 +35,19 @@ public class BossSkillState : BossCombatState
 
     protected override void OnHitImpact()
     {
-        // 효과가 실제로 적용된 위치는 효과마다 다르다(데미지는 타겟, 힐은 캐스터 자신)
-        Vector3 hitPos = skill.Use(boss, target);
+        // 효과가 실제로 적용된 위치는 효과마다 다르다(데미지는 타겟, 힐은 캐스터 자신, AOE는 맞은 모든 타겟)
+        Vector3[] hitPositions = skill.Use(boss, target);
 
         SkillEntry entry = skill.Entry;
         if (entry == null) return;
 
-        if (entry.hitVfxPrefab != null)
-            CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, hitPos);
+        for (int i = 0; i < hitPositions.Length; i++)
+        {
+            if (entry.hitVfxPrefab != null)
+                CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, hitPositions[i]);
 
-        if (entry.hitSfx != null)
-            AudioSource.PlayClipAtPoint(entry.hitSfx, hitPos);
+            if (entry.hitSfx != null)
+                AudioSource.PlayClipAtPoint(entry.hitSfx, hitPositions[i]);
+        }
     }
 }
