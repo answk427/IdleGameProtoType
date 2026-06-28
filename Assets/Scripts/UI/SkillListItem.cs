@@ -43,11 +43,22 @@ public class SkillListItem : MonoBehaviour, IPointerClickHandler
         if (selectedHighlight != null) selectedHighlight.enabled = selected;
     }
 
+    // 모바일 터치는 Unity EventSystem이 clickCount를 마우스처럼 1->2로 못 올려주는 경우가 많아서
+    // (PC에서는 더블클릭 인식되는데 모바일에서는 항상 1로만 들어옴), 직접 시간차로 더블탭을 판정한다.
+    private const float DoubleClickThreshold = 0.3f;
+    private static int lastClickedSkillId = -1;
+    private static float lastClickTime = -999f;
+
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (eventData.clickCount >= 2)
+        bool isDoubleClick = SkillId == lastClickedSkillId && Time.unscaledTime - lastClickTime <= DoubleClickThreshold;
+        lastClickedSkillId = SkillId;
+        lastClickTime = Time.unscaledTime;
+
+        if (isDoubleClick)
         {
             onDoubleClick?.Invoke(SkillId);
+            lastClickedSkillId = -1;
         }
         else
         {
