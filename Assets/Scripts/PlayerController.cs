@@ -37,10 +37,11 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     public float GroundOffset => groundOffset;
 
     private PlayerStats stats = new PlayerStats();
+    private PlayerSaveData saveData;
     private int currentHp;
 
     // 슬롯 인덱스 → 장착된 Skill 런타임 인스턴스 (빈 슬롯은 null)
-    private readonly Skill[] equippedSkills = new Skill[PlayerSaveData.SkillSlotCount];
+    private readonly Skill[] equippedSkills = new Skill[PlayerStatsSaveData.SkillSlotCount];
 
     public event Action OnHitEvent;
     public event Action OnAttackEndEvent;
@@ -60,6 +61,8 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     public int CurrentHp => currentHp;
     public PlayerStats Stats => stats;
 
+    public PlayerSaveData SaveData => saveData;
+
 
     private void Awake()
     {
@@ -73,8 +76,10 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         fsm = new StateMachine();
         HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
 
+        saveData = SaveStorageProvider.Current.Load();
+
         stats.Initialize(statData, upgradeConfig, baseRunSpeed);
-        stats.LoadSave(PlayerSaveData.Load());
+        stats.LoadSave(saveData.stats);
 
         currentHp = stats.MaxHp;
         IsAlive = true;
@@ -219,7 +224,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 
     public void AddExp(int amount) => stats.AddExp(amount);
 
-    public void SaveProgress() => stats.Save();
+    public void SaveProgress() => GameManager.Instance?.SaveGame();
 
     public bool TryUpgrade(UpgradeStatType type)
     {
@@ -228,7 +233,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         if (!GameManager.Instance.Wallet.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
 
         stats.Upgrade(type);
-        stats.Save();
         return true;
     }
 
@@ -242,7 +246,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         {
             int skillId = stats.GetEquippedSkillId(slot);
 
-            if (skillId == PlayerSaveData.EmptySlot)
+            if (skillId == PlayerStatsSaveData.EmptySlot)
             {
                 equippedSkills[slot] = null;
                 continue;

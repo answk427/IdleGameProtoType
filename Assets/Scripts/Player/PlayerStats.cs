@@ -9,7 +9,7 @@ public enum UpgradeStatType
     AttackSpeed
 }
 
-// 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerSaveData)
+// 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerStatsSaveData)
 [System.Serializable]
 public class PlayerStats
 {
@@ -23,7 +23,7 @@ public class PlayerStats
     // ── 참조 ────────────────────────────────────────────────
     private PlayerStatDatabase statData;
     private PlayerUpgradeConfig upgradeConfig;
-    private PlayerSaveData saveData;
+    private PlayerStatsSaveData saveData;
 
     // 고정 이동속도. 버프/스킬로만 일시적으로 바뀐다
     private float baseRunSpeed;
@@ -56,7 +56,7 @@ public class PlayerStats
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
         this.baseRunSpeed = baseRunSpeed;
-        this.saveData = new PlayerSaveData(); // 기본값
+        this.saveData = new PlayerStatsSaveData(); // 기본값
 
         IUpgradeStat[] stats = {
             new HpUpgradeStat(this, upgradeConfig),
@@ -71,7 +71,7 @@ public class PlayerStats
         }
     }
 
-    public void LoadSave(PlayerSaveData data)
+    public void LoadSave(PlayerStatsSaveData data)
     {
         saveData = data;
     }
@@ -163,7 +163,6 @@ public class PlayerStats
         if (!CanLearnSkill(skillId)) return false;
 
         saveData.learnedSkillIds.Add(skillId);
-        Save();
         OnSkillLearned?.Invoke();
         Debug.Log($"[PlayerStats] 스킬 학습: {skillId}");
         return true;
@@ -172,7 +171,7 @@ public class PlayerStats
     public int GetEquippedSkillId(int slotIndex)
     {
         if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length)
-            return PlayerSaveData.EmptySlot;
+            return PlayerStatsSaveData.EmptySlot;
         return saveData.equippedSkillSlotIds[slotIndex];
     }
 
@@ -185,11 +184,10 @@ public class PlayerStats
         for (int i = 0; i < saveData.equippedSkillSlotIds.Length; i++)
         {
             if (saveData.equippedSkillSlotIds[i] == skillId)
-                saveData.equippedSkillSlotIds[i] = PlayerSaveData.EmptySlot;
+                saveData.equippedSkillSlotIds[i] = PlayerStatsSaveData.EmptySlot;
         }
 
         saveData.equippedSkillSlotIds[slotIndex] = skillId;
-        Save();
         OnSkillEquipChanged?.Invoke();
         return true;
     }
@@ -197,16 +195,12 @@ public class PlayerStats
     public bool UnequipSkill(int slotIndex)
     {
         if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length) return false;
-        if (saveData.equippedSkillSlotIds[slotIndex] == PlayerSaveData.EmptySlot) return false;
+        if (saveData.equippedSkillSlotIds[slotIndex] == PlayerStatsSaveData.EmptySlot) return false;
 
-        saveData.equippedSkillSlotIds[slotIndex] = PlayerSaveData.EmptySlot;
-        Save();
+        saveData.equippedSkillSlotIds[slotIndex] = PlayerStatsSaveData.EmptySlot;
         OnSkillEquipChanged?.Invoke();
         return true;
     }
 
-    // ── 저장 ────────────────────────────────────────────────
-
-    public void Save() => saveData?.Save();
-    public PlayerSaveData GetSaveData() => saveData;
+    public PlayerStatsSaveData GetSaveData() => saveData;
 }

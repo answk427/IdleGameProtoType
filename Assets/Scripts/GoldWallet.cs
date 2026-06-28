@@ -24,4 +24,11 @@ public class GoldWallet
         OnGoldChanged?.Invoke(Gold);
         return true;
     }
+
+    // 저장 파일에서 불러온 골드로 복원. UI가 OnGoldChanged를 구독 중이면 같이 갱신된다.
+    public void LoadGold(int amount)
+    {
+        Gold = amount;
+        OnGoldChanged?.Invoke(Gold);
+    }
 }

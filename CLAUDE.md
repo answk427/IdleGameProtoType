@@ -66,11 +66,17 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 `GlobalGameEvents`/`GlobalCombatEvents`(`Assets/Scripts/Event/`) — 정적 이벤트 버스로 매니저 간 직접 참조를 끊음. 예: `Monster`는 죽었다는 사실만 `GlobalCombatEvents.OnMonsterDied`로 알리고, 골드/경험치 지급은 `GameManager`가 구독해서 처리 — `Monster`는 보상 지급 방법을 모름.
 
-## 저장 시스템 — 알려진 갭 (포트폴리오 디스클로저용)
+## 저장 시스템
 
-- `PlayerSaveData`(`Assets/Scripts/Player/PlayerSaveData.cs`)는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯을 JSON으로 `Application.persistentDataPath/player_save.json`에 저장 가능.
-- **하지만 자동저장이 없음.** `Save()`가 호출되는 곳은 `PlayerController.TryUpgrade()`(스탯 업그레이드할 때)와 `PlayerSpawner.ReleasePlayer()`(콘텐츠 전환용으로 만들어졌지만 실제로 어디서도 호출 안 됨) 둘뿐. `OnApplicationQuit`/주기적 자동저장 없음 — 업그레이드를 한 번도 안 하면 저장 파일이 생성되지 않음.
-- **골드는 저장 로직이 전혀 없음.** `GoldWallet`(`Assets/Scripts/GoldWallet.cs`)은 `GameManager`가 들고 있는 순수 메모리 클래스이고 직렬화/파일 입출력이 아예 없음 — Play 모드 재시작하면 무조건 0.
+- **`PlayerSaveData`(최상위, `Assets/Scripts/Player/PlayerSaveData.cs`)와 `PlayerStatsSaveData`(`PlayerStats` 전용 슬라이스)로 분리돼 있음.** `PlayerSaveData`는 `{ stats: PlayerStatsSaveData, gold, currentStageNumber }` 형태 — 저장 파일 전체에 대응. `PlayerStatsSaveData`는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯처럼 `PlayerStats`가 실제로 읽고 쓰는 것만 담음. 골드/스테이지 번호는 `PlayerStats`가 전혀 쓰지 않는 데이터라(`GameManager`만 씀) 같은 클래스에 두면 안 된다고 판단해서 분리함.
+- **노출 지점은 `PlayerController.SaveData`(최상위 전체) / `PlayerStats.GetSaveData()`(stats 슬라이스만).** `PlayerController.Awake()`가 Unity 생명주기상 가장 먼저 파일을 읽어야 하는 곳이라(Start 시점엔 이미 늦음) 실제 `ISaveStorage.Load()` 호출도 거기서 함 — 그 결과(최상위 `PlayerSaveData`)를 자기 필드로 들고 `SaveData` 프로퍼티로 노출하고, `stats` 슬라이스만 `PlayerStats.LoadSave()`에 넘김. `GameManager`는 골드/스테이지를 읽고 쓸 때 `player.SaveData`로 직접 접근 — `PlayerStats`를 거치지 않음.
+- **저장 백엔드는 `ISaveStorage`로 추상화**(`Assets/Scripts/Player/ISaveStorage.cs`, 최상위 `PlayerSaveData` 기준). `LocalFileSaveStorage`가 현재 구현체(JSON을 `Application.persistentDataPath/player_save.json`에 입출력). `SaveStorageProvider.Current`가 스위치 지점 — 나중에 서버 저장으로 바꿀 때 `ServerSaveStorage : ISaveStorage`를 새로 만들고 `SaveStorageProvider.Current`에 대입하는 한 줄만 바꾸면 됨. `Load()`는 동기(Awake에서 즉시 써야 해서), `Save()`는 `IEnumerator`(코루틴) — 호출부가 기다리지 않는 fire-and-forget이라 서버 지연을 흡수할 수 있게 미리 비동기 모양으로 잡아둔 것.
+- **`PlayerStats`는 `ISaveStorage`를 모름.** MonoBehaviour가 아니라 코루틴을 못 돌리는 순수 클래스라서, 실제 저장 트리거(코루틴 시작)는 항상 MonoBehaviour 쪽에서 함. `PlayerStats.Upgrade()`/`LearnSkill()`/`EquipSkill()`/`UnequipSkill()`은 데이터만 바꾸고 이벤트(`OnUpgraded`/`OnSkillLearned`/`OnSkillEquipChanged`)만 쏨. **`GameManager`가 이 이벤트들을 `Start()`에서 직접 구독해서 `SaveGame()`을 호출**(`PlayerController`는 거치지 않음) — `PlayerController`는 `RefreshEquippedSkills`처럼 자기 런타임 상태와 진짜 관련 있는 구독만 갖고, 저장은 "언제 저장할지"를 실제로 결정하는 `GameManager`의 책임으로 분리함.
+- **골드/스테이지 진행도는 `GameManager.SaveGame()`이 한 곳에서 동기화.** `GoldWallet`(골드)과 `StageManager`(스테이지 번호)는 `PlayerSaveData`와 별개 객체라서, 저장 직전에 `player.SaveData`에 두 값을 합쳐 넣고 저장함. 업그레이드/스킬학습/스킬장착/스테이지전환 등 저장이 일어나는 모든 경로가 이 메서드 하나로 모임 — 그래서 어느 경로로 저장되든 골드/스테이지가 항상 같이 동기화됨. `GoldWallet.LoadGold()`로 시작 시 복원.
+- ⚠️ **`PlayerSaveData`/`PlayerStatsSaveData`의 필드를 바꾸면 JSON 저장 파일의 키와 안 맞아서 기존 진행도가 조용히 초기화될 수 있음** — ScriptableObject `.asset`의 "직렬화 함정"과 같은 종류의 문제가 JSON 세이브 파일에도 적용됨(`JsonUtility`도 필드 이름으로 매칭). 구조를 바꿀 땐 `%LOCALAPPDATA%\..\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`을 직접 새 스키마로 마이그레이션할 것.
+- **`OnApplicationQuit`/`OnApplicationPause(true)`는 `SaveGameImmediate()`로 동기 처리.** `StartCoroutine`으로 예약하면 앱이 곧 종료/일시정지돼서 코루틴이 실행될 프레임을 못 받을 수 있어, 이 두 경로만 `IEnumerator.MoveNext()`를 끝까지 직접 돌려서 저장이 확실히 끝나게 함. (로컬 저장 기준 안전 — 서버 구현체로 바뀌면 응답을 못 기다리고 끊길 수 있는데, 그건 그때 "종료 직전 저장을 어떻게 보장할지" product 차원에서 다시 봐야 함.)
+- **자동저장 체크포인트**: 종료/일시정지, 스테이지 전환 완료, 업그레이드, 스킬 학습/장착. 주기적(타이머) 자동저장은 의도적으로 안 둠.
+- **스테이지 중간 진행도(인카운터 진행 수)는 저장 안 함** — 의도된 범위 제한. 저장된 스테이지 번호로 복귀하면 그 스테이지를 처음부터(인카운터 1부터) 다시 시작한다. 전투 중 HP/몬스터 상태까지 직렬화하려면 FSM/스포너 상태까지 손대야 해서 범위 밖으로 뺌.
 - 세이브 파일 경로: `C:\Users\<user>\AppData\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`
 
 ## 작업 시 주의사항
