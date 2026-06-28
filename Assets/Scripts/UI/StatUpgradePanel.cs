@@ -137,7 +137,7 @@ public class StatUpgradePanel : UITabPanel
         if (expFillImage != null)
             expFillImage.fillAmount = stats.RequiredExp > 0 ? Mathf.Min(1f, (float)stats.CurrentExp / stats.RequiredExp) : 0f;
 
-        if (expText != null) expText.text = $"EXP {stats.CurrentExp} / {stats.RequiredExp}";
+        if (expText != null) expText.text = $"EXP {NumberFormatUtility.Format(stats.CurrentExp)} / {NumberFormatUtility.Format(stats.RequiredExp)}";
 
         if (expPercentText != null)
         {

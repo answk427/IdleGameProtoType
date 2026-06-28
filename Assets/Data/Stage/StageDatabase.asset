@@ -19,7 +19,7 @@ MonoBehaviour:
       bossMonsterId: 2002
       monstersPerEncounter: 2
       encountersToComplete: 2
-      monsterSpacing: 3
+      monsterSpacing: 1.5
       bgTexturePath: 
       clearType: 0
     backgroundTexture: {fileID: 2800000, guid: 36097b5693c0714478ffc6273a352644, type: 3}
@@ -28,8 +28,8 @@ MonoBehaviour:
       normalMonsterId: 1002
       bossMonsterId: 2001
       monstersPerEncounter: 3
-      encountersToComplete: 2
-      monsterSpacing: 3
+      encountersToComplete: 1
+      monsterSpacing: 1.5
       bgTexturePath: 
       clearType: 0
     backgroundTexture: {fileID: 2800000, guid: b147266f8e2d8e849ad06136e78d4e77, type: 3}
@@ -37,9 +37,9 @@ MonoBehaviour:
       stageNumber: 3
       normalMonsterId: 1001
       bossMonsterId: 2001
-      monstersPerEncounter: 1
-      encountersToComplete: 2
-      monsterSpacing: 3
+      monstersPerEncounter: 4
+      encountersToComplete: 1
+      monsterSpacing: 1.5
       bgTexturePath: 
       clearType: 0
     backgroundTexture: {fileID: 2800000, guid: 6a8a8fb6953cc4f45a25c7b27f799696, type: 3}

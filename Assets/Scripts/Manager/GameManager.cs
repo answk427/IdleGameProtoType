@@ -43,8 +43,17 @@ public class GameManager : MonoBehaviour
     {
         player = PlayerSpawner.Instance != null ? PlayerSpawner.Instance.EnsurePlayer() : null;
 
-        //TODO: 저장된 플레이어 스테이지번호(임시)
-        int currStage = 1;
+        int currStage = player != null ? player.SaveData.currentStageNumber : 1;
+        if (player != null)
+        {
+            wallet.LoadGold(player.SaveData.gold);
+
+            // 저장 로직
+            player.Stats.OnUpgraded += SaveGame;
+            player.Stats.OnSkillLearned += SaveGame;
+            player.Stats.OnSkillEquipChanged += SaveGame;
+        }
+
         if (!ValidateReferences() || !stageManager.Initialize(currStage))
         {
             return;
@@ -71,6 +80,13 @@ public class GameManager : MonoBehaviour
         GlobalGameEvents.OnPlayerDied -= HandlePlayerDied;
         GlobalCombatEvents.OnMonsterDied -= HandleMonsterDied;
         GlobalGameEvents.OnStageChanged -= HandleStageChanged;
+
+        if (player != null)
+        {
+            player.Stats.OnUpgraded -= SaveGame;
+            player.Stats.OnSkillLearned -= SaveGame;
+            player.Stats.OnSkillEquipChanged -= SaveGame;
+        }
     }
 
     private void HandleStageChanged(int stageNumber)
@@ -88,6 +104,45 @@ public class GameManager : MonoBehaviour
     {
         if (currentSpawnLoop != null) StopCoroutine(currentSpawnLoop);
         StartCoroutine(TransitionToStage(true));
+    }
+
+    private void OnApplicationQuit()
+    {
+        // 곧 프로세스가 종료돼 StartCoroutine으로 예약한 저장이 실행될 프레임을
+        // 못 받을 수 있다 — 끝까지 동기적으로 돌려서 저장이 실제로 끝나도록 한다.
+        SaveGameImmediate();
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus) SaveGameImmediate();
+    }
+
+    // 골드/스테이지 진행도를 PlayerSaveData에 합쳐서 저장. 
+    public void SaveGame()
+    {
+        IEnumerator routine = BuildSaveRoutine();
+        if (routine != null) StartCoroutine(routine);
+    }
+
+    // 종료/일시정지처럼 다음 프레임을 보장 못 받는 시점 전용. 로컬 저장 기준으로는
+    // 안전하지만, 나중에 서버 구현체로 바뀌면 응답을 못 기다리고 끊길 수 있다는
+    // 한계가 있다 — 그건 그때 "종료 직전 저장을 어떻게 보장할지"를 다시 봐야 한다.
+    private void SaveGameImmediate()
+    {
+        IEnumerator routine = BuildSaveRoutine();
+        if (routine == null) return;
+        while (routine.MoveNext()) { }
+    }
+
+    private IEnumerator BuildSaveRoutine()
+    {
+        if (player == null) return null;
+
+        PlayerSaveData saveData = player.SaveData;
+        saveData.gold = wallet.Gold;
+        saveData.currentStageNumber = stageManager.CurrentStage.StageNumber;
+        return SaveStorageProvider.Current.Save(saveData);
     }
 
     private void HandlePlayerDied()
@@ -168,6 +223,7 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("보스전 시작!!!");
 
+        player.FullHeal();
         monsterSpawner.ClearEncounter();
 
         yield return new WaitForSeconds(1.0f);
@@ -228,5 +284,7 @@ public class GameManager : MonoBehaviour
         {
             stageManager.Initialize();
         }
+
+        SaveGame();
     }
 }

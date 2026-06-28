@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b09ac77e6af07854db25f6f606c891e6, type: 3}
   m_Name: PlayerUpgradeConfig
   m_EditorClassIdentifier: Assembly-CSharp::PlayerUpgradeConfig
-  maxUpgradeLevel: 0
+  maxUpgradeLevel: 29
   settings:
     hpPerUpgrade: 20
     attackPerUpgrade: 3

@@ -67,12 +67,12 @@ public class SkillManagePopup : UIBase
         RefreshSlots();
     }
 
-    // PlayerSaveData.SkillSlotCount 개수만큼 슬롯 위젯을 런타임에 생성한다.
+    // PlayerStatsSaveData.SkillSlotCount 개수만큼 슬롯 위젯을 런타임에 생성한다.
     private void BuildSlots()
     {
         if (slotContainer == null || slotWidgetPrefab == null) return;
 
-        for (int i = 0; i < PlayerSaveData.SkillSlotCount; i++)
+        for (int i = 0; i < PlayerStatsSaveData.SkillSlotCount; i++)
         {
             SkillSlotWidget widget = Instantiate(slotWidgetPrefab, slotContainer);
             widget.Initialize(i, OnSlotWidgetClicked);

@@ -43,7 +43,7 @@ public class UpgradeListItem : MonoBehaviour
                 : $"{currentValue.ToString(format)} → {nextValue.ToString(format)}";
 
         if (costText != null)
-            costText.text = isMaxed ? "MAX" : cost.ToString();
+            costText.text = isMaxed ? "MAX" : NumberFormatUtility.Format(cost);
 
         if (upgradeButton != null)
             upgradeButton.interactable = !isMaxed && canAfford;
