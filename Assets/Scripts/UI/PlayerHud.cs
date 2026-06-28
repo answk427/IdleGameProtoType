@@ -72,7 +72,7 @@ public class PlayerHud : UIBase
     private void UpdateHpBar(float currentHp, float maxHp)
     {
         if (hpFillImage != null && maxHp > 0) hpFillImage.fillAmount = currentHp / maxHp;
-        if (hpText != null) hpText.text = $"{Mathf.CeilToInt(currentHp)} / {Mathf.CeilToInt(maxHp)}";
+        if (hpText != null) hpText.text = $"{NumberFormatUtility.Format(Mathf.CeilToInt(currentHp))} / {NumberFormatUtility.Format(Mathf.CeilToInt(maxHp))}";
     }
 
     private void UpdateExpBar(int currentExp, int requiredExp)
@@ -93,6 +93,6 @@ public class PlayerHud : UIBase
 
     private void UpdateGoldText(int gold)
     {
-        if (goldText != null) goldText.text = gold.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        if (goldText != null) goldText.text = NumberFormatUtility.Format(gold);
     }
 }
