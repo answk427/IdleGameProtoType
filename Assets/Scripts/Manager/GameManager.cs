@@ -223,6 +223,7 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("보스전 시작!!!");
 
+        player.FullHeal();
         monsterSpawner.ClearEncounter();
 
         yield return new WaitForSeconds(1.0f);

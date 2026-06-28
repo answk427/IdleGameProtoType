@@ -43,6 +43,6 @@ public class BossAttackState : BossCombatState
         target?.TakeDamage(boss.GetCalculatedDamage());
 
         if (target != null)
-            CombatEffectManager.Instance.SpawnHitParticle(target.Position);
+            CombatEffectManager.Instance.SpawnHitParticle(target);
     }
 }

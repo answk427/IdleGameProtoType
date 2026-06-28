@@ -320,4 +320,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         OnHpChanged?.Invoke(currentHp, stats.MaxHp);
         GlobalCombatEvents.TriggerHealed(amount, transform.position);
     }
+
+    public void FullHeal() => Heal(stats.MaxHp);
 }

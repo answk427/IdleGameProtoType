@@ -5,7 +5,8 @@ public class CombatEffectManager : MonoBehaviour
     public static CombatEffectManager Instance;
 
     [SerializeField] private GameObject damageTextPrefab;
-    [SerializeField] private GameObject hitParticlePrefab;
+    [SerializeField] private GameObject hitParticlePrefab; // 플레이어가 몬스터를 벨 때 (검 이펙트)
+    [SerializeField] private GameObject playerHitParticlePrefab; // 플레이어가 맞을 때 (타격 이펙트)
     [SerializeField] private Canvas dynamicCanvas;
 
     [Header("Floating Text Colors")]
@@ -84,21 +85,28 @@ public class CombatEffectManager : MonoBehaviour
         damageText.Play(amount, worldPos, dynamicCanvas, canvasRect, ReturnDamageText, color, prefix);
     }
 
-    public void SpawnHitParticle(Vector3 worldPos)
+    // 어떤 이펙트를 쓸지는 "맞은 대상이 플레이어인가"로 결정한다 (데미지 텍스트 색 판단과 동일한 기준).
+    public void SpawnHitParticle(IDamageable target)
     {
+        bool isPlayerHit = target is PlayerController;
+        GameObject prefab = isPlayerHit && playerHitParticlePrefab != null
+            ? playerHitParticlePrefab
+            : hitParticlePrefab;
+
+        Vector3 worldPos = target.Position;
         GameObject obj = PoolManager.Instance.Spawn(
-            hitParticlePrefab,
+            prefab,
             worldPos,
             Quaternion.identity
         );
 
         if (!obj.TryGetComponent(out HitParticle hitParticle))
         {
-            Debug.LogError($"{hitParticlePrefab.name} needs HitParticle on root.");
+            Debug.LogError($"{prefab.name} needs HitParticle on root.");
             return;
         }
 
-        hitParticle.Play(worldPos, ReturnHitParticle);
+        hitParticle.Play(worldPos, returnedObj => ReturnHitParticle(prefab, returnedObj));
     }
 
     public void SpawnRewardDrop(Object target, int goldAmount, Vector3 worldPos)
@@ -312,9 +320,9 @@ public class CombatEffectManager : MonoBehaviour
         PoolManager.Instance.Despawn(damageTextPrefab, obj);
     }
 
-    public void ReturnHitParticle(GameObject obj)
+    public void ReturnHitParticle(GameObject prefab, GameObject obj)
     {
-        PoolManager.Instance.Despawn(hitParticlePrefab, obj);
+        PoolManager.Instance.Despawn(prefab, obj);
     }
 
     public void ReturnRewardDrop(GameObject obj)

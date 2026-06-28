@@ -45,6 +45,6 @@ public class PlayerAttackState : PlayerCombatState
         target?.TakeDamage(player.GetCalculatedDamage());
 
         if (target != null)
-            CombatEffectManager.Instance.SpawnHitParticle(target.Position);
+            CombatEffectManager.Instance.SpawnHitParticle(target);
     }
 }
