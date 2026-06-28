@@ -5,6 +5,9 @@
 - 엔진: Unity 6000.4.9f1 (Unity 6)
 - 개발 기간: 2026.06 ~ 진행 중
 
+## 직접 플레이
+https://answk427.itch.io/unityidlegame
+
 ## 목차
 
 - [플레이영상](#플레이영상)
