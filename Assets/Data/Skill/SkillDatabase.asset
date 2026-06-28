@@ -22,7 +22,7 @@ MonoBehaviour:
       value1: 2.5
       value2: 0
       requiredLevel: 1
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: f171342a4b1511842a509a9e5c2e89fb, type: 3}
     castVfxPrefab: {fileID: 0}
     hitVfxPrefab: {fileID: 2433282508537954060, guid: 52da95424df5f2d4c83d5709e54aeda7, type: 3}
     castSfx: {fileID: 0}
@@ -36,7 +36,7 @@ MonoBehaviour:
       value1: 1.5
       value2: 3
       requiredLevel: 3
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: c74f03bdc4a53f644a1da892693554f2, type: 3}
     castVfxPrefab: {fileID: 0}
     hitVfxPrefab: {fileID: 4021103657954561961, guid: c6ecfe5ab071cb0438c118570e17e2da, type: 3}
     castSfx: {fileID: 0}
@@ -50,7 +50,7 @@ MonoBehaviour:
       value1: 30
       value2: 0
       requiredLevel: 5
-    icon: {fileID: 21300000, guid: 0869b1e96aac6d34cb086976dc7af826, type: 3}
+    icon: {fileID: 21300000, guid: c10336875fc8d6d4dae49b324b1c31dc, type: 3}
     castVfxPrefab: {fileID: 0}
     hitVfxPrefab: {fileID: 8771972552311404799, guid: aecbcee09aff3f54cac809fbdee0c03d, type: 3}
     castSfx: {fileID: 0}
@@ -64,7 +64,7 @@ MonoBehaviour:
       value1: 4
       value2: 0
       requiredLevel: 6
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 4633cb32b4ab22a4c93cc4315f912beb, type: 3}
     castVfxPrefab: {fileID: 0}
     hitVfxPrefab: {fileID: 8194992990867289339, guid: 3f78a770afb06514498e9290f5f225d7, type: 3}
     castSfx: {fileID: 0}
@@ -78,8 +78,22 @@ MonoBehaviour:
       value1: 3
       value2: 5
       requiredLevel: 7
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 14224047add0ac844a14dfd56998c510, type: 3}
     castVfxPrefab: {fileID: 0}
     hitVfxPrefab: {fileID: 3432958286849152088, guid: 4efd0d2f6e864b74394e07c99efb3946, type: 3}
+    castSfx: {fileID: 0}
+    hitSfx: {fileID: 0}
+  - data:
+      id: 6
+      skillName: "\uC800\uC8FC"
+      cooldown: 6
+      animationTrigger: Skill
+      effectType: 0
+      value1: 5
+      value2: 0
+      requiredLevel: 1
+    icon: {fileID: 21300000, guid: 7d6231da606dc46469721a9359b49dde, type: 3}
+    castVfxPrefab: {fileID: 0}
+    hitVfxPrefab: {fileID: 7226888052703040409, guid: 2b8a7b50643ffc340b364ae0c07d9415, type: 3}
     castSfx: {fileID: 0}
     hitSfx: {fileID: 0}
