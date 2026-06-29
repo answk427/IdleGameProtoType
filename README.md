@@ -157,7 +157,7 @@ flowchart LR
 
 ### 4. 스킬 시스템 (Strategy Pattern)
 
-<video src="https://github.com/user-attachments/assets/767b076e-f7cc-4e4f-8195-f6aa5fb51c03" width="100%" controls></video>
+<video src="https://github.com/user-attachments/assets/dcd362f5-cd88-47b0-9840-fc482eaa7fbd" width="100%" controls></video>
 > 스킬 배치 -> 배치된 스킬 자동 사용
 
 스킬의 실제 동작(`ISkillBehavior`)은 코드가 아니라 데이터(`SkillData.effectType`)로 결정되므로, 같은 효과 타입의 새 스킬을 추가할 때는 수치(`value1` / `value2`), (EffectFX / SoundFX)등만 다른 데이터로 추가하고 코드는 건드리지 않습니다. `Skill` 클래스가 쿨다운 계산과 실행을 함께 감싸서, FSM(`PlayerSkillState`/`BossSkillState`)는 스킬이 피해 · 광역 · 회복 중 무엇인지 몰라도 `IsReady` / `Use()` 만으로 동일하게 다룹니다. 캐스터 쪽도 `ISkillCaster` 인터페이스로 추상화해서, 플레이어와 보스가 같은 스킬 실행 코드를 공유합니다 — 보스도 쿨다운이 차면 일반 공격 대신 스킬을 자동으로 씁니다.
