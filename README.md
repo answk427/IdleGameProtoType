@@ -14,6 +14,7 @@ https://answk427.itch.io/unityidlegame
 - [핵심 설계](#핵심-설계)
 - [핵심 게임플레이](#핵심-게임플레이)
 - [아키텍처](#아키텍처)
+- [트러블슈팅](#트러블슈팅)
 - [프로젝트 구조](#프로젝트-구조)
 
 ## 플레이영상
@@ -108,10 +109,12 @@ stateDiagram-v2
     state "Boss (MonsterRunState 상속)" as BossFSM {
         B_Run : Run
         B_Atk : Attack
+        B_Skill : Skill
         B_Die : Die
         [*] --> B_Run
         B_Run --> B_Atk : 사거리 진입
-        B_Atk --> B_Run : 범위 이탈
+        B_Atk --> B_Skill : 스킬 준비됨
+        B_Skill --> B_Atk : 모션 종료
         B_Run --> B_Die : HP 0
     }
 ```
@@ -157,7 +160,7 @@ flowchart LR
 <video src="https://github.com/user-attachments/assets/767b076e-f7cc-4e4f-8195-f6aa5fb51c03" width="100%" controls></video>
 > 스킬 배치 -> 배치된 스킬 자동 사용
 
-스킬의 실제 동작(`ISkillBehavior`)은 코드가 아니라 데이터(`SkillData.effectType`)로 결정되므로, 같은 효과 타입의 새 스킬을 추가할 때는 수치(`value1` / `value2`), (EffectFX / SoundFX)등만 다른 데이터로 추가하고 코드는 건드리지 않습니다. `Skill` 클래스가 쿨다운 계산과 실행을 함께 감싸서, FSM(PlayerSkillState)는 스킬이 피해 · 광역 · 회복 중 무엇인지 몰라도 `IsReady` / `Use()` 만으로 동일하게 다룹니다.
+스킬의 실제 동작(`ISkillBehavior`)은 코드가 아니라 데이터(`SkillData.effectType`)로 결정되므로, 같은 효과 타입의 새 스킬을 추가할 때는 수치(`value1` / `value2`), (EffectFX / SoundFX)등만 다른 데이터로 추가하고 코드는 건드리지 않습니다. `Skill` 클래스가 쿨다운 계산과 실행을 함께 감싸서, FSM(`PlayerSkillState`/`BossSkillState`)는 스킬이 피해 · 광역 · 회복 중 무엇인지 몰라도 `IsReady` / `Use()` 만으로 동일하게 다룹니다. 캐스터 쪽도 `ISkillCaster` 인터페이스로 추상화해서, 플레이어와 보스가 같은 스킬 실행 코드를 공유합니다 — 보스도 쿨다운이 차면 일반 공격 대신 스킬을 자동으로 씁니다.
 
 ([Skill.cs](Assets/Scripts/Skill/Skill.cs), [ISkillBehavior.cs](Assets/Scripts/Skill/ISkillBehavior.cs))
 
@@ -196,6 +199,38 @@ flowchart LR
 
 ---
 
+### 7. 저장 시스템
+
+```mermaid
+flowchart LR
+    E["업그레이드 · 스킬 학습/장착\n스테이지 전환 · 종료/일시정지"] --> SG["GameManager.SaveGame()"]
+    SG --> ISS(("ISaveStorage"))
+    ISS --> L["Load() 동기"]
+    ISS --> S["Save() 코루틴"]
+    ISS -.교체 지점.-> SV["ServerSaveStorage\n(나중에)"]
+```
+> 주기적 자동저장은 없고 이 4개 이벤트에서만 저장합니다. `Load()`는 결과가 즉시 필요해서 동기, `Save()`는 호출부가 안 기다려도 돼서 코루틴 — 종료/일시정지처럼 다음 프레임을 보장 못 받는 시점만 그 코루틴을 동기적으로 끝까지 돌려서 저장을 보장합니다. 백엔드 교체는 `ISaveStorage` 구현체 하나 + 진입점 한 줄.
+
+### 추후 고려사항
+- 서버 저장으로 전환할 경우 종료 직전(`OnApplicationQuit`) 동기 저장 로직은 응답을 기다리지 못하고 끊길 수 있어, 그 시점엔 별도 보장 전략이 필요합니다.
+
+([ISaveStorage.cs](Assets/Scripts/Player/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/Player/LocalFileSaveStorage.cs), [GameManager.cs](Assets/Scripts/Manager/GameManager.cs))
+
+---
+
+## 트러블슈팅
+
+### 충돌/이펙트 위치 보정
+
+<img width="1024" height="618" alt="Image" src="https://github.com/user-attachments/assets/e99a215c-97a8-446f-aa05-3ed365a8e1bb" />
+
+> PIVOT 중심거리만으로 사거리를 재면 덩치가 다른 캐릭터의 판정이 부정확합니다. SpriteRenderer/Collider2D 바운드의 중심·폭을 계산해서 자동으로 보정하려 했지만, 바운드가 캐릭터 실루엣보다 크게 잡히거나 애니메이션 프레임마다 달라져서 자동 계산 자체가 불안정했습니다. 그래서 디자이너가 직접 값을 넣는 `halfWidthOverride`로 바꿨고, 이펙트 위치 보정(`hitPositionOffset`)도 같은 이유로 같은 방식을 택했습니다.
+
+([CombatRangeUtility.cs](Assets/Scripts/CombatRangeUtility.cs), [HitboxProfile.cs](Assets/Scripts/HitboxProfile.cs), [IDamageable.cs](Assets/Scripts/UI/IDamageable.cs))
+
+---
+
+
 ## 프로젝트 구조
 
 ```
@@ -210,5 +245,6 @@ Assets/
 │  └─ Event/         # 전역 이벤트 버스
 ├─ Editor/DataImporter/  # Excel → JSON → ScriptableObject 변환 툴
 ├─ Data/                 # 데이터베이스 ScriptableObject 에셋
-└─ Resources/             # 런타임 로드 프리팹 / JSON
+├─ Resources/             # 런타임 로드 프리팹 / JSON
+└─ Tests/EditMode/        # 스탯/업그레이드/스킬 쿨다운 등 핵심 도메인 로직 단위 테스트
 ```
