@@ -26,9 +26,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     [Tooltip("고정 이동속도. 버프/스킬로만 일시적으로 변경됨")]
     [SerializeField] private float baseRunSpeed = 2f;
 
-    // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
-    // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
-    [SerializeField] private float halfWidthOverride = 0f;
+    [SerializeField] private HitboxProfile hitboxProfile = new();
 
     [Tooltip("스프라이트 피벗이 발 기준이 아닐 때, 발이 바닥(PlayAreaBounds.GroundY)에 닿아 보이도록 " +
              "보정하는 값(월드 유닛). MonsterEntry.groundOffset과 동일한 역할 — 캐릭터(직업)별로 다른 " +
@@ -51,7 +49,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 
     public StateMachine fsm { get; private set; }
     public bool IsAlive { get; private set; }
-    public Vector3 Position => transform.position;
+    public Vector3 Position => hitboxProfile.GetPosition(transform);
     public float HalfWidth { get; private set; }
 
     public int AttackDamage => stats.AttackDamage;
@@ -74,7 +72,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         attackClipLength = FindClipLength(attackTriggerName);
 
         fsm = new StateMachine();
-        HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
+        HalfWidth = hitboxProfile.GetHalfWidth(gameObject);
 
         saveData = SaveStorageProvider.Current.Load();
 

@@ -131,10 +131,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Monster
   hpBar: {fileID: 0}
   animator: {fileID: 0}
+  hitboxProfile:
+    halfWidthOverride: 0.4
+    hitPositionOffset: {x: 0, y: 0}
   maxHp: 10
   goldReward: 1
   moveSpeed: 3
-  halfWidthOverride: 0.4
 --- !u!114 &3184703108519338795
 MonoBehaviour:
   m_ObjectHideFlags: 0

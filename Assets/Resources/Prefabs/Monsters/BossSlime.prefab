@@ -131,10 +131,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BossMonster
   hpBar: {fileID: 0}
   animator: {fileID: 0}
+  hitboxProfile:
+    halfWidthOverride: 1.5
+    hitPositionOffset: {x: 0, y: 0}
   maxHp: 10
   goldReward: 1
   expReward: 0
-  halfWidthOverride: 1.5
   attackRange: 1.5
   attackInterval: 2
 --- !u!114 &7220386100751836

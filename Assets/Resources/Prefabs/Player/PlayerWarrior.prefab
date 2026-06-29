@@ -138,7 +138,9 @@ MonoBehaviour:
   reviveTriggerName: Revive
   attackRange: 0.1
   baseRunSpeed: 3.4
-  halfWidthOverride: 0.4
+  hitboxProfile:
+    halfWidthOverride: 0.4
+    hitPositionOffset: {x: 0, y: 0}
   groundOffset: 1.08
 --- !u!114 &7381849167385634018
 MonoBehaviour:

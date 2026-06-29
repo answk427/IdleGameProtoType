@@ -6,13 +6,11 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     [SerializeField] private FloatingHpBar hpBar;
     [SerializeField] protected Animator animator;
 
+    [SerializeField] protected HitboxProfile hitboxProfile = new();
+
     [SerializeField] private int maxHp = 10;
     [SerializeField] private int goldReward = 1;
     [SerializeField] private int expReward = 0;
-
-    // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
-    // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
-    [SerializeField] protected float halfWidthOverride = 0f;
 
     public event Action<int> OnDamaged;
     public event Action<float, float> OnHpChanged;
@@ -22,7 +20,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     private int currentHp;
 
     public bool IsAlive { get; protected set; }
-    public Vector3 Position => transform.position;
+    public Vector3 Position => hitboxProfile.GetPosition(transform);
     public float HalfWidth { get; protected set; }
     public int GoldReward => goldReward;
     public int ExpReward => expReward;
@@ -33,7 +31,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         if (animator == null)
             animator = GetComponent<Animator>();
 
-        if (hpBar == null)  
+        if (hpBar == null)
             hpBar = GetComponentInChildren<FloatingHpBar>();
 
         fsm = new StateMachine();
@@ -45,7 +43,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     protected virtual void OnEnable()
     {
         IsAlive = true;
-        HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
+        HalfWidth = hitboxProfile.GetHalfWidth(gameObject);
         fsm.ChangeState(new MonsterIdleState(this));
 
         // 죽으면서 숨겼던 체력바를 풀에서 재사용될 때 다시 보이게 한다.

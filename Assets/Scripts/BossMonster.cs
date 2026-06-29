@@ -21,7 +21,7 @@ public class BossMonster : Monster, ISkillCaster
     protected override void OnEnable()
     {
         IsAlive = true;
-        HalfWidth = halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(gameObject);
+        HalfWidth = hitboxProfile.GetHalfWidth(gameObject);
         fsm.ChangeState(new BossRunState(this));
     }
 
