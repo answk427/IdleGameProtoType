@@ -52,7 +52,7 @@ MonoBehaviour:
   - data:
       id: 2002
       monsterName: BossUndead
-      maxHp: 1000
+      maxHp: 10000
       goldReward: 1000
       expReward: 0
       attackDamage: 10

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 
 // 저장 데이터를 "어디에" 두는지에 대한 추상화. 로컬 파일/서버 등 백엔드를 갈아끼울 때
@@ -11,4 +12,11 @@ public interface ISaveStorage
     PlayerSaveData Load();
     IEnumerator Save(PlayerSaveData data);
     void Delete();
+}
+
+// 저장 데이터가 존재하지만(신규 유저가 아님) 읽거나 해석할 수 없을 때 던지는 예외.
+public class SaveDataCorruptedException : Exception
+{
+    public SaveDataCorruptedException(string message) : base(message) { }
+    public SaveDataCorruptedException(string message, Exception inner) : base(message, inner) { }
 }

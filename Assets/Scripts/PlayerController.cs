@@ -61,7 +61,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 
     public PlayerSaveData SaveData => saveData;
 
-
     private void Awake()
     {
         if (animator == null)
@@ -73,9 +72,18 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 
         fsm = new StateMachine();
         HalfWidth = hitboxProfile.GetHalfWidth(gameObject);
+    }
 
-        saveData = SaveStorageProvider.Current.Load();
+    // 세이브 데이터를 로드하는 건 PlayerSpawner의 책임 — 여기서는 로드된 결과를 받아서
+    // 적용만 한다(PlayerStats.LoadSave가 데이터를 받기만 하는 것과 같은 모양).
+    public void Initialize(PlayerSaveData data)
+    {
+        saveData = data;
+        ApplySaveData();
+    }
 
+    private void ApplySaveData()
+    {
         stats.Initialize(statData, upgradeConfig, baseRunSpeed);
         stats.LoadSave(saveData.stats);
 

@@ -43,6 +43,14 @@ public class GameManager : MonoBehaviour
     {
         player = PlayerSpawner.Instance != null ? PlayerSpawner.Instance.EnsurePlayer() : null;
 
+        if (player == null && PlayerSpawner.Instance != null && PlayerSpawner.Instance.SaveDataLoadFailed)
+        {
+            // 세이브 파일이 손상돼 PlayerSpawner가 스폰 자체를 하지 않은 상태 — 진행도
+            // 유실 위험이 있어 게임을 시작하지 않고 안내 UI만 띄운다.
+            UIManager.Instance.ShowUI<SaveErrorPopup>();
+            return;
+        }
+
         int currStage = player != null ? player.SaveData.currentStageNumber : 1;
         if (player != null)
         {
