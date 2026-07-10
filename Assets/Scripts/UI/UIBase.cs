@@ -19,6 +19,8 @@ public enum UITabType
     Shop
 }
 
+// UI클래스는 UIBase를 상속 받아야 함
+// List의 Item처럼 다른 UI에 속하는 클래스는 상속받지 않음
 public abstract class UIBase : MonoBehaviour
 {
     [Header("UI Layer")]

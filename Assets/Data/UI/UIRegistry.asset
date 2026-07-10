@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 386671632b9bba749a5b85c4794d7c60, type: 3}
+  m_Name: UIRegistry
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::UIRegistry
+  panelPrefabs:
+  - {fileID: 4936437048712021230, guid: b67757f269a2a9c4198208939f36ce94, type: 3}
+  - {fileID: 220815565811027289, guid: d2d4ddeae5dd924498115bd5babf954a, type: 3}
+  - {fileID: 168404692315274929, guid: 2d09ad79c310fb743b0566285fc2f187, type: 3}
+  - {fileID: 103827207206487007, guid: fe8b7ff7d67cda742b30e87468ef403f, type: 3}

@@ -147,7 +147,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossChallengeButton
   Layer: 0
-  TabType: 0
 --- !u!1 &8706027189109041437
 GameObject:
   m_ObjectHideFlags: 0

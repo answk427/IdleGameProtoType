@@ -63,7 +63,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleGameProtoType.Runtime::StageAnnouncement
   Layer: 0
-  TabType: 0
   label: {fileID: 3180245815280520530}
   canvasGroup: {fileID: 247043940897366852}
   visibleDuration: 1.5
