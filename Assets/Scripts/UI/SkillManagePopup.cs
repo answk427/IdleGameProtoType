@@ -4,7 +4,7 @@ using UnityEngine;
 // 스킬 관리 팝업
 // 목록에서 배운 스킬을 한 번 클릭(선택) → 상단 슬롯을 클릭하면 그 슬롯에 배치
 // 미학습 스킬은 더블클릭으로 학습 시도 (레벨 조건만 체크).
-public class SkillManagePopup : UIBase
+public class SkillManagePopup : UIPopup
 {
     [SerializeField] private Transform slotContainer;
     [SerializeField] private SkillSlotWidget slotWidgetPrefab;
@@ -27,10 +27,8 @@ public class SkillManagePopup : UIBase
         }
     }
 
-    public override void Show()
+    protected override void OnShown()
     {
-        base.Show();
-
         if (player == null && GameManager.Instance != null)
         {
             player = GameManager.Instance.GetPlayer();
@@ -50,7 +48,7 @@ public class SkillManagePopup : UIBase
         RefreshSlots();
     }
 
-    public override void Hide()
+    protected override void OnHidden()
     {
         if (player != null)
         {
@@ -58,7 +56,6 @@ public class SkillManagePopup : UIBase
             player.Stats.OnSkillEquipChanged -= RefreshAll;
         }
         selectedSkillId = -1;
-        base.Hide();
     }
 
     private void RefreshAll()

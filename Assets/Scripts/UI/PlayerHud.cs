@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 플레이어 체력/경험치/레벨/골드만 보여주는 상시 HUD.
-public class PlayerHud : UIBase
+public class PlayerHud : UIHud
 {
     [Header("HP")]
     [SerializeField] private Image hpFillImage;
@@ -18,10 +18,8 @@ public class PlayerHud : UIBase
 
     private PlayerController player;
 
-    public override void Show()
+    protected override void OnShown()
     {
-        base.Show();
-
         if (player == null && GameManager.Instance != null)
         {
             player = GameManager.Instance.GetPlayer();
@@ -49,7 +47,7 @@ public class PlayerHud : UIBase
         UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0);
     }
 
-    public override void Hide()
+    protected override void OnHidden()
     {
         if (player != null)
         {
@@ -63,8 +61,6 @@ public class PlayerHud : UIBase
         {
             GameManager.Instance.Wallet.OnGoldChanged -= UpdateGoldText;
         }
-
-        base.Hide();
     }
 
     private void RefreshHpBar() => UpdateHpBar(player.CurrentHp, player.MaxHp);

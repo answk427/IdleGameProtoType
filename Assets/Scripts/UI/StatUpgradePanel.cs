@@ -44,10 +44,8 @@ public class StatUpgradePanel : UITabPanel
         }
     }
 
-    public override void Show()
+    protected override void OnShown()
     {
-        base.Show();
-
         if (player == null && GameManager.Instance != null)
         {
             player = GameManager.Instance.GetPlayer();
@@ -71,7 +69,7 @@ public class StatUpgradePanel : UITabPanel
         RefreshAll();
     }
 
-    public override void Hide()
+    protected override void OnHidden()
     {
         if (player != null)
         {
@@ -84,8 +82,6 @@ public class StatUpgradePanel : UITabPanel
         {
             GameManager.Instance.Wallet.OnGoldChanged -= OnGoldChanged;
         }
-
-        base.Hide();
     }
 
     private void OnGoldChanged(int _) => RefreshAll();

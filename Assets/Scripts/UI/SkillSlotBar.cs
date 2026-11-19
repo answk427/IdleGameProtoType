@@ -34,10 +34,8 @@ public class SkillSlotBar : UITabPanel
         }
     }
 
-    public override void Show()
+    protected override void OnShown()
     {
-        base.Show();
-
         if (player == null && GameManager.Instance != null)
         {
             player = GameManager.Instance.GetPlayer();
@@ -54,13 +52,12 @@ public class SkillSlotBar : UITabPanel
         RefreshAll();
     }
 
-    public override void Hide()
+    protected override void OnHidden()
     {
         if (player != null)
         {
             player.Stats.OnSkillEquipChanged -= RefreshAll;
         }
-        base.Hide();
     }
 
     private void Update()

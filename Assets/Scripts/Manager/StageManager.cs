@@ -73,6 +73,7 @@ public class StageManager : MonoBehaviour
 
         encounterProgress = 0;
         bossAvailable = true;
+        GlobalGameEvents.TriggerBossChallengeAvailable();
         return true;
     }
 
