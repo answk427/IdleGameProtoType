@@ -15,7 +15,7 @@ public class AttackSpeedUpgradeStat : IUpgradeStat
 
     public int GetLevel() => stats.GetSaveData().attackSpeedUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().attackSpeedUpgradeLevel++;
-    public int GetCost(int level) => config.GetAttackSpeedUpgradeCost(level);
+    public GameNumber GetCost(int level) => config.GetAttackSpeedUpgradeCost(level);
 
     // 공격 간격(초)은 작을수록 강해지는 값이라 그대로 보여주면 직관과 반대로 읽힌다.
     // 다른 스탯들과 동일하게 "클수록 좋다"가 되도록 초당 공격 횟수로 환산해서 보여준다.

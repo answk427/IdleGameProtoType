@@ -25,9 +25,6 @@ public class PlayerStats
     private PlayerUpgradeConfig upgradeConfig;
     private PlayerStatsSaveData saveData;
 
-    // 고정 이동속도. 버프/스킬로만 일시적으로 바뀐다
-    private float baseRunSpeed;
-
     // ── 읽기 전용 프로퍼티 ──────────────────────────────────
 
     public int Level => saveData?.level ?? 1;
@@ -40,9 +37,6 @@ public class PlayerStats
     public int AttackDamage => BaseStat.BaseAttackDamage + (saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade;
     public float AttackInterval => Mathf.Max(0.1f, BaseStat.BaseAttackInterval - (saveData?.attackSpeedUpgradeLevel ?? 0) * upgradeConfig.settings.attackSpeedPerUpgrade);
 
-    // 버프/스킬이 생기면 여기에 배율만 곱하면 된다.
-    public float RunSpeed => baseRunSpeed;
-
     private PlayerStatData BaseStat => statData.GetByLevel(Level);
 
     // 스탯 종류별 동작(IUpgradeStat)을 한 곳에 등록.
@@ -51,11 +45,11 @@ public class PlayerStats
 
     // ── 초기화 ──────────────────────────────────────────────
 
-    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig, float baseRunSpeed)
+    // 이동속도처럼 저장되지 않는 캐릭터 속성은 여기(진행도)가 아니라 PlayerController가 갖는다.
+    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig)
     {
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
-        this.baseRunSpeed = baseRunSpeed;
         this.saveData = new PlayerStatsSaveData(); // 기본값
 
         IUpgradeStat[] stats = {
@@ -71,9 +65,11 @@ public class PlayerStats
         }
     }
 
+    // GameSession.Apply()가 호출한다. PlayerStats 객체 자체는 그대로 두고 데이터만 갈아끼우므로,
+    // 이 객체를 참조하는 쪽(캐릭터, UI)은 다시 연결할 필요가 없다.
     public void LoadSave(PlayerStatsSaveData data)
     {
-        saveData = data;
+        saveData = data ?? new PlayerStatsSaveData();
     }
 
     // ── 경험치 / 레벨업 ─────────────────────────────────────
@@ -110,7 +106,7 @@ public class PlayerStats
     // ── 업그레이드 (돈은 외부에서 검사) ────────
     public int GetCurrentUpgradeLevel(UpgradeStatType type) => upgradeStats[type].GetLevel();
 
-    public int GetNextUpgradeCost(UpgradeStatType type)
+    public GameNumber GetNextUpgradeCost(UpgradeStatType type)
     {
         IUpgradeStat stat = upgradeStats[type];
         return stat.GetCost(stat.GetLevel());

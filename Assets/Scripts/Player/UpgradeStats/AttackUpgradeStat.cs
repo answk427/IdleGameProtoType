@@ -13,7 +13,7 @@ public class AttackUpgradeStat : IUpgradeStat
 
     public int GetLevel() => stats.GetSaveData().attackUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().attackUpgradeLevel++;
-    public int GetCost(int level) => config.GetAttackUpgradeCost(level);
+    public GameNumber GetCost(int level) => config.GetAttackUpgradeCost(level);
     public float GetCurrentValue() => stats.AttackDamage;
     public float GetNextValue() => stats.AttackDamage + config.settings.attackPerUpgrade;
 }

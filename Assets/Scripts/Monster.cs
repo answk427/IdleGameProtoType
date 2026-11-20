@@ -9,7 +9,6 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     [SerializeField] protected HitboxProfile hitboxProfile = new();
 
     [SerializeField] private int maxHp = 10;
-    [SerializeField] private int goldReward = 1;
     [SerializeField] private int expReward = 0;
 
     public event Action<int> OnDamaged;
@@ -19,10 +18,13 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     private int currentHp;
 
+    // 처치 보상 골드. 스테이지 배율로 지수적으로 커지므로 GameNumber. 스폰 시 Initialize()가 데이터로 채운다.
+    private GameNumber goldReward = 1;
+
     public bool IsAlive { get; protected set; }
     public Vector3 Position => hitboxProfile.GetPosition(transform);
     public float HalfWidth { get; protected set; }
-    public int GoldReward => goldReward;
+    public GameNumber GoldReward => goldReward;
     public int ExpReward => expReward;
     public GameObject OriginPrefab { get; set; }
 
@@ -66,7 +68,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
     {
         this.maxHp = Mathf.RoundToInt(monsterData.MaxHp * hpMultiplier);
         this.currentHp = this.maxHp;
-        this.goldReward = Mathf.RoundToInt(monsterData.GoldReward * goldMultiplier);
+        this.goldReward = GameNumber.Round((double)monsterData.GoldReward * goldMultiplier);
         this.expReward = monsterData.ExpReward;
 
         IsAlive = true;
@@ -127,7 +129,7 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     public void moveToPlayer()
     {
-        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f : 0f;
+        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.RunSpeed ?? 0f : 0f;
         transform.Translate(Vector3.left * runSpeed * Time.deltaTime);
     }
 }

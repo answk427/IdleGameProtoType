@@ -3,21 +3,22 @@ using System;
 // 골드(재화) 보유량과 증감 로직만 담당하는 순수 클래스.
 // GameManager에서 분리됨 - MonoBehaviour가 아니라 PlayerStats와 같은 패턴으로,
 // 단위 테스트와 재사용이 쉽도록 의도적으로 Unity 라이프사이클에 묶지 않았다.
+// 골드는 상한 없이 지수적으로 커지므로 GameNumber로 다룬다.
 public class GoldWallet
 {
-    public event Action<int> OnGoldChanged;
+    public event Action<GameNumber> OnGoldChanged;
 
-    public int Gold { get; private set; }
+    public GameNumber Gold { get; private set; } = GameNumber.Zero;
 
-    public void AddGold(int amount)
+    public void AddGold(GameNumber amount)
     {
         Gold += amount;
         OnGoldChanged?.Invoke(Gold);
     }
 
-    public bool TrySpendGold(int amount)
+    public bool TrySpendGold(GameNumber amount)
     {
-        if (amount <= 0) return true;
+        if (amount <= GameNumber.Zero) return true;
         if (Gold < amount) return false;
 
         Gold -= amount;
@@ -25,8 +26,8 @@ public class GoldWallet
         return true;
     }
 
-    // 저장 파일에서 불러온 골드로 복원. UI가 OnGoldChanged를 구독 중이면 같이 갱신된다.
-    public void LoadGold(int amount)
+    // 저장 데이터를 적용할 때 사용(GameSession.Apply). UI가 OnGoldChanged를 구독 중이면 같이 갱신된다.
+    public void LoadGold(GameNumber amount)
     {
         Gold = amount;
         OnGoldChanged?.Invoke(Gold);

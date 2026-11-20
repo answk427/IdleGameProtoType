@@ -44,7 +44,7 @@ public class PlayerHud : UIHud
         UpdateHpBar(player.CurrentHp, player.MaxHp);
         UpdateExpBar(player.Stats.CurrentExp, player.Stats.RequiredExp);
         UpdateLevelText(player.Stats.Level);
-        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0);
+        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : GameNumber.Zero);
     }
 
     protected override void OnHidden()
@@ -87,7 +87,7 @@ public class PlayerHud : UIHud
         if (levelText != null) levelText.text = $"Lv.{level}";
     }
 
-    private void UpdateGoldText(int gold)
+    private void UpdateGoldText(GameNumber gold)
     {
         if (goldText != null) goldText.text = NumberFormatUtility.Format(gold);
     }

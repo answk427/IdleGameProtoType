@@ -43,7 +43,7 @@ public class BackgroundScroller : MonoBehaviour
             return;
         }
 
-        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.Stats.RunSpeed ?? 0f : 0f;
+        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.RunSpeed ?? 0f : 0f;
         offset.x += runSpeed * scrollScale * Time.deltaTime;
 
         offset.x = Mathf.Repeat(offset.x, 1f);

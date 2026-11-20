@@ -32,7 +32,7 @@ public class UpgradeListItem : MonoBehaviour
         }
     }
 
-    public void Refresh(int upgradeLevel, float currentValue, float nextValue, int cost, bool isMaxed, bool canAfford)
+    public void Refresh(int upgradeLevel, float currentValue, float nextValue, GameNumber cost, bool isMaxed, bool canAfford)
     {
         if (levelText != null) levelText.text = $"Lv.{upgradeLevel + 1}";
 

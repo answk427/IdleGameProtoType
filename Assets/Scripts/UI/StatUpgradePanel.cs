@@ -84,7 +84,7 @@ public class StatUpgradePanel : UITabPanel
         }
     }
 
-    private void OnGoldChanged(int _) => RefreshAll();
+    private void OnGoldChanged(GameNumber _) => RefreshAll();
     private void OnExpChanged(int current, int required) => RefreshHeader();
     private void OnLevelUp(int newLevel) => RefreshAll();
 
@@ -107,13 +107,13 @@ public class StatUpgradePanel : UITabPanel
         RefreshHeader();
 
         var stats = player.Stats;
-        int gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : 0;
+        GameNumber gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : GameNumber.Zero;
 
         foreach (var item in spawnedItems)
         {
             UpgradeStatType type = item.StatType;
             bool isMaxed = stats.IsUpgradeMaxed(type);
-            int cost = stats.GetNextUpgradeCost(type);
+            GameNumber cost = stats.GetNextUpgradeCost(type);
             int upgradeLevel = stats.GetCurrentUpgradeLevel(type);
             float currentValue = stats.GetCurrentStatValue(type);
             float nextValue = isMaxed ? currentValue : stats.GetNextStatValue(type);
@@ -147,8 +147,9 @@ public class StatUpgradePanel : UITabPanel
 
     private void OnClickUpgrade(UpgradeStatType type)
     {
-        if (player == null) return;
-        player.TryUpgrade(type);
+        if (player == null || GameManager.Instance == null) return;
+        // 결과(UpgradeResult)별 안내는 1차 UI 이관 때 붙인다. 지금은 버튼 활성화로 이미 걸러진다.
+        GameManager.Instance.Session.TryUpgrade(type);
         // RefreshAll()은 OnUpgraded/OnGoldChanged 이벤트로 자동 호출됨
     }
 

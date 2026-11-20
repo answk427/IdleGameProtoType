@@ -27,35 +27,35 @@ public class PlayerUpgradeConfigTests
     [Test]
     public void HpUpgradeCost_AtLevelZero_EqualsBaseCost()
     {
-        Assert.AreEqual(50, config.GetHpUpgradeCost(0));
+        Assert.AreEqual((GameNumber)50, config.GetHpUpgradeCost(0));
     }
 
     [Test]
     public void HpUpgradeCost_GrowsByMultiplierPerLevel()
     {
         int expectedLevel3 = Mathf.RoundToInt(50 * Mathf.Pow(1.15f, 3));
-        Assert.AreEqual(expectedLevel3, config.GetHpUpgradeCost(3));
+        Assert.AreEqual((GameNumber)expectedLevel3, config.GetHpUpgradeCost(3));
     }
 
     [Test]
     public void AttackUpgradeCost_AtLevelZero_EqualsBaseCost()
     {
-        Assert.AreEqual(80, config.GetAttackUpgradeCost(0));
+        Assert.AreEqual((GameNumber)80, config.GetAttackUpgradeCost(0));
     }
 
     [Test]
     public void AttackSpeedUpgradeCost_AtLevelZero_EqualsBaseCost()
     {
-        Assert.AreEqual(80, config.GetAttackSpeedUpgradeCost(0));
+        Assert.AreEqual((GameNumber)80, config.GetAttackSpeedUpgradeCost(0));
     }
 
     [Test]
     public void UpgradeCost_NeverDecreasesAsLevelIncreases()
     {
-        int prev = config.GetHpUpgradeCost(0);
+        GameNumber prev = config.GetHpUpgradeCost(0);
         for (int level = 1; level <= 20; level++)
         {
-            int cost = config.GetHpUpgradeCost(level);
+            GameNumber cost = config.GetHpUpgradeCost(level);
             Assert.GreaterOrEqual(cost, prev, $"cost at level {level} should not be lower than previous level");
             prev = cost;
         }

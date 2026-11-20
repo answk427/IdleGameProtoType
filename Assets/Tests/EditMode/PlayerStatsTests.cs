@@ -39,7 +39,7 @@ public class PlayerStatsTests
         upgradeConfig.maxUpgradeLevel = 0;
 
         stats = new PlayerStats();
-        stats.Initialize(statDatabase, upgradeConfig, baseRunSpeed: 2f);
+        stats.Initialize(statDatabase, upgradeConfig);
     }
 
     [TearDown]
@@ -99,12 +99,12 @@ public class PlayerStatsTests
     [Test]
     public void GetNextUpgradeCost_MatchesConfigFormula_AndRisesAfterPurchase()
     {
-        int firstCost = stats.GetNextUpgradeCost(UpgradeStatType.Hp);
+        GameNumber firstCost = stats.GetNextUpgradeCost(UpgradeStatType.Hp);
         Assert.AreEqual(upgradeConfig.GetHpUpgradeCost(0), firstCost);
 
         stats.Upgrade(UpgradeStatType.Hp);
 
-        int secondCost = stats.GetNextUpgradeCost(UpgradeStatType.Hp);
+        GameNumber secondCost = stats.GetNextUpgradeCost(UpgradeStatType.Hp);
         Assert.AreEqual(upgradeConfig.GetHpUpgradeCost(1), secondCost);
         Assert.Greater(secondCost, firstCost);
     }

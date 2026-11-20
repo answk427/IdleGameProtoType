@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 // 업그레이드 설정
@@ -29,12 +30,16 @@ public class PlayerUpgradeConfig : ScriptableObject
 
     [SerializeField] public UpgradeSetting settings = new();
 
-    public int GetHpUpgradeCost(int currentLevel)
-        => Mathf.RoundToInt(settings.hpBaseCost * Mathf.Pow(settings.hpCostMultiplier, currentLevel));
+    // 비용은 지수적으로 커지므로 int가 아니라 GameNumber로 계산한다(int는 약 21억에서 넘친다).
+    public GameNumber GetHpUpgradeCost(int currentLevel)
+        => CalculateCost(settings.hpBaseCost, settings.hpCostMultiplier, currentLevel);
 
-    public int GetAttackUpgradeCost(int currentLevel)
-        => Mathf.RoundToInt(settings.attackBaseCost * Mathf.Pow(settings.attackCostMultiplier, currentLevel));
+    public GameNumber GetAttackUpgradeCost(int currentLevel)
+        => CalculateCost(settings.attackBaseCost, settings.attackCostMultiplier, currentLevel);
 
-    public int GetAttackSpeedUpgradeCost(int currentLevel)
-        => Mathf.RoundToInt(settings.attackSpeedBaseCost * Mathf.Pow(settings.attackSpeedCostMultiplier, currentLevel));
+    public GameNumber GetAttackSpeedUpgradeCost(int currentLevel)
+        => CalculateCost(settings.attackSpeedBaseCost, settings.attackSpeedCostMultiplier, currentLevel);
+
+    private static GameNumber CalculateCost(int baseCost, float multiplier, int level)
+        => GameNumber.Round(baseCost * Math.Pow(multiplier, level));
 }

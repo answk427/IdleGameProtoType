@@ -6,7 +6,7 @@ public interface IUpgradeStat
     UpgradeStatType Type { get; }
     int GetLevel();
     void IncrementLevel();
-    int GetCost(int level);
+    GameNumber GetCost(int level);
     float GetCurrentValue();
     float GetNextValue();
 }

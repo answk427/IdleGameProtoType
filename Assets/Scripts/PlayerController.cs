@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// 플레이어 캐릭터(전투 상태 + 연출). 저장되는 진행도(PlayerStats)는 이 캐릭터가 갖지 않고
+// GameSession이 소유하며, GameInitializer가 Initialize(stats)로 넘겨준다.
 public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 {
-    [Header("스탯 설정 (ScriptableObject)")]
-    [SerializeField] private PlayerStatDatabase statData;
-    [SerializeField] private PlayerUpgradeConfig upgradeConfig;
-
     [Header("애니메이션")]
     [SerializeField] private Animator animator;
     [SerializeField] private string runBoolName = "Run";
@@ -26,6 +24,10 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     [Tooltip("고정 이동속도. 버프/스킬로만 일시적으로 변경됨")]
     [SerializeField] private float baseRunSpeed = 2f;
 
+    // 이동속도는 저장되는 진행도가 아니라 캐릭터 속성이라 PlayerStats가 아니라 여기 둔다.
+    // 버프/스킬이 생기면 여기에 배율만 곱하면 된다.
+    public float RunSpeed => baseRunSpeed;
+
     [SerializeField] private HitboxProfile hitboxProfile = new();
 
     [Tooltip("스프라이트 피벗이 발 기준이 아닐 때, 발이 바닥(PlayAreaBounds.GroundY)에 닿아 보이도록 " +
@@ -34,8 +36,7 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     [SerializeField] private float groundOffset = 0f;
     public float GroundOffset => groundOffset;
 
-    private PlayerStats stats = new PlayerStats();
-    private PlayerSaveData saveData;
+    private PlayerStats stats;
     private int currentHp;
 
     // 슬롯 인덱스 → 장착된 Skill 런타임 인스턴스 (빈 슬롯은 null)
@@ -59,9 +60,6 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     public int CurrentHp => currentHp;
     public PlayerStats Stats => stats;
 
-    public PlayerSaveData SaveData => saveData;
-
-
     private void Awake()
     {
         if (animator == null)
@@ -73,11 +71,19 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 
         fsm = new StateMachine();
         HalfWidth = hitboxProfile.GetHalfWidth(gameObject);
+    }
 
-        saveData = SaveStorageProvider.Current.Load();
+    // 다른 객체(진행도)에 의존하는 초기화는 Awake가 아니라 GameInitializer가 부르는 여기서 한다.
+    // 예전에는 Awake에서 세이브를 직접 읽었는데, 그 때문에 "Awake가 가장 먼저 돌아야 한다"는
+    // 암묵적인 순서 규칙이 생겼었다.
+    public void Initialize(PlayerStats stats)
+    {
+        if (this.stats != null)
+        {
+            this.stats.OnSkillEquipChanged -= RefreshEquippedSkills;
+        }
 
-        stats.Initialize(statData, upgradeConfig, baseRunSpeed);
-        stats.LoadSave(saveData.stats);
+        this.stats = stats;
 
         currentHp = stats.MaxHp;
         IsAlive = true;
@@ -88,11 +94,16 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
 
     private void OnDestroy()
     {
-        stats.OnSkillEquipChanged -= RefreshEquippedSkills;
+        if (stats != null)
+        {
+            stats.OnSkillEquipChanged -= RefreshEquippedSkills;
+        }
     }
 
     private void Update()
     {
+        if (stats == null) return; // GameInitializer가 Initialize()하기 전
+
         fsm.Update();
 
         for (int i = 0; i < equippedSkills.Length; i++)
@@ -218,21 +229,12 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     }
 
 
-    // ── 경험치 / 업그레이드 (외부 UI, 몬스터 처치 보상 등에서 호출) ──
+    // ── 경험치 (몬스터 처치 보상 등에서 호출) ──
+    // 업그레이드(골드 차감 + 스탯 증가)는 게임 규칙이라 GameSession.TryUpgrade()로 옮겼다.
 
     public void AddExp(int amount) => stats.AddExp(amount);
 
     public void SaveProgress() => GameManager.Instance?.SaveGame();
-
-    public bool TryUpgrade(UpgradeStatType type)
-    {
-        if (GameManager.Instance == null) return false;
-        if (stats.IsUpgradeMaxed(type)) return false;
-        if (!GameManager.Instance.Wallet.TrySpendGold(stats.GetNextUpgradeCost(type))) return false;
-
-        stats.Upgrade(type);
-        return true;
-    }
 
     // ── 스킬 시스템 ──
 

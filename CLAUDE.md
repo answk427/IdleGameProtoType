@@ -5,7 +5,7 @@ Unity 2D 방치형(idle) 액션 게임 프로토타입. Unity 6000.4.9f1.
 
 ## 핵심 게임 루프
 
-`GameManager.Start()` → `StageManager.Initialize(stage)` → 몬스터 인카운터 반복 스폰(`MonsterSpawner`) → 인카운터 다 죽이면 보스 도전 가능 → 보스 클리어 시 다음 스테이지로 전환. 플레이어는 자동 전투(타겟 자동 탐색 + 공격)만 하며 조작 입력은 없음 — 스탯 업그레이드와 스킬 장착만 플레이어가 직접 함.
+`GameInitializer.Start()`(세이브 로드 → `GameSession` 생성 → 플레이어 스폰) → `GameManager.Initialize(session, player)` → `StageManager.Initialize(stage)` → 몬스터 인카운터 반복 스폰(`MonsterSpawner`) → 인카운터 다 죽이면 보스 도전 가능 → 보스 클리어 시 다음 스테이지로 전환. 플레이어는 자동 전투(타겟 자동 탐색 + 공격)만 하며 조작 입력은 없음 — 스탯 업그레이드와 스킬 장착만 플레이어가 직접 함.
 
 ## 데이터 아키텍처 (Excel → JSON → ScriptableObject)
 
@@ -26,7 +26,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 → `MonsterData`/`StageData` 등의 `[SerializeField] private` 필드 이름을 바꾸면(예: `_id` → `id`), 기존 `.asset` 파일의 YAML 키(`_id: 1001`)와 더 이상 매칭이 안 돼서 **그 값이 조용히 기본값(0/null)으로 리셋됨.** 컴파일 에러도, 런타임 에러도 안 남고 그냥 데이터가 사라짐.
 
-이게 원인이 돼서 한 번 "캐릭터가 안 달리고 배경도 안 바뀌고 진행이 안 되는" 버그가 났던 적 있음 (`StageDatabase.asset`의 `_stageNumber`가 코드의 `stageNumber`와 안 맞아서 `GetByNumber(1)`이 실패 → `StageManager.Initialize()` 실패 → `GameManager.Start()` 조기 return → 그 아래 있던 달리기 시작/배경 갱신/스폰 루프가 전부 실행 안 됨).
+이게 원인이 돼서 한 번 "캐릭터가 안 달리고 배경도 안 바뀌고 진행이 안 되는" 버그가 났던 적 있음 (`StageDatabase.asset`의 `_stageNumber`가 코드의 `stageNumber`와 안 맞아서 `GetByNumber(1)`이 실패 → `StageManager.Initialize()` 실패 → 당시 `GameManager.Start()`(지금은 `GameManager.Initialize()`) 조기 return → 그 아래 있던 달리기 시작/배경 갱신/스폰 루프가 전부 실행 안 됨).
 
 **필드 이름을 바꿀 일이 있으면**: `[FormerlySerializedAs("옛이름")]`을 붙이거나, 엑셀에서 데이터를 재동기화(Syncer 재실행)하거나, `.asset` YAML을 직접 패치해서 코드와 데이터 양쪽을 같이 맞출 것. 코드만 고치고 끝내면 안 됨.
 
@@ -69,10 +69,13 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 ## 저장 시스템
 
 - **`PlayerSaveData`(최상위, `Assets/Scripts/Player/PlayerSaveData.cs`)와 `PlayerStatsSaveData`(`PlayerStats` 전용 슬라이스)로 분리돼 있음.** `PlayerSaveData`는 `{ stats: PlayerStatsSaveData, gold, currentStageNumber }` 형태 — 저장 파일 전체에 대응. `PlayerStatsSaveData`는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯처럼 `PlayerStats`가 실제로 읽고 쓰는 것만 담음. 골드/스테이지 번호는 `PlayerStats`가 전혀 쓰지 않는 데이터라(`GameManager`만 씀) 같은 클래스에 두면 안 된다고 판단해서 분리함.
-- **노출 지점은 `PlayerController.SaveData`(최상위 전체) / `PlayerStats.GetSaveData()`(stats 슬라이스만).** `PlayerController.Awake()`가 Unity 생명주기상 가장 먼저 파일을 읽어야 하는 곳이라(Start 시점엔 이미 늦음) 실제 `ISaveStorage.Load()` 호출도 거기서 함 — 그 결과(최상위 `PlayerSaveData`)를 자기 필드로 들고 `SaveData` 프로퍼티로 노출하고, `stats` 슬라이스만 `PlayerStats.LoadSave()`에 넘김. `GameManager`는 골드/스테이지를 읽고 쓸 때 `player.SaveData`로 직접 접근 — `PlayerStats`를 거치지 않음.
+- **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, FSM)는 캐릭터(`PlayerController`)가 갖는다.
+- **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()` → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `GameManager.Initialize(session, player)`. 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
+- **저장 데이터 변환은 `GameSession.Apply(PlayerSaveData)` / `GameSession.ToSaveData()` 두 곳뿐.** `Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다(세션/Stats/Wallet을 참조하는 쪽이 옛 객체를 붙잡지 않게). 세이브 로드와 이후 서버 롤백(`docs/SERVER_DESIGN.md`)이 같은 경로를 쓴다.
 - **저장 백엔드는 `ISaveStorage`로 추상화**(`Assets/Scripts/Player/ISaveStorage.cs`, 최상위 `PlayerSaveData` 기준). `LocalFileSaveStorage`가 현재 구현체(JSON을 `Application.persistentDataPath/player_save.json`에 입출력). `SaveStorageProvider.Current`가 스위치 지점 — 나중에 서버 저장으로 바꿀 때 `ServerSaveStorage : ISaveStorage`를 새로 만들고 `SaveStorageProvider.Current`에 대입하는 한 줄만 바꾸면 됨. `Load()`는 동기(Awake에서 즉시 써야 해서), `Save()`는 `IEnumerator`(코루틴) — 호출부가 기다리지 않는 fire-and-forget이라 서버 지연을 흡수할 수 있게 미리 비동기 모양으로 잡아둔 것.
-- **`PlayerStats`는 `ISaveStorage`를 모름.** MonoBehaviour가 아니라 코루틴을 못 돌리는 순수 클래스라서, 실제 저장 트리거(코루틴 시작)는 항상 MonoBehaviour 쪽에서 함. `PlayerStats.Upgrade()`/`LearnSkill()`/`EquipSkill()`/`UnequipSkill()`은 데이터만 바꾸고 이벤트(`OnUpgraded`/`OnSkillLearned`/`OnSkillEquipChanged`)만 쏨. **`GameManager`가 이 이벤트들을 `Start()`에서 직접 구독해서 `SaveGame()`을 호출**(`PlayerController`는 거치지 않음) — `PlayerController`는 `RefreshEquippedSkills`처럼 자기 런타임 상태와 진짜 관련 있는 구독만 갖고, 저장은 "언제 저장할지"를 실제로 결정하는 `GameManager`의 책임으로 분리함.
-- **골드/스테이지 진행도는 `GameManager.SaveGame()`이 한 곳에서 동기화.** `GoldWallet`(골드)과 `StageManager`(스테이지 번호)는 `PlayerSaveData`와 별개 객체라서, 저장 직전에 `player.SaveData`에 두 값을 합쳐 넣고 저장함. 업그레이드/스킬학습/스킬장착/스테이지전환 등 저장이 일어나는 모든 경로가 이 메서드 하나로 모임 — 그래서 어느 경로로 저장되든 골드/스테이지가 항상 같이 동기화됨. `GoldWallet.LoadGold()`로 시작 시 복원.
+- **`PlayerStats`는 `ISaveStorage`를 모름.** MonoBehaviour가 아니라 코루틴을 못 돌리는 순수 클래스라서, 실제 저장 트리거(코루틴 시작)는 항상 MonoBehaviour 쪽에서 함. `PlayerStats.Upgrade()`/`LearnSkill()`/`EquipSkill()`/`UnequipSkill()`은 데이터만 바꾸고 이벤트(`OnUpgraded`/`OnSkillLearned`/`OnSkillEquipChanged`)만 쏨. **`GameManager`가 이 이벤트들을 `Initialize()`에서 직접 구독해서 `SaveGame()`을 호출**(`PlayerController`는 거치지 않음) — `PlayerController`는 `RefreshEquippedSkills`처럼 자기 런타임 상태와 진짜 관련 있는 구독만 갖고, 저장은 "언제 저장할지"를 실제로 결정하는 `GameManager`의 책임으로 분리함.
+- **저장은 `GameManager.SaveGame()` 한 곳에서 `session.ToSaveData()`를 저장.** 스테이지 번호는 `GameManager`가 `OnStageChanged`를 받아 세션에 반영해 둔다. 업그레이드/스킬학습/스킬장착/스테이지전환 등 저장이 일어나는 모든 경로가 이 메서드 하나로 모인다.
+- **재화는 `GameNumber`(`Assets/Scripts/Economy/GameNumber.cs`, 내부 `double`).** 골드, 업그레이드 비용, 몬스터 처치 보상. 저장 DTO(`PlayerSaveData.gold`)는 `double`, 데이터 테이블(`MonsterData.goldReward`)은 `int` 그대로 — 구조체를 직렬화 대상에 넣지 않는다(직렬화 함정). 예전 세이브의 정수 `gold`는 `double` 필드로 그대로 읽힌다(확인함).
 - ⚠️ **`PlayerSaveData`/`PlayerStatsSaveData`의 필드를 바꾸면 JSON 저장 파일의 키와 안 맞아서 기존 진행도가 조용히 초기화될 수 있음** — ScriptableObject `.asset`의 "직렬화 함정"과 같은 종류의 문제가 JSON 세이브 파일에도 적용됨(`JsonUtility`도 필드 이름으로 매칭). 구조를 바꿀 땐 `%LOCALAPPDATA%\..\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`을 직접 새 스키마로 마이그레이션할 것.
 - **`OnApplicationQuit`/`OnApplicationPause(true)`는 `SaveGameImmediate()`로 동기 처리.** `StartCoroutine`으로 예약하면 앱이 곧 종료/일시정지돼서 코루틴이 실행될 프레임을 못 받을 수 있어, 이 두 경로만 `IEnumerator.MoveNext()`를 끝까지 직접 돌려서 저장이 확실히 끝나게 함. (로컬 저장 기준 안전 — 서버 구현체로 바뀌면 응답을 못 기다리고 끊길 수 있는데, 그건 그때 "종료 직전 저장을 어떻게 보장할지" product 차원에서 다시 봐야 함.)
 - **자동저장 체크포인트**: 종료/일시정지, 스테이지 전환 완료, 업그레이드, 스킬 학습/장착. 주기적(타이머) 자동저장은 의도적으로 안 둠.

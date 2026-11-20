@@ -109,9 +109,11 @@ public class CombatEffectManager : MonoBehaviour
         hitParticle.Play(worldPos, returnedObj => ReturnHitParticle(prefab, returnedObj));
     }
 
-    public void SpawnRewardDrop(Object target, int goldAmount, Vector3 worldPos)
+    public void SpawnRewardDrop(Object target, GameNumber goldAmount, Vector3 worldPos)
     {
-        int coinCount = Mathf.Clamp(goldAmount, minCoinDropCount, maxCoinDropCount);
+        // 골드가 아무리 커도 코인 개수는 [min, max]로 제한되므로, 먼저 max로 잘라서 int로 바꾼다.
+        int cappedAmount = (int)GameNumber.Min(goldAmount, maxCoinDropCount).ToDouble();
+        int coinCount = Mathf.Clamp(cappedAmount, minCoinDropCount, maxCoinDropCount);
         for (int i = 0; i < coinCount; i++)
         {
             Vector3 offset = new Vector3(

@@ -13,7 +13,7 @@ public class HpUpgradeStat : IUpgradeStat
 
     public int GetLevel() => stats.GetSaveData().hpUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().hpUpgradeLevel++;
-    public int GetCost(int level) => config.GetHpUpgradeCost(level);
+    public GameNumber GetCost(int level) => config.GetHpUpgradeCost(level);
     public float GetCurrentValue() => stats.MaxHp;
     public float GetNextValue() => stats.MaxHp + config.settings.hpPerUpgrade;
 }

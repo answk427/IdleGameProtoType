@@ -11,13 +11,16 @@ public class GameManager : MonoBehaviour
     private Coroutine currentSpawnLoop;
 
     private PlayerController player;
+    private GameSession session;
     [SerializeField] private MonsterSpawner monsterSpawner;
     [SerializeField] private StageManager stageManager;
 
     [SerializeField] private float postEncounterDelay = 0.5f;
 
-    private readonly GoldWallet wallet = new GoldWallet();
-    public GoldWallet Wallet => wallet;
+    // 진행도(골드 포함)의 주인은 GameSession이다. UI가 아직 GameManager를 거쳐 접근하므로
+    // 1차 UI 이관(Presenter 주입) 전까지만 통로로 남겨 둔다.
+    public GameSession Session => session;
+    public GoldWallet Wallet => session?.Wallet;
 
     public bool IsScrolling
     {
@@ -36,25 +39,29 @@ public class GameManager : MonoBehaviour
         GlobalGameEvents.OnStageCleared += StartStageTransition;
         GlobalGameEvents.OnPlayerDied += HandlePlayerDied;
         GlobalCombatEvents.OnMonsterDied += HandleMonsterDied;
+        GlobalGameEvents.OnStageChanged += HandleStageChanged;
     }
 
-    private void Start()
+    // GameInitializer가 세션 생성과 캐릭터 스폰을 끝낸 뒤 호출한다.
+    // (예전에는 Start()에서 직접 플레이어를 찾고, 캐릭터가 Awake에서 읽어 둔 세이브 데이터를 꺼내 썼다.)
+    public void Initialize(GameSession session, PlayerController player)
     {
-        player = PlayerSpawner.Instance != null ? PlayerSpawner.Instance.EnsurePlayer() : null;
+        this.session = session;
+        this.player = player;
 
-        int currStage = player != null ? player.SaveData.currentStageNumber : 1;
-        if (player != null)
+        if (!ValidateReferences())
         {
-            wallet.LoadGold(player.SaveData.gold);
-
-            // 저장 로직
-            player.Stats.OnUpgraded += SaveGame;
-            player.Stats.OnSkillLearned += SaveGame;
-            player.Stats.OnSkillEquipChanged += SaveGame;
+            return;
         }
 
-        if (!ValidateReferences() || !stageManager.Initialize(currStage))
+        // 저장 로직
+        session.Stats.OnUpgraded += SaveGame;
+        session.Stats.OnSkillLearned += SaveGame;
+        session.Stats.OnSkillEquipChanged += SaveGame;
+
+        if (!stageManager.Initialize(session.CurrentStageNumber))
         {
+            Debug.LogError($"[GameManager] 저장된 스테이지 {session.CurrentStageNumber}를 불러오지 못했습니다.");
             return;
         }
 
@@ -78,19 +85,26 @@ public class GameManager : MonoBehaviour
         GlobalGameEvents.OnStageCleared -= StartStageTransition;
         GlobalGameEvents.OnPlayerDied -= HandlePlayerDied;
         GlobalCombatEvents.OnMonsterDied -= HandleMonsterDied;
+        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
 
-        if (player != null)
+        if (session != null)
         {
-            player.Stats.OnUpgraded -= SaveGame;
-            player.Stats.OnSkillLearned -= SaveGame;
-            player.Stats.OnSkillEquipChanged -= SaveGame;
+            session.Stats.OnUpgraded -= SaveGame;
+            session.Stats.OnSkillLearned -= SaveGame;
+            session.Stats.OnSkillEquipChanged -= SaveGame;
         }
     }
 
-    private void HandleMonsterDied(Monster monster, int goldReward, Vector3 position)
+    private void HandleMonsterDied(Monster monster, GameNumber goldReward, Vector3 position)
     {
-        wallet.AddGold(goldReward);
+        session?.Wallet.AddGold(goldReward);
         player?.AddExp(monster.ExpReward);
+    }
+
+    // 스테이지가 바뀔 때마다 세션의 진행도에 반영해 둔다. 저장은 SaveGame()이 세션에서 한 번에 꺼낸다.
+    private void HandleStageChanged(int stageNumber)
+    {
+        session?.SetCurrentStageNumber(stageNumber);
     }
 
     private void StartStageTransition()
@@ -111,7 +125,7 @@ public class GameManager : MonoBehaviour
         if (pauseStatus) SaveGameImmediate();
     }
 
-    // 골드/스테이지 진행도를 PlayerSaveData에 합쳐서 저장. 
+    // 진행도 전체(스탯/골드/스테이지)는 GameSession이 갖고 있으므로 거기서 한 번에 꺼내 저장한다.
     public void SaveGame()
     {
         IEnumerator routine = BuildSaveRoutine();
@@ -130,12 +144,9 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator BuildSaveRoutine()
     {
-        if (player == null) return null;
+        if (session == null) return null;
 
-        PlayerSaveData saveData = player.SaveData;
-        saveData.gold = wallet.Gold;
-        saveData.currentStageNumber = stageManager.CurrentStage.StageNumber;
-        return SaveStorageProvider.Current.Save(saveData);
+        return SaveStorageProvider.Current.Save(session.ToSaveData());
     }
 
     private void HandlePlayerDied()
@@ -165,6 +176,12 @@ public class GameManager : MonoBehaviour
 
     private bool ValidateReferences()
     {
+        if (session == null)
+        {
+            Debug.LogError("GameManager needs a GameSession.");
+            return false;
+        }
+
         if (player == null)
         {
             Debug.LogError("GameManager needs a PlayerController reference.");
