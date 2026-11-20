@@ -89,6 +89,20 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - 일부 `.cs` 파일은 CP949(EUC-KR) 인코딩 — UTF-8로 Edit/Write하면 한글 주석이 깨질 수 있으니 주의. (직접 새로 작성하는 파일은 UTF-8로 써도 무방, 기존 CP949 파일을 수정할 때만 주의)
 - IData 구현 클래스의 필드/프로퍼티를 리네임하는 작업은 반드시 위 "직렬화 함정" 섹션을 먼저 확인하고, `.asset` 데이터와의 정합성을 같이 맞출 것.
 
-## 외부 도구
+## 외부 도구: Unity 에디터 조작
 
-- Unity MCP(`mcp__UnityMCP__*`)로 Unity 에디터 직접 조작 가능 (컴파일 체크, Play 모드 진입, `execute_code`로 런타임 코드 실행 등). `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.
+에디터 조작(컴파일 확인, 씬 편집, 플레이 모드 확인, 테스트)은 아래 우선순위로 한다. 기계별 경로(에디터 설치 위치 등)는 이 파일이 아니라 Claude memory에 있다.
+
+1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: 패키지 미설치** — 설치(`unity pipeline install`, `Packages/manifest.json` 변경)와 커밋 여부는 사용자 확인 후 진행하기로 함.
+2. **에디터가 꺼져 있으면: 배치 모드** — `Unity.exe`를 창 없이 띄워 일을 시키고 종료한다. 0단계(GameSession/GameInitializer)를 이 방식으로 구현·검증했다.
+   - **실행 전:** 사용자가 이 프로젝트를 에디터로 열고 있으면 실행할 수 없다(프로젝트 잠금, `Temp/UnityLockfile`). Unity 프로세스가 없는지 먼저 확인.
+   - **컴파일 + 임의 작업:** `Unity.exe -batchmode -quit -projectPath <프로젝트> -executeMethod <클래스.메서드> -logFile <로그>`. 로그에서 `error CS`, `Exception`, `Exiting batchmode successfully now!`를 확인. 한 번에 1~2분 걸린다.
+   - **테스트:** `-runTests -testPlatform EditMode -testResults <xml>` (`-quit`를 붙이지 않는다).
+   - **씬 편집/확인:** `Assets/Editor/`에 임시 에디터 스크립트를 만들어 `-executeMethod`로 실행하고, 끝나면 스크립트와 `.meta`를 반드시 지운다. 씬 참조 연결은 `SerializedObject`로 한다(씬 YAML 직접 편집 금지).
+   - **플레이 모드 확인:** `[InitializeOnLoad]` 임시 스크립트에서 `EditorApplication.EnterPlaymode()/ExitPlaymode()/Exit()`를 쓴다. 플레이 진입 시 도메인 리로드로 정적 변수가 초기화되므로 단계는 `SessionState`에 저장한다. 사용자 세이브(`player_save.json`)가 이미 있으면 덮어쓰지 않도록 중단하고, 확인용으로 만든 세이브는 끝나고 지운다.
+   - **실행 후 정리(알려진 부작용):** `git status`로 의도치 않은 변경을 확인할 것.
+     - `BackgroundFitter`가 `[ExecuteAlways]`라 배치 모드에서 씬을 저장하면 배경 오브젝트의 `m_LocalScale`이 화면 비율에 맞춰 바뀐다 → 되돌린다.
+     - 테스트 실행은 `persistentDataPath`(`LocalLow/DefaultCompany/IdleGameProtoType/`)에 `TestResults.xml`과 `Unity/` 폴더를 남긴다 → 지운다.
+     - 로그의 `UnityEditor.Search.SearchDatabase` `ArgumentOutOfRangeException`은 배치 모드 에디터 내부 예외로 프로젝트 코드와 무관하다.
+   - 한계: 화면을 볼 수 없다. UI가 제대로 보이는지는 사용자 확인이 필요하다.
+3. **Unity MCP(`mcp__UnityMCP__*`)** — 과거 세션에서 쓰던 방식. 세션에 연결돼 있을 때만 쓸 수 있다. `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.
