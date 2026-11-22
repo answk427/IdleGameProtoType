@@ -9,6 +9,7 @@
 - **다음 결정:** 실행 중인 에디터를 조작하는 Unity CLI + Pipeline 패키지(`com.unity.pipeline`)를 설치할지, 패키지를 커밋할지(CLAUDE.md "외부 도구" 참고).
 - **1차 수직 슬라이스 완료 (2026-11-22, 집 PC):** 스킬 관리 창 하나가 `WindowRegistry` → `WindowManager` → `SkillManagePresenter` → 반응형 구독/자동 해제 → `InputBlocker`를 통과한다(`Assets/Scripts/UI/Core/`). 조립과 기존 `UIManager`(HUD, 탭)와의 연결은 `UIRoot` 한 곳. 새 팝업은 `UIWindow`로 만든다.
 - **옛 브랜치 반영 결정 완료 (2026-11-22):** 집 PC `UIManager_improvement`는 병합하지 않는다. `.gitignore` 규칙, `BalanceConfig`, 코드리뷰의 미해결 항목만 옮겼다. UIRegistry와 Canvas 정리는 UI_DESIGN이 대체하고, SingletonBehaviour는 보류(아래 "코드 품질"), 세이브 로드 실패 처리는 따로 고쳤다(`SaveDataValidator`, 남은 것은 아래 "저장").
+- **먼저 고칠 것 (심각, 미수정):** 프레임이 튀면 전투가 영구히 멈춘다(아래 "전투"). WebGL 빌드는 새로고침하면 세이브가 전부 사라진다(아래 "저장").
 - **다음 작업 (1차의 남은 것):**
   - 세이브 오류 창: 닫을 수 없는 System 창. UI_DESIGN 보완안(`UI_REDESIGN_PROPOSAL.md`)의 B8(스택 삽입 순서), B9(로드 실패 시 UIRoot 준비)를 그때 확인받고 반영
   - 탭 2개 이관: 스택 방식 Exclusive 옵션 추가, `UIRoot`의 "이관 기간 연결" 제거
@@ -52,7 +53,19 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
   화면 UI는 Screen Space - Overlay라 Sorting Layer가 적용되지 않으므로 이 작업과 무관하다(화면 UI 순서는 코드 enum → sortingOrder 구간으로 관리).
   현재 순서가 깨지는 증상은 없어서 범위 밖으로 둠.
 
+## 전투
+
+- **프레임이 튀면 게임 진행이 영구히 멈춤** (2026-11-22 재현, UI 슬라이스 이전 코드에서도 동일)
+  몬스터가 `이동속도 × deltaTime`만큼 움직여서, 긴 프레임 한 번에 사거리를 건너뛰고 플레이어 뒤로 넘어간다. `GetClosestMonster`는 앞쪽만 보므로 그 몬스터는 타겟이 되지 않고,
+  계속 왼쪽으로 달리며 살아 있어서 `AllDie()`가 영영 참이 되지 않는다(다음 스폰 없음).
+  30fps에 100프레임당 한 번 0.333초 프레임을 섞으면 게임 시간 70~310초 안에 3번 중 3번 멈췄다. 몬스터 이동을 사거리 경계에서 멈추거나 지나친 몬스터도 타겟에 넣는 식의 수정이 필요하다(방식 미정).
+
 ## 저장
+
+- **WebGL 빌드에서 새로고침하면 세이브가 전부 사라짐** (2026-11-22 빌드로 재현)
+  기본 템플릿의 `index.html`에 `config.autoSyncPersistentDataPath = true;`가 주석 처리돼 있어 `persistentDataPath`(IDBFS)가 브라우저 저장소로 내려가지 않는다.
+  빌드 산출물에서 그 한 줄을 켜면 유지되는 것까지 확인했다. 빌드마다 손으로 고치지 않으려면 프로젝트 WebGL 템플릿이 필요하다.
+  별개로 웹은 새로고침/탭 닫기 때 `OnApplicationQuit`이 오지 않아 마지막 체크포인트 이후 진행(골드, 경험치)은 잃는다(31.5K → 21K로 재현).
 
 - **손상된 세이브로 시작이 막혔을 때 안내가 없음** (유실 자체는 2026-11-22에 수정: `SaveDataValidator`가 변환 전에 막고 원본을 보존)
   - 콘솔 에러만 남고 게임이 시작되지 않는다. 안내창은 1차 슬라이스 뒤 System 구분의 창으로 만들고, `GameInitializer`의 로드 실패 지점에서 띄운다.
