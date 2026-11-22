@@ -49,6 +49,8 @@
 
 ## 4. 창 API (원안 모양, 컴파일 확인)
 
+구현 전 승인받은 모양의 기록이다. 실제 API는 `Assets/Scripts/UI/Core/`가 기준이다.
+
 ```csharp
 public interface IWindowArgs<TWindow> where TWindow : UIWindow { }                      // B5
 public interface IWindowArgs<TWindow, TResult> where TWindow : UIWindow { }
@@ -105,16 +107,10 @@ UI_DESIGN은 최종 구조만 정하므로 이 절은 이관 기간에만 쓰는
 
 ## 6. UI 설계와 별개로 발견한 것
 
-| 문제 | 근거 | 처리 제안 |
-|---|---|---|
-| 손상/불완전 세이브가 기본값으로 로드된 뒤 덮어써짐 | 재현 | **수정됨** (`SaveDataValidator`) |
-| 플레이 중 Reset Save가 종료 때 되살아남 | 재현 | **수정됨** (플레이 중 메뉴 비활성) |
-| 슬롯을 옮기면 쿨다운 0 | 재현 | 별도 수정 |
-| 사망 후 보스 버튼이 남음 | 재현 | 5-3의 `BossAvailable` 상태 전환 때 해결 |
-| `.asset`과 JSON 불일치(몬스터 2002, 스킬 6, 1스테이지 보스) | 코드 | 원본 엑셀 확인 전 재동기화 금지 |
+전부 [TODO](TODO.md)로 옮겼다(전투, 저장, 데이터, UI).
 
 ## 7. 검증 범위
 
 - 원안 + 보완 규칙 검사 19개 통과, 잘못된 인자의 컴파일 에러, 4장 API 컴파일.
 - 배치 모드라 그려진 화면은 [미확인]. 중첩 Canvas의 화면상 순서는 `renderOrder` 값과 터치 순서로만 확인했다.
-- Android/WebGL, 성능, 슬라이스 전체 통합은 [미확인].
+- Android, 성능은 [미확인]. 슬라이스 통합과 WebGL 화면/입력은 구현 후 확인했다.

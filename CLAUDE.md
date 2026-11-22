@@ -54,7 +54,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 ## 엔지니어링 스타일 (이 프로젝트에서 합의된 방향)
 
 - 예: `PlayerCombatState.isAnimationFinished` 단일 플래그로 정착하기 전에, Animator `AnyState` 전이 방식과 별도 `hasHitLanded` 플래그 방식을 둘 다 시도했다가 "주먹구구식"이라는 이유로 명시적으로 반려됨.
-- 새 기능을 freestanding `MonoBehaviour`로 만들기보다, 기존 패턴(`UIBase` 상속 등)에 맞춰 들어가는 설계를 선호함 (`StageAnnouncement`가 그 사례).
+- 새 기능을 freestanding `MonoBehaviour`로 만들기보다, 기존 패턴에 맞춰 들어가는 설계를 선호함 (`StageAnnouncement`가 그 사례). 새 팝업의 패턴은 `UIBase` 상속이 아니라 `UIWindow` + Presenter(아래 "UI 구조").
 
 ## UI 구조
 
