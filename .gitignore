@@ -115,3 +115,7 @@ InitTestScene*.unity*
 /WebGL Builds/
 /connectwebgl.zip
 /webgl_sharing
+
+# Per-PC settings that contain local paths - never publish
+/ProjectSettings/Packages/com.unity.connect.share/Settings.json
+/.claude/settings.local.json
