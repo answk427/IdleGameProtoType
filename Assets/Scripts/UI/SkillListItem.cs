@@ -4,8 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// 스킬 관리 팝업 하단 목록의 항목 1개
-// 단일 클릭: 배치를 위한 선택. 더블 클릭: 학습 시도.
+// 스킬 관리 창 하단 목록의 항목 1개. 표시와 탭 전달만 한다(더블탭 판정은 SkillManageWindow).
 public class SkillListItem : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField] private Image iconImage;
@@ -18,24 +17,23 @@ public class SkillListItem : MonoBehaviour, IPointerClickHandler
 
     public int SkillId { get; private set; }
 
-    private Action<int> onSingleClick;
-    private Action<int> onDoubleClick;
+    private Action<int> onTapped;
 
-    public void Bind(SkillEntry entry, bool isLearned, Action<int> singleClickCallback, Action<int> doubleClickCallback)
+    public void Bind(int skillId, Sprite icon, string displayName, string requirement, Action<int> tapped)
     {
-        SkillId = entry.data.Id;
-        onSingleClick = singleClickCallback;
-        onDoubleClick = doubleClickCallback;
+        SkillId = skillId;
+        onTapped = tapped;
 
-        if (iconImage != null)
-        {
-            iconImage.sprite = entry.icon;
-            iconImage.color = isLearned ? LearnedColor : UnlearnedColor;
-        }
-        if (nameText != null) nameText.text = entry.data.SkillName;
-        if (requiredLevelText != null) requiredLevelText.text = $"Lv.{entry.data.RequiredLevel}";
+        if (iconImage != null) iconImage.sprite = icon;
+        if (nameText != null) nameText.text = displayName;
+        if (requiredLevelText != null) requiredLevelText.text = requirement;
 
         SetSelected(false);
+    }
+
+    public void SetLearned(bool learned)
+    {
+        if (iconImage != null) iconImage.color = learned ? LearnedColor : UnlearnedColor;
     }
 
     public void SetSelected(bool selected)
@@ -43,26 +41,5 @@ public class SkillListItem : MonoBehaviour, IPointerClickHandler
         if (selectedHighlight != null) selectedHighlight.enabled = selected;
     }
 
-    // 모바일 터치는 Unity EventSystem이 clickCount를 마우스처럼 1->2로 못 올려주는 경우가 많아서
-    // (PC에서는 더블클릭 인식되는데 모바일에서는 항상 1로만 들어옴), 직접 시간차로 더블탭을 판정한다.
-    private const float DoubleClickThreshold = 0.3f;
-    private static int lastClickedSkillId = -1;
-    private static float lastClickTime = -999f;
-
-    public void OnPointerClick(PointerEventData eventData)
-    {
-        bool isDoubleClick = SkillId == lastClickedSkillId && Time.unscaledTime - lastClickTime <= DoubleClickThreshold;
-        lastClickedSkillId = SkillId;
-        lastClickTime = Time.unscaledTime;
-
-        if (isDoubleClick)
-        {
-            onDoubleClick?.Invoke(SkillId);
-            lastClickedSkillId = -1;
-        }
-        else
-        {
-            onSingleClick?.Invoke(SkillId);
-        }
-    }
+    public void OnPointerClick(PointerEventData eventData) => onTapped?.Invoke(SkillId);
 }

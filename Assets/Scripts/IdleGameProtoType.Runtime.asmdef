@@ -2,6 +2,7 @@
     "name": "IdleGameProtoType.Runtime",
     "rootNamespace": "",
     "references": [
+        "Unity.InputSystem",
         "Unity.TextMeshPro",
         "UnityEngine.UI"
     ],

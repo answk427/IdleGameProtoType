@@ -1,7 +1,7 @@
 # UI 시스템 설계
 
 화면 UI의 뼈대 설계 문서. 대화로 검토하며 확정한 내용과, 도중에 뒤집힌 결정과 그 이유를 함께 남긴다.
-**상태: 설계 확정(미결 없음). 0단계 구현 완료, 1차 이후 구현 전.** `refactor/ui-stack` 브랜치의 현재 코드(`UIBase`/`UIManager` 통합 스택)는 이 설계 이전 단계의 결과물이며, 1차 구현에서 대체된다.
+**상태: 설계 확정. 0단계와 1차 수직 슬라이스(스킬 관리 창) 구현 완료, 나머지 1차 이관 전.** `refactor/ui-stack` 브랜치에 남아 있는 `UIBase`/`UIManager`(HUD, 탭)는 이 설계 이전 단계의 결과물이며, 나머지 1차 이관에서 대체된다.
 
 ## 1. 목표와 원칙
 
@@ -56,10 +56,12 @@ UIRoot (화면 UI의 유일한 진입점)
 
 - 지금 쓰는 것만 정의하고 간격을 1000으로 넓게 둔다. sortingOrder 범위가 -32768~32767이라 아낄 이유가 없다. 토스트/튜토리얼은 2차에서 4000 근처에 추가한다.
 - 창의 sortingOrder = `구분 기준값 + 깊이 × 10`. 창마다 자기 Canvas(`overrideSorting`)를 가진다.
+  - **`overrideSorting`은 WindowManager가 활성 상태에서 설정한다.** 비활성 상태에서 넣은 값은 무시되고 order 0으로 남는다. 사람이 프리팹에서 켜는 값이 아니다.
   - **깊이는 같은 구분 안에서 센다.** 창 2개 위에 처음 뜬 팝업은 깊이 0이라 `3000 + 0`이다.
   - **×10은 창 하나가 쓰는 칸이다.** `−1`: 공용 딤(맨 위 모달 바로 아래), `0`: 창 본체, `+1 ~ +8`: 창 안에서 자기 Canvas로 위에 떠야 하는 요소(드롭다운 목록, 툴팁 등).
   - **한도:** 구분마다 깊이 100까지(간격 1000 ÷ 10). 넘으면 한도에서 멈추고 에러 로그를 낸다. 다른 구분을 조용히 침범하는 대신 바로 드러나게 한다.
   - **주의:** uGUI 기본 드롭다운(`Dropdown`/`TMP_Dropdown`)은 펼친 목록용 Canvas를 sortingOrder 30000으로 만드는 것으로 알고 있다(구현 시 확인). 그대로 두면 System 구분까지 뚫고 올라가므로 창의 `+1~+8` 칸으로 맞춰 준다.
+- **Fx Canvas에는 GraphicRaycaster를 두지 않는다.** 데미지 숫자가 버튼과 팝업의 터치를 가로채지 않게 한다. 텍스트마다 `raycastTarget`을 끄는 것에 기대지 않는다.
 - **런타임에 나타나는 것의 순서는 시스템이 정한다.** 하이어라키 배치 순서에 의존하지 않는다.
 - **창 프리팹 내부 요소는 하이어라키 순서를 쓴다.** 디자이너가 저작 시점에 정하는 순서라 정당하다.
 - 스택은 "닫는 순서", 정렬 구분은 "그리는 순서"를 정한다. 둘은 분리한다.
@@ -142,7 +144,7 @@ Q3. 다른 상태들로부터 계산되나?                            예 → �
 | 사건 | 레벨업 순간, 골드 획득, 몬스터 사망, 스테이지 전환 | `Subject<T>` |
 | 매 프레임 값 | 스킬 쿨다운 비율, 보스 제한 시간 | 폴링 (원인은 상태로: "쿨다운 끝나는 시각") |
 
-- **모음 데이터**(배운 스킬, 슬롯 6개)는 목록 전체를 새 목록으로 교체하는 방식(`ReactiveProperty<IReadOnlyList<T>>`). 항목 단위 반응형 컬렉션은 이 규모에서 얻는 것이 없다.
+- **모음 데이터**(배운 스킬, 슬롯 5개 = `PlayerStatsSaveData.SkillSlotCount`)는 목록 전체를 새 목록으로 교체하는 방식(`ReactiveProperty<IReadOnlyList<T>>`). 항목 단위 반응형 컬렉션은 이 규모에서 얻는 것이 없다.
 - **파생 상태의 위치:** 게임 규칙(레벨업 가능, 구매 가능, 해금)은 모델/게임 서비스에, 표시용 가공(`"EXP 45.20%"`, `"1.2K"`)은 Presenter에.
 - **상태와 사건을 겸하던 이벤트는 둘로 나눈다.** `OnLevelUp` → `Level` + `LevelReached`, `OnStageChanged` → `CurrentStageNumber` + `StageChanged`.
 - **재분류: 보스 도전 가능.** 지금은 `OnBossChallengeAvailable` 사건이지만 "지금 도전 가능한가?"에 답이 있으므로 상태다(`StageManager.BossAvailable`이 이미 존재). 버튼은 `BossAvailable && !보스전 중`을 구독해 켜지고 꺼지기만 하며, 클릭 시 스스로 `Hide()`하던 코드가 사라진다.
@@ -183,6 +185,7 @@ Q3. 다른 상태들로부터 계산되나?                            예 → �
 - **Presenter:** 순수 C#. 서비스를 생성자로 주입받는다(`GameManager.Instance`를 찾지 않는다). 모델 상태/사건을 구독해 View에 넣고, 사용자 입력을 모델 명령으로 바꾼다.
 - **UI는 모델을 직접 바꾸지 않는다.** 명령을 보내고 결과를 받는다. 명령은 동기 + 실패 이유를 담은 결과 반환(10-1).
 - **구독은 창 수명에 묶는다.** 창마다 `IDisposable` 묶음을 두고 닫힐 때 일괄 해제한다.
+- **Presenter 생성:** 창 타입별 생성 함수를 UIRoot가 WindowManager에 등록한다(`Bind`). View는 자기 Presenter를 모른다. Presenter는 열 때마다 새로 만들고 닫을 때 버린다.
 - **의존성 주입:** DI 프레임워크 없이 GameInitializer 하나가 서비스를 만들어 넘긴다. 규모가 커지면 VContainer 등으로 옮길 수 있는 모양이다.
 - **테스트:** Presenter가 순수 C#이라 구조상 단위 테스트가 가능하다. 단, 이 프로젝트는 명시적 요청 없이 새 테스트를 작성하지 않는다는 규칙을 따른다.
 
@@ -220,12 +223,14 @@ public class SkillManageWindow : UIWindow<SkillManageArgs>
 ### 6-3. 수명 주기와 API
 
 - 로드 → 초기화(1회) → 열림(타입 있는 인자 받음) → 열림 완료(전환 후) → 닫힘 → 닫힘 완료 → 캐시 또는 파괴.
-- 인자는 창이 선언한다: `Open<SkillManageWindow>(new SkillManageArgs(...))`.
+- 인자는 창이 선언한다: `Open<SkillManageWindow>(new SkillManageArgs(...))`. 인자 타입이 자기 창을 가리키므로(`SkillManageArgs : IWindowArgs<SkillManageWindow>`) 다른 창의 인자를 넘기면 컴파일되지 않는다.
 - **결과와 닫힘 대기.** 열기는 핸들을 돌려주고, 핸들로 닫힐 때까지 기다리거나(`await handle.Closed`) 타입 있는 결과를 받는다(`UIWindow<TArgs, TResult>`). 확인창(`bool ok = await dialogs.Confirm(...)`)과 시작 팝업 순서(오프라인 보상 → 공지 → 출석: 하나 닫히면 다음)가 이것으로 해결된다. 순서 처리는 호출하는 쪽의 연속된 `await`로 한다. 아래 "요청 큐 없음"과는 다른 것이다 — 큐는 경쟁 상태 방지 장치였고, 이건 의도한 순서대로 보여 주는 기능이다.
 - API는 비동기 모양(Unity 6 내장 `Awaitable`). 지금은 동기 로드라도, Addressables/전환 애니메이션이 들어와도 호출부가 바뀌지 않게 한다.
+- **`Closed`는 읽을 때마다 새 `Awaitable`을 준다.** `Awaitable`은 풀에서 재사용돼 같은 인스턴스를 두 번 await하면 예외가 난다. `await handle.Closed`는 여러 곳에서 여러 번 써도 되고, 꺼낸 `Awaitable`을 변수에 담아 두 번 await하지는 않는다.
 - **요청 큐는 두지 않는다.** 경쟁 상태의 대부분은 사용자 연타이며, 창 전환 중 InputBlocker로 막는다. 나머지는 창별 상태(Opening/Open/Closing/Closed) 확인으로 처리한다.
 - **실패와 취소:** 로드 실패 시 에러를 남기고 열기 결과로 실패를 돌려준다(예외로 흐름을 끊지 않음). 로드 중에 닫기 요청이 오거나 UIRoot가 파괴되면 `CancellationToken`으로 열기를 취소하고, 늦게 도착한 프리팹은 바로 정리한다.
 - 숨김은 `SetActive(false)` 대신 `Canvas.enabled = false` + `GraphicRaycaster` 비활성화. 재표시 비용(`OnEnable`, 레이아웃 재계산)이 없다.
+  - **창 안의 자식 Canvas와 GraphicRaycaster까지 끄고 `CanvasGroup.interactable = false`로 둔다.** 자식 Canvas(`+1~+8`칸)는 부모를 꺼도 터치를 받고, 안 보이는 버튼도 Submit에는 눌린다. 다시 보일 때는 숨길 때 껐던 것만 켠다.
 - **창은 `Update`를 쓰지 않는다.** 숨긴 창도 `Update`는 계속 돌기 때문이다. 갱신은 반응형 구독으로 하고, 매 프레임 값(쿨다운)이 필요한 창은 **WindowManager가 열린 창에만 호출하는 `Tick()`**에서 폴링한다. (HUD 위젯은 항상 보이므로 `Update` 사용 가능.)
 
 ### 6-4. 내비게이션
@@ -252,6 +257,7 @@ using (inputBlocker.Acquire("StageTransition"))   // 스코프를 벗어나면 �
 
 - 참조 카운트: 여러 곳에서 동시에 걸어도 마지막 해제 때 풀린다.
 - 스코프 기반 해제: 예외가 나도 잠긴 채 남지 않는다.
+  - **코루틴의 지역변수로 `using`하지 않는다.** `StopCoroutine`이나 오브젝트 파괴로 끊기면 `finally`가 실행되지 않는다. `async` + `destroyCancellationToken`에서 쓰거나, 수명이 있는 객체가 필드로 들고 `OnDisable`에서도 해제한다.
 - 지연 스피너: 차단은 즉시, 스피너는 일정 시간(예: 0.3초) 넘을 때만 표시해 깜빡임을 없앤다.
 - 이유 기록 + 타임아웃 경고: 영구 잠금 디버깅용.
 - 사용처: 창 전환(자동), 화면 페이드(현재 `FadeController`의 `blocksRaycasts`를 대체), 서버가 필요한 명령(결제 등, 생길 때) 대기, 튜토리얼(전체 차단에 구멍 하나를 뚫는 변형, 2차 이후).

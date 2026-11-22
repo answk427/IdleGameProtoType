@@ -1,15 +1,19 @@
 # TODO / 알려진 한계
 
-## 다음 세션 시작점 (2026-11-20 기준)
+## 다음 세션 시작점 (2026-11-22 기준)
 
 대화 기록은 PC 간에 넘어가지 않으므로, 이어서 작업할 때는 이 문단과 [UI_DESIGN.md](UI_DESIGN.md)부터 읽는다.
 
 - **완료:** 설계 확정(UI_DESIGN, SERVER_DESIGN). 0단계(`GameNumber`, `GameSession`, `GameInitializer`) 구현 — 배치 모드에서 컴파일, EditMode 테스트(22개 중 20개 통과, 실패 2개는 아래 "테스트" 항목의 기존 실패), 플레이 모드(저장 → 업그레이드 → 재시작 후 유지) 확인.
 - **사용자 확인 대기:** 에디터에서 직접 플레이해 업그레이드 패널 비용 표시와 골드 HUD가 정상으로 보이는지(배치 모드는 화면을 못 봄).
 - **다음 결정:** 실행 중인 에디터를 조작하는 Unity CLI + Pipeline 패키지(`com.unity.pipeline`)를 설치할지, 패키지를 커밋할지(CLAUDE.md "외부 도구" 참고).
-- **1차 진행 중 (2026-11-22, 집 PC):** 반응형 타입(`Assets/Scripts/Reactive/`, UI_DESIGN 5-5) 구현 — 격리 사본의 배치 모드에서 컴파일과 규약 동작 확인. 아직 어떤 모델/UI도 쓰지 않는다. 파생 상태는 쓰는 곳이 생길 때 추가.
+- **1차 수직 슬라이스 완료 (2026-11-22, 집 PC):** 스킬 관리 창 하나가 `WindowRegistry` → `WindowManager` → `SkillManagePresenter` → 반응형 구독/자동 해제 → `InputBlocker`를 통과한다(`Assets/Scripts/UI/Core/`). 조립과 기존 `UIManager`(HUD, 탭)와의 연결은 `UIRoot` 한 곳. 새 팝업은 `UIWindow`로 만든다.
 - **옛 브랜치 반영 결정 완료 (2026-11-22):** 집 PC `UIManager_improvement`는 병합하지 않는다. `.gitignore` 규칙, `BalanceConfig`, 코드리뷰의 미해결 항목만 옮겼다. UIRegistry와 Canvas 정리는 UI_DESIGN이 대체하고, SingletonBehaviour는 보류(아래 "코드 품질"), 세이브 로드 실패 처리는 따로 고쳤다(`SaveDataValidator`, 남은 것은 아래 "저장").
-- **다음 작업:** 1차 수직 슬라이스 — `SkillManagePopup` 하나를 WindowRegistry → WindowManager → Presenter → 반응형 구독/자동 해제 → InputBlocker까지 새 구조로 통과시켜 인터페이스를 확정(UI_DESIGN 9장).
+- **다음 작업 (1차의 남은 것):**
+  - 세이브 오류 창: 닫을 수 없는 System 창. UI_DESIGN 보완안(`UI_REDESIGN_PROPOSAL.md`)의 B8(스택 삽입 순서), B9(로드 실패 시 UIRoot 준비)를 그때 확인받고 반영
+  - 탭 2개 이관: 스택 방식 Exclusive 옵션 추가, `UIRoot`의 "이관 기간 연결" 제거
+  - HUD, 보스 버튼, StageAnnouncement 이관과 모델(레벨, 경험치, 골드, 보스 가능)·이벤트 버스의 반응형 전환
+  - 전체 화면, 캐시 정책 옵션은 쓰는 창이 생길 때. 드로콜/리빌드 실측(UI_DESIGN 4-4)
 
 ---
 
@@ -26,8 +30,8 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
   탭이 늘어나면 잠금 규칙을 어느 쪽이 소유할지 정해야 함.
 
 - **탭 위에 전체 화면을 올리는 구조 미지원**
-  UI 스택은 `Overlay`(팝업)와 `Exclusive`(탭) 두 모드만 지원. 탭 → 전체 화면 → 뒤로가기로 탭 복귀하는 흐름은 불가.
-  상세 화면을 팝업으로 만들면 현재 규칙으로 가능하고, 정말 필요해지면 `StackMode`에 세 번째 값을 추가하면 됨.
+  탭은 기존 `UIManager`(Exclusive), 팝업은 `WindowManager`(쌓임)만 지원. 탭 → 전체 화면 → 뒤로가기로 탭 복귀하는 흐름은 불가.
+  상세 화면을 팝업으로 만들면 현재 규칙으로 가능하고, 정말 필요해지면 `WindowOptions`에 전체 화면 축을 추가하면 됨.
 
 - **선택된 탭 강조 표시 없음**
   `TabBarController`가 현재 탭을 모른다. `UIManager`의 탭 변경 이벤트는 UI 구조 정리 때 추가하지만, 강조 표시 UI 자체는 별도 작업.
@@ -35,9 +39,9 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 - **스택이 비었을 때 뒤로가기는 아무 동작도 안 함**
   종료 확인창은 아직 없음.
 
-- **Canvas 순서가 암묵적이고 화면 페이드가 UI를 덮지 못함**
-  Canvas 3개(`UIManager`, `StaticCanvas`, `DynamicCanvas`)가 전부 order 0이라 하이어라키 순서에 의존한다. `FadePanel`이 HUD와 탭바보다 아래라 전환 중에도 UI가 보이고 눌린다.
-  UI_DESIGN 4-1의 정렬 구분(페이드는 System)으로 1차에서 해결한다.
+- **기존 UI 쪽 Canvas 순서가 암묵적**
+  창, 딤, 페이드, 입력 차단은 정렬 구분으로 순서가 정해졌지만, 이관 전인 `UIManager`/`StaticCanvas`/`DynamicCanvas`는 전부 order 0이라 하이어라키 순서에 의존한다.
+  그래서 데미지 숫자가 아직 HUD와 탭바 위에 그려진다(터치는 가로채지 않음). HUD 이관 때 Fx/Hud 구분으로 옮긴다.
 
 ## 렌더링
 

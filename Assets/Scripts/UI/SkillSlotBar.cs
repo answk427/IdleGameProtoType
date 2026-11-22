@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,13 +12,16 @@ public class SkillSlotBar : UITabPanel
     private readonly List<SkillSlotWidget> slotWidgets = new List<SkillSlotWidget>();
     private PlayerController player;
 
+    // 어떤 창을 어떻게 열지는 모른다. 요청만 내고 UIRoot가 연다.
+    public event Action SkillManageRequested;
+
     private void Awake()
     {
         BuildSlots();
 
         if (settingsButton != null)
         {
-            settingsButton.onClick.AddListener(() => UIManager.Instance.ShowUI<SkillManagePopup>());
+            settingsButton.onClick.AddListener(() => SkillManageRequested?.Invoke());
         }
     }
 

@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 스킬 슬롯 1칸의 표시(아이콘/쿨다운)와 클릭 입력을 담당.
-// 전투 탭의 SkillSlotBar와 SkillManagePopup 상단 영역에서 공통으로 재사용한다.
+// 전투 탭의 SkillSlotBar와 SkillManageWindow 상단 영역에서 공통으로 재사용한다.
 public class SkillSlotWidget : MonoBehaviour
 {
     [SerializeField] private Button button;
@@ -39,11 +39,20 @@ public class SkillSlotWidget : MonoBehaviour
 
     public void SetSkill(Sprite icon, float cooldownRatio)
     {
-        if (iconImage != null)
-        {
-            iconImage.sprite = icon;
-            iconImage.enabled = true;
-        }
-        if (cooldownOverlay != null) cooldownOverlay.fillAmount = Mathf.Clamp01(cooldownRatio);
+        SetIcon(icon);
+        SetCooldown(cooldownRatio);
+    }
+
+    public void SetIcon(Sprite icon)
+    {
+        if (iconImage == null) return;
+
+        iconImage.sprite = icon;
+        iconImage.enabled = true;
+    }
+
+    public void SetCooldown(float ratio)
+    {
+        if (cooldownOverlay != null) cooldownOverlay.fillAmount = Mathf.Clamp01(ratio);
     }
 }

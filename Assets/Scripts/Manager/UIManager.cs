@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 패널 등록/조회와 "닫는 순서"가 중요한 패널(탭, 팝업)의 통합 스택을 관리한다.
+// 패널 등록/조회와 탭 스택을 관리한다. 1차 이관이 끝나면 사라진다 (docs/UI_DESIGN.md 9장).
+// 팝업(창)은 여기가 아니라 UIRoot의 WindowManager가 관리한다. 새 팝업을 여기에 추가하지 말 것.
 // 게임 상태에 따라 HUD를 언제 켤지는 모른다 — 그건 각 패널이 이벤트를 구독해서 스스로 결정한다.
 public class UIManager : MonoBehaviour
 {
@@ -11,7 +12,7 @@ public class UIManager : MonoBehaviour
     private readonly Dictionary<Type, UIBase> uiDict = new();
     private readonly Dictionary<UITabType, UITabPanel> tabDict = new();
 
-    // 인덱스 0이 바닥, 마지막이 맨 위. StackMode가 Overlay/Exclusive인 패널만 들어간다.
+    // 인덱스 0이 바닥, 마지막이 맨 위. StackMode가 Exclusive인 패널(탭)만 들어간다.
     private readonly List<UIBase> stack = new();
 
     // 스택 바닥이 탭이면 그 탭. 별도 상태를 두지 않고 계산해서 스택과 어긋날 일이 없다.
@@ -75,15 +76,6 @@ public class UIManager : MonoBehaviour
                 ui.Show();
                 break;
 
-            case StackMode.Overlay:
-                // 이미 스택에 있는 팝업은 무시한다.
-                if (stack.Contains(ui)) return;
-
-                onShow?.Invoke(ui);
-                stack.Add(ui);
-                ui.Show();
-                break;
-
             case StackMode.Exclusive:
                 onShow?.Invoke(ui);
                 ShowExclusive(ui);
@@ -133,7 +125,7 @@ public class UIManager : MonoBehaviour
         return true;
     }
 
-    // 스택을 전부 비운다 (팝업 전부 + 탭).
+    // 스택을 전부 비운다.
     public void CloseAll()
     {
         UITabType prevTab = CurrentTab;

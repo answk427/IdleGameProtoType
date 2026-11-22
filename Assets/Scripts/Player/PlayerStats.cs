@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public enum UpgradeStatType
@@ -7,6 +8,22 @@ public enum UpgradeStatType
     Hp,
     Attack,
     AttackSpeed
+}
+
+public enum LearnSkillResult
+{
+    Success,
+    AlreadyLearned,
+    UnknownSkill,
+    LevelTooLow,
+}
+
+public enum SkillSlotResult
+{
+    Success,
+    Unchanged,
+    NotLearned,
+    InvalidSlot,
 }
 
 // 최종 스탯 = 레벨 기본 스탯 (PlayerStatDatabase) + 업그레이드 보너스 (PlayerStatsSaveData)
@@ -24,6 +41,16 @@ public class PlayerStats
     private PlayerStatDatabase statData;
     private PlayerUpgradeConfig upgradeConfig;
     private PlayerStatsSaveData saveData;
+
+    // ── 상태 ────────────────────────────────────────────────
+    // 모음은 내용을 고치지 않고 새 목록으로 교체한다. 바꾸는 곳은 SetLearnedSkills/SetEquippedSlots뿐이다.
+    private readonly ReactiveProperty<IReadOnlyList<int>> learnedSkills =
+        new ReactiveProperty<IReadOnlyList<int>>(Array.Empty<int>());
+    private readonly ReactiveProperty<IReadOnlyList<int>> equippedSlots =
+        new ReactiveProperty<IReadOnlyList<int>>(Array.AsReadOnly(new PlayerStatsSaveData().equippedSkillSlotIds));
+
+    public IReadOnlyReactiveProperty<IReadOnlyList<int>> LearnedSkills => learnedSkills;
+    public IReadOnlyReactiveProperty<IReadOnlyList<int>> EquippedSlots => equippedSlots;
 
     // ── 읽기 전용 프로퍼티 ──────────────────────────────────
 
@@ -50,7 +77,7 @@ public class PlayerStats
     {
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
-        this.saveData = new PlayerStatsSaveData(); // 기본값
+        LoadSave(null); // 기본값
 
         IUpgradeStat[] stats = {
             new HpUpgradeStat(this, upgradeConfig),
@@ -70,6 +97,10 @@ public class PlayerStats
     public void LoadSave(PlayerStatsSaveData data)
     {
         saveData = data ?? new PlayerStatsSaveData();
+
+        // 상태만 갱신한다. 저장을 일으키는 사건(OnSkillLearned 등)은 내지 않는다.
+        SetLearnedSkills(saveData.learnedSkillIds ?? new List<int>());
+        SetEquippedSlots(saveData.equippedSkillSlotIds ?? new PlayerStatsSaveData().equippedSkillSlotIds);
     }
 
     // ── 경험치 / 레벨업 ─────────────────────────────────────
@@ -139,64 +170,92 @@ public class PlayerStats
 
     // ── 스킬 학습 / 장착 ────────────────────────────────────
     // 학습 조건은 플레이어 레벨만 체크
+    // 명령은 동기 + 실패 이유 반환. 상태를 다 바꾼 뒤에 사건을 낸다.
+    // 사건(저장, 캐릭터, SkillSlotBar가 구독)은 그쪽 이관이 끝나면 정리한다.
 
-    public bool IsSkillLearned(int skillId) => saveData?.learnedSkillIds.Contains(skillId) ?? false;
+    public bool IsSkillLearned(int skillId) => learnedSkills.Value.Contains(skillId);
 
-    public IReadOnlyList<int> LearnedSkillIds => saveData?.learnedSkillIds;
+    public bool CanLearnSkill(int skillId) => CheckLearnSkill(skillId) == LearnSkillResult.Success;
 
-    public bool CanLearnSkill(int skillId)
+    public LearnSkillResult LearnSkill(int skillId)
     {
-        if (IsSkillLearned(skillId)) return false;
+        LearnSkillResult result = CheckLearnSkill(skillId);
+        if (result != LearnSkillResult.Success) return result;
 
-        SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
-        if (entry?.data == null) return false;
-
-        return Level >= entry.data.RequiredLevel;
-    }
-
-    public bool LearnSkill(int skillId)
-    {
-        if (!CanLearnSkill(skillId)) return false;
-
-        saveData.learnedSkillIds.Add(skillId);
+        SetLearnedSkills(learnedSkills.Value.Append(skillId));
         OnSkillLearned?.Invoke();
         Debug.Log($"[PlayerStats] 스킬 학습: {skillId}");
-        return true;
+        return LearnSkillResult.Success;
     }
 
     public int GetEquippedSkillId(int slotIndex)
     {
-        if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length)
-            return PlayerStatsSaveData.EmptySlot;
-        return saveData.equippedSkillSlotIds[slotIndex];
+        IReadOnlyList<int> slots = equippedSlots.Value;
+        if (slotIndex < 0 || slotIndex >= slots.Count) return PlayerStatsSaveData.EmptySlot;
+        return slots[slotIndex];
     }
 
-    public bool EquipSkill(int skillId, int slotIndex)
+    public SkillSlotResult EquipSkill(int skillId, int slotIndex)
     {
-        if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length) return false;
-        if (!IsSkillLearned(skillId)) return false;
+        if (!IsValidSlot(slotIndex)) return SkillSlotResult.InvalidSlot;
+        if (!IsSkillLearned(skillId)) return SkillSlotResult.NotLearned;
+
+        // 새 목록은 내용이 같아도 "다른 값"으로 알려지므로, 바뀌지 않는 명령은 여기서 거른다.
+        if (equippedSlots.Value[slotIndex] == skillId) return SkillSlotResult.Unchanged;
+
+        int[] slots = equippedSlots.Value.ToArray();
 
         // 다른 슬롯에 이미 배치되어 있던 스킬이면 그 슬롯은 비운다 (중복 배치 방지)
-        for (int i = 0; i < saveData.equippedSkillSlotIds.Length; i++)
+        for (int i = 0; i < slots.Length; i++)
         {
-            if (saveData.equippedSkillSlotIds[i] == skillId)
-                saveData.equippedSkillSlotIds[i] = PlayerStatsSaveData.EmptySlot;
+            if (slots[i] == skillId) slots[i] = PlayerStatsSaveData.EmptySlot;
         }
 
-        saveData.equippedSkillSlotIds[slotIndex] = skillId;
+        slots[slotIndex] = skillId;
+        SetEquippedSlots(slots);
         OnSkillEquipChanged?.Invoke();
-        return true;
+        return SkillSlotResult.Success;
     }
 
-    public bool UnequipSkill(int slotIndex)
+    public SkillSlotResult UnequipSkill(int slotIndex)
     {
-        if (saveData == null || slotIndex < 0 || slotIndex >= saveData.equippedSkillSlotIds.Length) return false;
-        if (saveData.equippedSkillSlotIds[slotIndex] == PlayerStatsSaveData.EmptySlot) return false;
+        if (!IsValidSlot(slotIndex)) return SkillSlotResult.InvalidSlot;
+        if (equippedSlots.Value[slotIndex] == PlayerStatsSaveData.EmptySlot) return SkillSlotResult.Unchanged;
 
-        saveData.equippedSkillSlotIds[slotIndex] = PlayerStatsSaveData.EmptySlot;
+        int[] slots = equippedSlots.Value.ToArray();
+        slots[slotIndex] = PlayerStatsSaveData.EmptySlot;
+        SetEquippedSlots(slots);
         OnSkillEquipChanged?.Invoke();
-        return true;
+        return SkillSlotResult.Success;
     }
 
+    private LearnSkillResult CheckLearnSkill(int skillId)
+    {
+        if (IsSkillLearned(skillId)) return LearnSkillResult.AlreadyLearned;
+
+        SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
+        if (entry?.data == null) return LearnSkillResult.UnknownSkill;
+
+        return Level >= entry.data.RequiredLevel ? LearnSkillResult.Success : LearnSkillResult.LevelTooLow;
+    }
+
+    private bool IsValidSlot(int slotIndex) => saveData != null && slotIndex >= 0 && slotIndex < equippedSlots.Value.Count;
+
+    // DTO를 먼저 맞추고 상태를 알린다. 알림을 받은 쪽이 바로 저장해도 새 값이 나간다.
+    private void SetLearnedSkills(IEnumerable<int> skillIds)
+    {
+        int[] next = skillIds.ToArray();
+        saveData.learnedSkillIds = new List<int>(next);
+        learnedSkills.Value = Array.AsReadOnly(next);
+    }
+
+    private void SetEquippedSlots(IEnumerable<int> skillIds)
+    {
+        int[] next = skillIds.ToArray();
+        saveData.equippedSkillSlotIds = (int[])next.Clone();
+        equippedSlots.Value = Array.AsReadOnly(next);
+    }
+
+    // 스킬 목록/슬롯은 이 객체로 고치지 말 것(상태에 알려지지 않는다). 위 명령을 쓴다.
     public PlayerStatsSaveData GetSaveData() => saveData;
 }
