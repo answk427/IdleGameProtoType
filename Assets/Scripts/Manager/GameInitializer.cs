@@ -2,7 +2,7 @@ using UnityEngine;
 
 // 게임 시작 시 객체를 순서대로 만들고 서로 연결하는 조립 지점(Composition Root). 씬에 하나만 둔다.
 //
-//   1. 세이브 로드
+//   1. 세이브 로드 (실패하면 여기서 중단)
 //   2. GameSession 생성 + 세이브 적용(Apply)
 //   3. 플레이어 캐릭터 스폰 + 진행도 주입
 //   4. GameManager에 세션과 캐릭터를 넘겨 게임 루프 시작
@@ -32,7 +32,18 @@ public class GameInitializer : MonoBehaviour
         // 시작 지점에서 먼저 검사해 원인을 바로 보이게 한다.
         if (!ValidateReferences()) return;
 
-        PlayerSaveData saveData = SaveStorageProvider.Current.Load();
+        PlayerSaveData saveData;
+        try
+        {
+            saveData = SaveStorageProvider.Current.Load();
+        }
+        catch (System.Exception e)
+        {
+            // 새 데이터로 대신 시작하지 않는다. 세션이 없으면 GameManager의 저장 경로(종료 저장 포함)가
+            // 아무것도 쓰지 않으므로 원본이 그대로 남는다. 세이브 오류 안내창도 여기서 띄우면 된다.
+            Debug.LogError($"[GameInitializer] 세이브를 읽지 못해 게임을 시작하지 않습니다(원본 보존).\n{e}");
+            return;
+        }
 
         Session = new GameSession(statData, upgradeConfig);
         Session.Apply(saveData);
