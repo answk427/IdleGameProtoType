@@ -8,7 +8,7 @@
 - **사용자 확인 대기:** 에디터에서 직접 플레이해 업그레이드 패널 비용 표시와 골드 HUD가 정상으로 보이는지(배치 모드는 화면을 못 봄).
 - **다음 결정:** 실행 중인 에디터를 조작하는 Unity CLI + Pipeline 패키지(`com.unity.pipeline`)를 설치할지, 패키지를 커밋할지(CLAUDE.md "외부 도구" 참고).
 - **1차 진행 중 (2026-11-22, 집 PC):** 반응형 타입(`Assets/Scripts/Reactive/`, UI_DESIGN 5-5) 구현 — 격리 사본의 배치 모드에서 컴파일과 규약 동작 확인. 아직 어떤 모델/UI도 쓰지 않는다. 파생 상태는 쓰는 곳이 생길 때 추가.
-- **슬라이스 전에 정할 것:** 집 PC `UIManager_improvement`의 커밋(UIRegistry, SaveErrorPopup, Canvas 정리, SingletonBehaviour, BalanceConfig)이 이 브랜치에 없고 `MainScene`/`UIManager`/`UIBase`/`GameManager`/`PlayerController`에서 충돌한다. 무엇을 가져올지 먼저 정한다.
+- **옛 브랜치 반영 결정 완료 (2026-11-22):** 집 PC `UIManager_improvement`는 병합하지 않는다. `.gitignore` 규칙, `BalanceConfig`, 코드리뷰의 미해결 항목만 옮겼다. UIRegistry와 Canvas 정리는 UI_DESIGN이 대체하고, SingletonBehaviour는 보류(아래 "코드 품질"), 세이브 로드 실패 처리는 아래 "저장"에서 따로 고친다.
 - **다음 작업:** 1차 수직 슬라이스 — `SkillManagePopup` 하나를 WindowRegistry → WindowManager → Presenter → 반응형 구독/자동 해제 → InputBlocker까지 새 구조로 통과시켜 인터페이스를 확정(UI_DESIGN 9장).
 
 ---
@@ -34,6 +34,10 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 
 - **스택이 비었을 때 뒤로가기는 아무 동작도 안 함**
   종료 확인창은 아직 없음.
+
+- **Canvas 순서가 암묵적이고 화면 페이드가 UI를 덮지 못함**
+  Canvas 3개(`UIManager`, `StaticCanvas`, `DynamicCanvas`)가 전부 order 0이라 하이어라키 순서에 의존한다. `FadePanel`이 HUD와 탭바보다 아래라 전환 중에도 UI가 보이고 눌린다.
+  UI_DESIGN 4-1의 정렬 구분(페이드는 System)으로 1차에서 해결한다.
 
 ## 렌더링
 
@@ -67,6 +71,36 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 - **필수 인스펙터 참조의 빌드 전 검사 없음**
   `GameInitializer`의 검사처럼 실행해야 드러나거나, 폴백에 가려진다(예: `CombatEffectManager`의 보상 드랍 참조 3개는 미연결 상태이고 임시 도형으로 표시된다).
   에디터 경고(`OnValidate`)와 빌드 실패 처리(`IPreprocessBuildWithReport`)를 검토한다. 의도된 폴백까지 막지 않도록 필수와 선택 참조를 먼저 구분한다.
+
+## 코드 품질
+
+2026-09 코드리뷰에서 미해결이던 항목 중 2026-11-22에 현재 코드에서 다시 확인한 것.
+
+- **개발용 로그가 상시 출력됨**
+  `PlayerHud.UpdateExpBar`는 경험치가 바뀔 때마다 2줄을 찍는다. `PlayerStats`(레벨업, 업그레이드, 학습), `GameManager`(보스전 시작)도 릴리스에 그대로 남는다.
+
+- **`CombatEffectManager` 책임 과다**
+  데미지 텍스트, 파티클, 보상 드랍, VFX, 임시 스프라이트 생성을 한 클래스가 한다. 임시 스프라이트는 지금 실제로 쓰이는 경로라, 아트를 연결하기 전에는 지우면 안 된다.
+
+- **애니메이션 이름 처리 불일치**
+  `PlayerController`는 직렬화 필드, `Monster`/`BossMonster`는 문자열(`"Idle"`, `"Death"`, `"Attack"`)을 코드에 박아 둔다.
+
+- **null 처리와 이름 규칙 불일치**
+  `Monster.PlayIdleAnimation`, `MonsterSpawner.AllDie`, `GameManager`의 `FadeController.Instance` 사용에 null 검사가 없다.
+  `MonsterSpawner.SpawnMonster`는 컴포넌트가 없으면 `AddComponent`로 프리팹 오류를 가린다. `Monster.moveToPlayer`만 camelCase다.
+
+- **싱글턴 규칙 불일치**
+  중복 검사와 `DontDestroyOnLoad`가 매니저마다 다르고, 파괴될 때 `Instance`를 비우는 곳이 없다. 씬이 하나인 지금은 드러나지 않으므로 부트 씬을 나눌 때(UI_DESIGN 9장) 정한다.
+  공통 베이스를 도입한다면 주의: `FadeController`는 `UIManager` 오브젝트에 붙어 있어 씬 간 유지로 만들면 UI 전체가 같이 유지된다.
+
+- **이벤트 버스 규칙 불일치**
+  `GlobalCombatEvents`만 `static class`가 아니다. 구독 시점도 `GameManager`는 Awake/OnDestroy, `CombatEffectManager`는 OnEnable/OnDisable로 다르다.
+
+- **`PlayerStats`의 방어 코드 불일치**
+  `saveData`는 곳곳에서 null을 검사하지만 `statData`와 `upgradeConfig`는 검사 없이 쓰는 곳이 있다.
+
+- **쓰이지 않는 코드와 값**
+  `JsonDataLoader`는 씬과 코드 어디에서도 쓰이지 않는다. `Monster`의 직렬화 필드 `maxHp`/`expReward`는 `Initialize`가 덮어써서 인스펙터 값이 의미 없다.
 
 ## 게임 기능
 
