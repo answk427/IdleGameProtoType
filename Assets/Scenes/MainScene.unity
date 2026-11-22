@@ -1281,6 +1281,7 @@ MonoBehaviour:
   monsterDatabase: {fileID: 11400000, guid: a896b59cbbd51184ab5ba5ed927379b3, type: 2}
   stageDatabase: {fileID: 11400000, guid: 937c96dd749b2044dbd790777f0d16cf, type: 2}
   skillDatabase: {fileID: 11400000, guid: 800e941405285a24986c3f9a63149977, type: 2}
+  balanceConfig: {fileID: 11400000, guid: a1dae11590d510a45aa64b4c1447d3cd, type: 2}
 --- !u!4 &1177051874
 Transform:
   m_ObjectHideFlags: 0

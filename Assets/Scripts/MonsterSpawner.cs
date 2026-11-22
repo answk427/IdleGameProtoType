@@ -179,8 +179,10 @@ public class MonsterSpawner : MonoBehaviour
 
     private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)
     {
-        hpMult = Mathf.Pow(1.15f, stageData.StageNumber);
-        dmgMult = Mathf.Pow(1.10f, stageData.StageNumber);
-        goldMult = Mathf.Pow(1.05f, stageData.StageNumber);
+        BalanceConfig balance = GameDatabaseManager.Instance.Balance;
+
+        hpMult = Mathf.Pow(balance.hpGrowthBase, stageData.StageNumber);
+        dmgMult = Mathf.Pow(balance.damageGrowthBase, stageData.StageNumber);
+        goldMult = Mathf.Pow(balance.goldGrowthBase, stageData.StageNumber);
     }
 }

@@ -55,6 +55,12 @@ public class GameInitializer : MonoBehaviour
         if (upgradeConfig == null) { Debug.LogError("[GameInitializer] upgradeConfig(PlayerUpgradeConfig)가 연결되지 않았습니다."); ok = false; }
         if (playerSpawner == null) { Debug.LogError("[GameInitializer] playerSpawner가 연결되지 않았습니다."); ok = false; }
         if (gameManager == null) { Debug.LogError("[GameInitializer] gameManager가 연결되지 않았습니다."); ok = false; }
+
+        // BalanceConfig는 첫 스폰 때에야 쓰인다. 여기서 막지 않으면 게임이 시작된 뒤 스폰 루프만 예외로 멈춘다.
+        GameDatabaseManager database = GameDatabaseManager.Instance;
+        if (database == null) { Debug.LogError("[GameInitializer] 씬에 GameDatabaseManager가 없습니다."); ok = false; }
+        else if (!database.HasBalanceConfig) { Debug.LogError("[GameInitializer] GameDatabaseManager에 balanceConfig(BalanceConfig)가 연결되지 않았습니다."); ok = false; }
+
         return ok;
     }
 }

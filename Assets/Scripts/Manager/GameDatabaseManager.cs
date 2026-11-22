@@ -31,8 +31,26 @@ public class GameDatabaseManager : MonoBehaviour
     [SerializeField] private MonsterDatabase monsterDatabase;
     [SerializeField] private StageDatabase stageDatabase;
     [SerializeField] private SkillDatabase skillDatabase;
+    [SerializeField] private BalanceConfig balanceConfig;
 
     private bool isInitialized;
+
+    // GameInitializer가 게임을 시작하기 전에 검사한다.
+    public bool HasBalanceConfig => balanceConfig != null;
+
+    // 스테이지 성장 곡선. 필수 데이터라 기본값으로 대신하지 않는다.
+    // 기본값으로 굴리면 연결이 빠져도 티가 나지 않고, 에셋을 고쳐도 조용히 무시되기 때문이다.
+    public BalanceConfig Balance
+    {
+        get
+        {
+            if (balanceConfig == null)
+            {
+                throw new System.InvalidOperationException("[GameDatabaseManager] BalanceConfig가 연결되어 있지 않습니다.");
+            }
+            return balanceConfig;
+        }
+    }
 
     private void Awake()
     {
