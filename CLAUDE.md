@@ -1,6 +1,7 @@
 # IdleGameProtoType
 
 Unity 2D 방치형(idle) 액션 게임 프로토타입. Unity 6000.4.9f1.
+**목표 플랫폼은 Android.** 플랫폼 동작과 최종 확인은 Android 빌드(+ adb)로 한다. WebGL은 포트폴리오 데모용일 뿐 정식 검증 과정이 아니며, WebGL 빌드/확인은 사용자가 명확히 요청할 때만 한다.
 **포트폴리오용 프로젝트** — 면접관에게 보여줄 코드이므로 문서는 솔직하게, 코드 품질에 신경 쓰고, 알려진 한계(저장 시스템 미완성 등)는 숨기지 말고 드러낼 것.
 **세이브 원칙: 진행도를 유실하지 않는다** — 로드 실패, 형식 변경, 저장 실패는 기존 세이브를 보존하는 쪽으로 처리할 것(아직 못 지키는 부분은 `docs/TODO.md`의 "저장").
 
@@ -94,6 +95,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **자동저장 체크포인트**: 종료/일시정지, 스테이지 전환 완료, 업그레이드, 스킬 학습/장착. 주기적(타이머) 자동저장은 의도적으로 안 둠.
 - **스테이지 중간 진행도(인카운터 진행 수)는 저장 안 함** — 의도된 범위 제한. 저장된 스테이지 번호로 복귀하면 그 스테이지를 처음부터(인카운터 1부터) 다시 시작한다. 전투 중 HP/몬스터 상태까지 직렬화하려면 FSM/스포너 상태까지 손대야 해서 범위 밖으로 뺌.
 - 세이브 파일 경로: `C:\Users\<user>\AppData\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`
+- **에디터 검증용 세이브 프로필**(`SaveProfile`, `Assets/Scripts/Player/SaveProfile.cs`): 에디터에서만 켤 수 있고, 켜면 세이브 폴더가 `persistentDataPath/profiles/<이름>/`로 바뀐다(형식과 저장 코드는 같음). 값은 `SessionState`라 에디터를 끄면 기본으로 돌아오고, 플레이 중에는 바꿀 수 없다. 메뉴는 `IdleGame/Save Profile/...`, `IdleGame/Reset Save Data`는 지금 켜진 프로필의 세이브를 지운다. 빌드에는 프로필 코드가 없어서 항상 기본 경로를 쓴다.
 
 ## 작업 시 주의사항
 
@@ -106,7 +108,8 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 에디터 조작(컴파일 확인, 씬 편집, 플레이 모드 확인, 테스트)은 아래 우선순위로 한다. 기계별 경로(에디터 설치 위치 등)는 이 파일이 아니라 Claude memory에 있다.
 
-1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: 패키지 미설치** — 설치(`unity pipeline install`, `Packages/manifest.json` 변경)와 커밋 여부는 사용자 확인 후 진행하기로 함.
+1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: `com.unity.pipeline` 1.0.1 설치됨, 회사 PC에서 켜 둔 에디터 연결 확인**(`unity status`, `script eval`, `console`, `capture editor_window` 동작. Claude 데스크톱 앱의 MSIX 샌드박스에서도 됨). 에디터가 켜져 있으면 배치 모드는 쓸 수 없으므로(프로젝트 잠금) 이 방식을 쓴다.
+   - **사용자 세이브 보호(필수):** 켜 둔 에디터는 사용자의 진짜 세이브를 쓴다. 플레이 모드에 들어가기 전에 항상 `SaveProfile.SetActive(SaveProfile.VerificationProfile)`(`claude` 프로필)을 켜고, 진입 후 콘솔에 `[Save] 검증용 프로필 'claude' 사용 중` 경고가 있는지 확인한 뒤 검증한다. 경고가 없으면 즉시 플레이를 끝낸다. 검증이 끝나면 플레이를 나와서 `SaveProfile.SetActive(null)`로 되돌린다.
 2. **에디터가 꺼져 있으면: 배치 모드** — `Unity.exe`를 창 없이 띄워 일을 시키고 종료한다. 0단계(GameSession/GameInitializer)를 이 방식으로 구현·검증했다.
    - **실행 전:** 사용자가 이 프로젝트를 에디터로 열고 있으면 실행할 수 없다(프로젝트 잠금, `Temp/UnityLockfile`). Unity 프로세스가 없는지 먼저 확인.
    - **컴파일 + 임의 작업:** `Unity.exe -batchmode -quit -projectPath <프로젝트> -executeMethod <클래스.메서드> -logFile <로그>`. 로그에서 `error CS`, `Exception`, `Exiting batchmode successfully now!`를 확인. 한 번에 1~2분 걸린다.
@@ -118,4 +121,9 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
      - 테스트 실행은 `persistentDataPath`(`LocalLow/DefaultCompany/IdleGameProtoType/`)에 `TestResults.xml`과 `Unity/` 폴더를 남긴다 → 지운다.
      - 로그의 `UnityEditor.Search.SearchDatabase` `ArgumentOutOfRangeException`은 배치 모드 에디터 내부 예외로 프로젝트 코드와 무관하다.
    - 한계: 화면을 볼 수 없다. UI가 제대로 보이는지는 사용자 확인이 필요하다.
-3. **Unity MCP(`mcp__UnityMCP__*`)** — 과거 세션에서 쓰던 방식. 세션에 연결돼 있을 때만 쓸 수 있다. `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.
+3. **Android 실기기 (adb)** — 최종 확인은 Android 빌드를 실기기에 설치해서 한다.
+   - **adb는 PC 전체에서 한 버전만 쓴다.** adb 서버는 PC에 하나(포트 5037)이고, 버전이 다른 adb가 명령을 보내면 서버를 끄고 자기 버전으로 다시 띄운다. 그래서 다른 프로젝트(liveeye_kr 웹 개발)와 같은 PC에서 쓰면 서로의 서버를 꺼 버린다. 기준은 **Unity에 딸린 adb**이고, 다른 도구가 쓰는 SDK의 `platform-tools`도 같은 것으로 맞춰 둔다(회사 PC: `~/android-dev/sdk/platform-tools`를 Unity 것으로 교체, 원본은 `platform-tools-37.0.1-backup`). **Unity를 업그레이드하면 adb 버전이 바뀌므로 그쪽 `platform-tools`도 다시 맞춘다.**
+   - 설정은 PC별 `.claude/settings.local.json`(원본: claude-sync `setup/`)의 `env`에 있다: `ADB`(Unity의 adb 경로), `ANDROID_SERIAL`(이 프로젝트 테스트 기기). `ANDROID_SERIAL`이 있으면 adb가 `-s` 없이도 그 기기에만 명령을 보낸다. 같은 PC에 다른 프로젝트가 쓰는 기기가 함께 연결돼 있을 수 있으므로 다른 기기에는 설치·실행·입력을 하지 않는다.
+   - `adb kill-server`/`start-server`는 권한 규칙으로 막혀 있다(두 프로젝트 모두). 서버를 다시 띄우는 판단은 사용자가 한다.
+   - 빌드: 배치 모드 `-buildTarget Android`로 APK만 만들고(Build & Run을 쓰지 않음), 설치는 `"$ADB" install -r <apk>`. 확인은 `screencap`, `logcat -s Unity:*`, `shell input`.
+4. **Unity MCP(`mcp__UnityMCP__*`)** — 과거 세션에서 쓰던 방식. 세션에 연결돼 있을 때만 쓸 수 있다. `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.

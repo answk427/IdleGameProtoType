@@ -6,12 +6,20 @@ using UnityEngine;
 //
 // Load: 파일이 없으면 신규 데이터, 파일이 있는데 온전히 읽을 수 없으면 예외(신규로 대신하지 않는다).
 // Save: Load가 받아들이지 않을 값이면 쓰지 않고 기존 파일을 남긴다.
+// 폴더는 SaveProfile이 정한다(에디터 검증용 프로필 분리). 호출마다 다시 읽어서 에디터에서 프로필을 바꿔도 따라간다.
 public class LocalFileSaveStorage : ISaveStorage
 {
-    private static string SavePath => Path.Combine(Application.persistentDataPath, "player_save.json");
+    private const string FileName = "player_save.json";
+
+    private static string SavePath => Path.Combine(SaveProfile.SaveDirectory, FileName);
 
     public PlayerSaveData Load()
     {
+        if (!SaveProfile.IsDefault)
+        {
+            Debug.LogWarning($"[Save] 검증용 프로필 '{SaveProfile.ActiveName}' 사용 중: {SavePath}");
+        }
+
         if (!File.Exists(SavePath))
         {
             Debug.Log("[LocalFileSaveStorage] 저장 파일 없음 → 신규 데이터 생성");
@@ -40,6 +48,7 @@ public class LocalFileSaveStorage : ISaveStorage
             yield break;
         }
 
+        Directory.CreateDirectory(SaveProfile.SaveDirectory); // 프로필 폴더는 처음엔 없다
         File.WriteAllText(SavePath, json);
         Debug.Log($"[LocalFileSaveStorage] 저장 완료: {SavePath}");
         yield break;
@@ -49,6 +58,6 @@ public class LocalFileSaveStorage : ISaveStorage
     {
         if (File.Exists(SavePath))
             File.Delete(SavePath);
-        Debug.Log("[LocalFileSaveStorage] 저장 파일 삭제");
+        Debug.Log($"[LocalFileSaveStorage] 저장 파일 삭제: {SavePath}");
     }
 }
