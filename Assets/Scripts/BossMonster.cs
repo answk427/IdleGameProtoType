@@ -25,9 +25,9 @@ public class BossMonster : Monster, ISkillCaster
         fsm.ChangeState(new BossRunState(this));
     }
 
-    protected override void Update()
+    public override void Tick()
     {
-        base.Update();
+        base.Tick();
         skill?.Tick(Time.deltaTime);
     }
 

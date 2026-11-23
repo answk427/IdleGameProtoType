@@ -14,8 +14,6 @@ public class PlayerAttackState : PlayerCombatState
 
         timer = player.AttackInterval;
         isAnimationFinished = true;
-
-        if (GameManager.Instance != null) GameManager.Instance.IsScrolling = false;
     }
 
     protected override void DoAction()
@@ -36,7 +34,7 @@ public class PlayerAttackState : PlayerCombatState
         {
             player.Attack();
             isAnimationFinished = false; // 새 공격 시작, 끝날 때까지 다음 행동 보류
-            timer = 0f;
+            timer = AttackTimer.NextStart(timer, player.AttackInterval);
         }
     }
 

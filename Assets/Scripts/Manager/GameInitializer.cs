@@ -6,7 +6,8 @@ using UnityEngine;
 //   2. GameSession 생성 + 세이브 적용(Apply)
 //   3. 플레이어 캐릭터 스폰 + 진행도 주입
 //   4. GameManager에 세션과 캐릭터를 넘겨 게임 루프 시작
-//   5. UIRoot에 세션과 서비스를 넘겨 UI 조립
+//   5. CombatSimulation에 캐릭터를 넘겨 고정 단계 전투 시작
+//   6. UIRoot에 세션과 서비스를 넘겨 UI 조립
 //
 // 예전에는 이 순서가 여러 Awake/Start에 흩어진 암묵 규칙이었다(캐릭터 Awake가 세이브를 읽고,
 // GameManager.Start가 그 캐릭터에서 골드/스테이지를 꺼내 썼다). 이제 순서를 이 한 곳에서 읽을 수 있다.
@@ -24,6 +25,7 @@ public class GameInitializer : MonoBehaviour
     [Header("씬 참조")]
     [SerializeField] private PlayerSpawner playerSpawner;
     [SerializeField] private GameManager gameManager;
+    [SerializeField] private CombatSimulation combatSimulation;
     [SerializeField] private UIRoot uiRoot;
 
     public GameSession Session { get; private set; }
@@ -59,6 +61,7 @@ public class GameInitializer : MonoBehaviour
 
         player.Initialize(Session.Stats);
         gameManager.Initialize(Session, player);
+        combatSimulation.Initialize(player);
         uiRoot.Initialize(Session, GameDatabaseManager.Instance.GetAllSkills(), player);
     }
 
@@ -70,6 +73,8 @@ public class GameInitializer : MonoBehaviour
         if (playerSpawner == null) { Debug.LogError("[GameInitializer] playerSpawner가 연결되지 않았습니다."); ok = false; }
         if (gameManager == null) { Debug.LogError("[GameInitializer] gameManager가 연결되지 않았습니다."); ok = false; }
         if (uiRoot == null) { Debug.LogError("[GameInitializer] uiRoot가 연결되지 않았습니다."); ok = false; }
+        if (combatSimulation == null) { Debug.LogError("[GameInitializer] combatSimulation이 연결되지 않았습니다."); ok = false; }
+        else if (!combatSimulation.ValidateReferences()) ok = false;
 
         // BalanceConfig는 첫 스폰 때에야 쓰인다. 여기서 막지 않으면 게임이 시작된 뒤 스폰 루프만 예외로 멈춘다.
         GameDatabaseManager database = GameDatabaseManager.Instance;

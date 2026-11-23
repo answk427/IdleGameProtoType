@@ -9,7 +9,10 @@ public class BackgroundScroller : MonoBehaviour
     private float scrollScale = 0.25f;
 
     private Material mat;      // 매터리얼을 담을 변수
-    private Vector2 offset; // 오프셋 값을 기억해 둘 변수
+
+    // 보간용 직전/현재 고정 단계의 UV 오프셋 x (docs/COMBAT_DESIGN.md 3-3)
+    private float previousOffsetX;
+    private float currentOffsetX;
 
     public bool IsActiveScroll { get; private set; } = true;
 
@@ -36,19 +39,28 @@ public class BackgroundScroller : MonoBehaviour
         }
     }
 
-    void LateUpdate()
+    // CombatSimulation이 고정 단계마다 부른다. 몬스터와 같은 단계에서 같은 속도로 움직여야 서로 미끄러져 보이지 않는다.
+    public void Tick()
     {
-        if (!IsActiveScroll)
-        {
-            return;
-        }
+        previousOffsetX = currentOffsetX;
+        if (!IsActiveScroll) return;
 
         float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.RunSpeed ?? 0f : 0f;
-        offset.x += runSpeed * scrollScale * Time.deltaTime;
+        currentOffsetX += runSpeed * scrollScale * Time.deltaTime;
 
-        offset.x = Mathf.Repeat(offset.x, 1f);
+        // 1을 넘기면 둘에서 똑같이 빼서, 보간이 0~1 사이를 거꾸로 훑지 않게 한다.
+        if (currentOffsetX >= 1f)
+        {
+            currentOffsetX -= 1f;
+            previousOffsetX -= 1f;
+        }
+    }
 
-        mat.mainTextureOffset = offset;
+    // CombatSimulation이 화면 프레임마다 부른다.
+    public void ApplyRenderOffset(float alpha)
+    {
+        float x = Mathf.Repeat(Mathf.LerpUnclamped(previousOffsetX, currentOffsetX, alpha), 1f);
+        mat.mainTextureOffset = new Vector2(x, mat.mainTextureOffset.y);
     }
 
     private void OnDestroy()

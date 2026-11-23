@@ -34,7 +34,7 @@ public class BossAttackState : BossCombatState
         {
             boss.Attack();
             isAnimationFinished = false; // 새 공격 시작, 끝날 때까지 다음 행동 보류
-            timer = 0f;
+            timer = AttackTimer.NextStart(timer, boss.AttackInterval);
         }
     }
 

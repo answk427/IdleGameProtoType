@@ -47,10 +47,20 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 전투/스킬
 
+설계와 검증 결과는 `docs/COMBAT_DESIGN.md`.
+
+- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 정해진 순서로 진행한다: 몬스터 위치 되돌리기 → `PlayerController.Tick()` → 몬스터 `Tick()` → `BackgroundScroller.Tick()` → 보간용 기록. 플레이어·몬스터·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도 처치 시각이 소수점까지 같다(검증함).
+  - **시간 규칙:** 위치를 읽거나 움직이는 전투 로직과 전투 타이머는 `Tick` 안에서만 돈다. 그 안에서 `Time.deltaTime`은 0.02라서 상태 코드는 `Time.deltaTime`을 그대로 쓴다. UI 입력 중 위치를 읽는 것(스킬 슬롯 탭)은 `PlayerController.RequestSkillSlot`으로 다음 단계에 처리한다. `GameManager`의 스폰 루프는 `WaitForFixedUpdate`와 단계 수로 기다린다(`WaitForSeconds`/`yield return null` 쓰지 말 것). 스테이지 전환 페이드만 화면 시간이다.
+  - **보간:** 화면 프레임에서는 몬스터 위치와 배경 UV를 직전 두 단계 사이로 그린다(최대 0.02초 늦게 보임). 몬스터를 스폰하거나 위치를 직접 정하면 보간 기준을 맞춰야 한다(`Monster.Initialize`가 함). 안 하면 예전 자리에서 미끄러져 온다.
+  - 캐릭터 프리팹 5개의 Animator Update Mode는 **Fixed**다. 타격/동작 끝 애니메이션 이벤트가 고정 단계에서 일어난다.
+- **CCD: 살아 있는 몬스터는 플레이어 몸을 통과하지 못한다**(`Monster.moveToPlayer`). 접촉선(플레이어 x + 두 반너비)에서 멈추고, 이미 겹쳐 있으면 더 파고들지 않는다. 한 단계 이동량과 무관하게 성립한다(이동속도 100에서 확인). 예전에는 긴 프레임 한 번에 몬스터가 플레이어 뒤로 순간이동해 진행이 영구히 멈췄다.
+- **스크롤(`GameManager.IsScrolling`)의 주인은 `PlayerRunState`다.** `Enter`가 켜고 `Exit`가 끈다. 달리기가 아닌 상태(공격, 수동 스킬 시전, 사망)에서는 배경과 몬스터가 멈춘다.
 - `Monster`(베이스) → `BossMonster`(상속) — 일반 몬스터와 보스는 같은 `IHasHp`/`IDamageable` 계약을 따르되 보스만 별도 공격 패턴(FSM의 `BossAttackState`/`BossRunState`)을 가짐.
 - `Skill` 런타임 클래스가 `SkillData`(밸런스 수치) + `ISkillBehavior`(실제 효과 실행)를 묶음. `ISkillBehavior` 구현체: `DamageSkillBehavior`/`AoeDamageSkillBehavior`/`HealSkillBehavior` — `SkillEffectType`에 따라 `Skill.CreateBehavior()`에서 분기 생성. 새 효과 타입을 추가하려면 `ISkillBehavior` 구현체 추가 + 그 switch문에 분기 추가.
 - 데미지/힐 텍스트는 색으로 구분: 플레이어가 받는 데미지=빨강, 몬스터가 받는 데미지=흰색, 힐="+N" 초록.
 - 공격 애니메이션 속도는 `AttackSpeedMultiplier`(Animator float 파라미터)로 `attackClipLength / AttackInterval`을 매 공격마다 다시 계산해서 동기화함(`PlayerController.Attack()`) — 공격속도 업그레이드로 `AttackInterval`이 짧아져도 애니메이션 자체 재생 속도가 못 따라가서 막혀 보이는 문제 때문에 추가됨.
+  - 공격 타이머는 이번 단계에 막 넘친 조각만 다음 간격으로 넘긴다(`AttackTimer.NextStart`). 간격 1.0초에서 실제 간격이 정확히 1.0초다.
+  - **알려진 한계:** 다음 공격은 애니메이터가 Attack → Idle → Attack을 한 바퀴 돈 뒤에야 시작돼서, 간격 0.1초(공격속도 최대)에서는 실제 간격이 0.14초다(`docs/TODO.md` "전투").
 
 ## 엔지니어링 스타일 (이 프로젝트에서 합의된 방향)
 
@@ -82,7 +92,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 - **`PlayerSaveData`(최상위, `Assets/Scripts/Player/PlayerSaveData.cs`)와 `PlayerStatsSaveData`(`PlayerStats` 전용 슬라이스)로 분리돼 있음.** `PlayerSaveData`는 `{ stats: PlayerStatsSaveData, gold, currentStageNumber }` 형태 — 저장 파일 전체에 대응. `PlayerStatsSaveData`는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯처럼 `PlayerStats`가 실제로 읽고 쓰는 것만 담음. 골드/스테이지 번호는 `PlayerStats`가 전혀 쓰지 않는 데이터라(`GameManager`만 씀) 같은 클래스에 두면 안 된다고 판단해서 분리함.
 - **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, FSM)는 캐릭터(`PlayerController`)가 갖는다.
-- **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()`(예외면 여기서 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `GameManager.Initialize(session, player)` → `UIRoot.Initialize(session, 스킬 목록, player)`. 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
+- **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()`(예외면 여기서 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `GameManager.Initialize(session, player)` → `CombatSimulation.Initialize(player)` → `UIRoot.Initialize(session, 스킬 목록, player)`. 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
 - **저장 데이터 변환은 `GameSession.Apply(PlayerSaveData)` / `GameSession.ToSaveData()` 두 곳뿐.** `Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다(세션/Stats/Wallet을 참조하는 쪽이 옛 객체를 붙잡지 않게). 세이브 로드와 이후 서버 롤백(`docs/SERVER_DESIGN.md`)이 같은 경로를 쓴다.
 - **저장 백엔드는 `ISaveStorage`로 추상화**(`Assets/Scripts/Player/ISaveStorage.cs`, 최상위 `PlayerSaveData` 기준). `LocalFileSaveStorage`가 현재 구현체(JSON을 `Application.persistentDataPath/player_save.json`에 입출력). `SaveStorageProvider.Current`가 스위치 지점 — 나중에 서버 저장으로 바꿀 때 `ServerSaveStorage : ISaveStorage`를 새로 만들고 `SaveStorageProvider.Current`에 대입하는 한 줄만 바꾸면 됨. `Load()`는 동기(`GameInitializer.Start()`에서 즉시 써야 해서), `Save()`는 `IEnumerator`(코루틴) — 호출부가 기다리지 않는 fire-and-forget이라 서버 지연을 흡수할 수 있게 미리 비동기 모양으로 잡아둔 것.
 - **손상된 세이브는 새 데이터로 대신하지 않는다.** `Load()`는 파일이 없을 때만 신규 데이터를 주고, 파일이 있는데 온전히 읽을 수 없으면 예외를 던진다. `GameInitializer`가 잡아서 세션 없이 중단하므로 종료 저장을 포함한 어떤 저장도 원본을 건드리지 않는다. 새 저장소 구현체도 이 규칙을 지킬 것.
@@ -110,6 +120,10 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: `com.unity.pipeline` 1.0.1 설치됨, 회사 PC에서 켜 둔 에디터 연결 확인**(`unity status`, `script eval`, `console`, `capture editor_window` 동작. Claude 데스크톱 앱의 MSIX 샌드박스에서도 됨). 에디터가 켜져 있으면 배치 모드는 쓸 수 없으므로(프로젝트 잠금) 이 방식을 쓴다.
    - **사용자 세이브 보호(필수):** 켜 둔 에디터는 사용자의 진짜 세이브를 쓴다. 플레이 모드에 들어가기 전에 항상 `SaveProfile.SetActive(SaveProfile.VerificationProfile)`(`claude` 프로필)을 켜고, 진입 후 콘솔에 `[Save] 검증용 프로필 'claude' 사용 중` 경고가 있는지 확인한 뒤 검증한다. 경고가 없으면 즉시 플레이를 끝낸다. 검증이 끝나면 플레이를 나와서 `SaveProfile.SetActive(null)`로 되돌린다.
+   - **열린 씬이 MainScene이 아닐 수 있다**(빈 새 씬이 열려 있던 적 있음). 사용자가 연 씬을 바꾸지 말고 `EditorSceneManager.playModeStartScene`에 MainScene을 넣고 플레이한 뒤 `null`로 되돌린다.
+   - **자동 반복 측정:** 플레이를 여러 번 돌릴 때는 임시 `[InitializeOnLoad]` 러너가 `SessionState`의 실행 목록을 하나씩 꺼내 플레이하고, 런타임 쪽 임시 스크립트(`#if UNITY_EDITOR`, `RuntimeInitializeOnLoadMethod`)가 `Time.captureDeltaTime`으로 프레임을 고정해 결과를 프로젝트 `Temp/`에 쓰고 플레이를 끝낸다. 전투 고정 타임스텝 검증에 쓴 것이 이 방식이다(스크립트는 지웠다). 플레이 중에는 스크립트를 고치지 않는다(재컴파일이 측정 사이에 끼어든다).
+   - **플레이/빌드 후 정리:** TMP 동적 폰트(`Assets/Fonts/MalgunGothic SDF.asset`)가 플레이 중 채운 글자로 바뀌고, Android 빌드 후 `ProjectSettings/UnityConnectSettings.asset`의 `m_Enabled`가 1이 된다. 플레이하면 `persistentDataPath/Unity/`(분석 캐시)도 생긴다. 셋 다 되돌리거나 지운다.
+   - **빌드:** 켜 둔 에디터에서는 `unity command build run --target Android --output-path Temp/AndroidBuild/idleproto.apk --confirm true` 후 `build status`로 기다린다. 출력은 프로젝트 안에 둔다(Claude 쪽 AppData 경로는 MSIX 가상화로 예전 파일이 보일 수 있다).
 2. **에디터가 꺼져 있으면: 배치 모드** — `Unity.exe`를 창 없이 띄워 일을 시키고 종료한다. 0단계(GameSession/GameInitializer)를 이 방식으로 구현·검증했다.
    - **실행 전:** 사용자가 이 프로젝트를 에디터로 열고 있으면 실행할 수 없다(프로젝트 잠금, `Temp/UnityLockfile`). Unity 프로세스가 없는지 먼저 확인.
    - **컴파일 + 임의 작업:** `Unity.exe -batchmode -quit -projectPath <프로젝트> -executeMethod <클래스.메서드> -logFile <로그>`. 로그에서 `error CS`, `Exception`, `Exiting batchmode successfully now!`를 확인. 한 번에 1~2분 걸린다.

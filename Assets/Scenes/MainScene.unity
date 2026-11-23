@@ -846,6 +846,52 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &596820659
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 596820661}
+  - component: {fileID: 596820660}
+  m_Layer: 0
+  m_Name: CombatSimulation
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &596820660
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 596820659}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51c64b37c2f76c148ab99ce92662e195, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::CombatSimulation
+  monsterSpawner: {fileID: 320452948}
+  backgroundScroller: {fileID: 1909895860}
+--- !u!4 &596820661
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 596820659}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!224 &692585973 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1273834540737075006, guid: fb234ace4dbf47d44bdb9987cbd95a2d, type: 3}
@@ -1595,6 +1641,7 @@ MonoBehaviour:
   upgradeConfig: {fileID: 11400000, guid: f994c30e3f6d11f4daa312febea87fbc, type: 2}
   playerSpawner: {fileID: 1881273561}
   gameManager: {fileID: 1061945704}
+  combatSimulation: {fileID: 596820660}
   uiRoot: {fileID: 1625906307}
 --- !u!4 &1424901934
 Transform:
@@ -2822,3 +2869,4 @@ SceneRoots:
   - {fileID: 1881273562}
   - {fileID: 1891042250}
   - {fileID: 1424901934}
+  - {fileID: 596820661}

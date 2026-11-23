@@ -42,6 +42,10 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
     // 슬롯 인덱스 → 장착된 Skill 런타임 인스턴스 (빈 슬롯은 null)
     private readonly Skill[] equippedSkills = new Skill[PlayerStatsSaveData.SkillSlotCount];
 
+    // UI가 요청한 스킬 슬롯. 다음 Tick에서 처리한다.
+    private const int NoPendingSkill = -1;
+    private int pendingSkillSlot = NoPendingSkill;
+
     public event Action OnHitEvent;
     public event Action OnAttackEndEvent;
     public event Action OnDeathEndEvent;
@@ -100,9 +104,18 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         }
     }
 
-    private void Update()
+    // CombatSimulation이 고정 단계마다 부른다(docs/COMBAT_DESIGN.md 3-1). 안의 Time.deltaTime은 고정 단계 길이다.
+    public void Tick()
     {
         if (stats == null) return; // GameInitializer가 Initialize()하기 전
+
+        // UI에서 들어온 스킬 요청은 위치(대상 선택)를 읽으므로 단계 안에서 처리한다.
+        if (pendingSkillSlot != NoPendingSkill)
+        {
+            int slot = pendingSkillSlot;
+            pendingSkillSlot = NoPendingSkill;
+            UseSkillSlot(slot);
+        }
 
         fsm.Update();
 
@@ -298,8 +311,15 @@ public class PlayerController : MonoBehaviour, IHasHp, IDamageable, ISkillCaster
         return equippedSkills[slotIndex];
     }
 
-    // UI(스킬 슬롯 클릭)가 호출.
-    public bool TryUseSkillSlot(int slotIndex)
+    // UI(스킬 슬롯 클릭)가 호출. 바로 쓰지 않고 다음 고정 단계의 Tick에서 쓴다(docs/COMBAT_DESIGN.md 3-2).
+    // 대상 선택이 몬스터 위치를 읽는데, 화면 프레임에서는 위치가 보간된 값이라서.
+    // 한 단계(최대 0.02초) 안에 여러 번 누르면 마지막 요청만 남는다.
+    public void RequestSkillSlot(int slotIndex)
+    {
+        pendingSkillSlot = slotIndex;
+    }
+
+    private bool UseSkillSlot(int slotIndex)
     {
         if (!IsAlive) return false;
         if (slotIndex < 0 || slotIndex >= equippedSkills.Length) return false;

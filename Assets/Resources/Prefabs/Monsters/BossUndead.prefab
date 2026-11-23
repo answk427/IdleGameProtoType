@@ -107,7 +107,7 @@ Animator:
   m_Avatar: {fileID: 0}
   m_Controller: {fileID: 9100000, guid: 3367be1250e7f0b42bcbdf9086dd9bb4, type: 2}
   m_CullingMode: 0
-  m_UpdateMode: 0
+  m_UpdateMode: 1
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
@@ -135,7 +135,6 @@ MonoBehaviour:
     halfWidthOverride: 0.1
     hitPositionOffset: {x: 1.1, y: 0}
   maxHp: 10
-  goldReward: 1
   expReward: 0
   attackRange: 0.1
   attackInterval: 2

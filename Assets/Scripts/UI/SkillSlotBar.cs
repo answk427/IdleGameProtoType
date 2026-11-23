@@ -103,6 +103,6 @@ public class SkillSlotBar : UITabPanel
     private void OnSlotClicked(int slotIndex)
     {
         if (player == null) return;
-        player.TryUseSkillSlot(slotIndex);
+        player.RequestSkillSlot(slotIndex);
     }
 }

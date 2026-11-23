@@ -17,6 +17,12 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private float postEncounterDelay = 0.5f;
 
+    // 전투 루프(인카운터 반복, 보스전)는 화면 프레임이 아니라 고정 단계 단위로 기다린다(docs/COMBAT_DESIGN.md 3-2).
+    // 화면 프레임 단위면 스폰 시점이 기기마다 달라져 전투 결과도 달라진다. 스테이지 전환 페이드는 연출이라 화면 시간 그대로 둔다.
+    private static readonly WaitForFixedUpdate WaitForStep = new WaitForFixedUpdate();
+
+    private static int StepsFor(float seconds) => Mathf.RoundToInt(seconds / Time.fixedDeltaTime);
+
     // 진행도(골드 포함)의 주인은 GameSession이다. UI가 아직 GameManager를 거쳐 접근하므로
     // 1차 UI 이관(Presenter 주입) 전까지만 통로로 남겨 둔다.
     public GameSession Session => session;
@@ -159,14 +165,19 @@ public class GameManager : MonoBehaviour
     {
         while (true)
         {
+            // 스폰도 고정 단계 끝에서 한다(게임 시작, 스테이지 전환 직후 포함).
+            yield return WaitForStep;
             monsterSpawner.SpawnEncounter(stageManager.CurrentStage);
 
             while (!monsterSpawner.AllDie())
             {
-                yield return null;
+                yield return WaitForStep;
             }
 
-            yield return new WaitForSeconds(postEncounterDelay);
+            for (int step = StepsFor(postEncounterDelay); step > 0; step--)
+            {
+                yield return WaitForStep;
+            }
             monsterSpawner.ClearEncounter();
 
             // 보스 도전 가능 여부는 StageManager가 판단해서 이벤트로 알린다.
@@ -234,13 +245,16 @@ public class GameManager : MonoBehaviour
         player.FullHeal();
         monsterSpawner.ClearEncounter();
 
-        yield return new WaitForSeconds(1.0f);
+        for (int step = StepsFor(1.0f); step > 0; step--)
+        {
+            yield return WaitForStep;
+        }
 
         monsterSpawner.SpawnBoss(stageManager.CurrentStage);
 
         while (!monsterSpawner.AllDie() && player.IsAlive)
         {
-            yield return null;
+            yield return WaitForStep;
         }
     }
 
