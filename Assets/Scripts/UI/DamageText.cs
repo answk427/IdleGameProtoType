@@ -16,7 +16,7 @@ public class DamageText : MonoBehaviour
 
     // prefix: 데미지는 보통 빈 문자열, 힐은 "+"처럼 구분되게 붙여서 색만으로도 헷갈리지 않게 한다.
     public void Play(
-    int amount,
+    GameNumber amount,
     Vector3 worldPos,
     Canvas canvas,
     RectTransform canvasRect,
@@ -28,7 +28,7 @@ public class DamageText : MonoBehaviour
 
         onComplete = returnAction;
 
-        text.text = prefix + amount;
+        text.text = prefix + NumberFormatUtility.Format(amount);
         text.color = new Color(color.r, color.g, color.b, 1f);
 
         Vector2 screenPoint = Camera.main.WorldToScreenPoint(worldPos);

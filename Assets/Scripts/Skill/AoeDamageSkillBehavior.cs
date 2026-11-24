@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 
+// 범위 데미지. 반경은 시전자의 몸 표면에서 상대의 몸 표면까지의 거리다(D10, 교전·대상과 같은 거리 규칙).
 public class AoeDamageSkillBehavior : ISkillBehavior
 {
     private readonly float damageMultiplier;
@@ -11,18 +12,17 @@ public class AoeDamageSkillBehavior : ISkillBehavior
         this.radius = radius;
     }
 
-    public UnityEngine.Vector3[] Execute(ISkillCaster caster, IDamageable target)
+    public void Execute(Combatant caster, Combatant target, List<Combatant> hits)
     {
-        List<IDamageable> targets = caster.GetOpponentsInRange(radius);
-        int damage = caster.GetCalculatedDamage(damageMultiplier);
+        if (caster.World == null) return;
 
-        UnityEngine.Vector3[] hitPositions = new UnityEngine.Vector3[targets.Count];
-        for (int i = 0; i < targets.Count; i++)
+        int first = hits.Count;
+        caster.World.CollectOpponentsInRange(caster, radius, hits);
+
+        GameNumber damage = caster.ComputeDamage(damageMultiplier);
+        for (int i = first; i < hits.Count; i++)
         {
-            targets[i].TakeDamage(damage);
-            hitPositions[i] = targets[i].Position;
+            hits[i].TakeDamage(damage);
         }
-
-        return hitPositions;
     }
 }

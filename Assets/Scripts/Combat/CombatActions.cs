@@ -2,13 +2,16 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 전투 행동을 하는 쪽(지금은 PlayerController, BossMonster. 2단계에서 Combatant로 합친다)이 제공해야 하는 것.
+// 전투 행동을 하는 쪽(Combatant)이 제공해야 하는 것. 테스트는 가짜 시전자로 이 규칙만 따로 확인한다.
 // 시각은 모두 시뮬레이션 시계의 절대 시각(초)이다.
 public interface ICombatActor
 {
     bool IsAlive { get; }
 
     bool TryGetTimeline(string key, out ActionTimeline timeline);
+
+    // 기본 공격이 있는가(데이터: 공격 간격 > 0). 없으면 스킬만 쓴다.
+    bool HasBasicAttack { get; }
 
     // 기본 공격 한 번의 길이(= 공격 간격). 공식은 각 시전자의 스탯이 정한다.
     double BasicAttackDuration { get; }
@@ -30,12 +33,6 @@ public interface ICombatActor
     // 연출 훅. skill은 기본 공격이면 null.
     void OnActionStarted(ActionTimeline action, double duration, Skill skill);
     void OnActionsIdle();
-}
-
-// 스케줄러가 교전 중인 전투원을 모을 때 쓰는 접점. 2단계의 Combatant가 이것을 대신한다.
-public interface ICombatParticipant
-{
-    CombatActions Combat { get; }
 }
 
 // 전투원 하나의 행동 결정과 진행(docs/COMBAT_ARCHITECTURE.md 7-3, 7-11, 7-13). 플레이어와 보스가 같이 쓴다.
@@ -116,7 +113,7 @@ public sealed class CombatActions : IActionListener
 
         Skill skill = TakeRequest(t) ?? actor.PickReadySkill(t);
         if (skill != null && TryResolve(skill.Data.AnimationTrigger, out ActionTimeline skillAction)
-            && IsValidDuration(skill.Data.CastTime, "cast-time:" + skill.Data.Id, $"스킬 {skill.Data.Id}({skill.Data.SkillName})의 시전 시간(castTime)"))
+            && HasValidCastTime(skill))
         {
             double castTime = skill.Data.CastTime;
             skill.BeginCooldown(t);
@@ -126,7 +123,7 @@ public sealed class CombatActions : IActionListener
             return true;
         }
 
-        if (!TryResolve(ActionKeys.Attack, out ActionTimeline attack)) return false;
+        if (!actor.HasBasicAttack || !TryResolve(ActionKeys.Attack, out ActionTimeline attack)) return false;
 
         double duration = actor.BasicAttackDuration;
         if (!IsValidDuration(duration, "attack-duration", "기본 공격 길이(공격 간격)")) return false;
@@ -137,12 +134,23 @@ public sealed class CombatActions : IActionListener
         return true;
     }
 
+    // 메시지 문자열은 실패했을 때만 만든다(통과하는 경로에서 할당하지 않게, R6).
     private bool IsValidDuration(double duration, string problemKey, string what)
     {
-        if (duration > 0.0 && !double.IsInfinity(duration)) return true;
+        if (IsPositiveFinite(duration)) return true;
         Report(problemKey, $"[CombatActions] {what}이 잘못됐습니다: {duration}. 0보다 커야 합니다.");
         return false;
     }
+
+    private bool HasValidCastTime(Skill skill)
+    {
+        if (IsPositiveFinite(skill.Data.CastTime)) return true;
+        Report("cast-time:" + skill.Data.Id,
+            $"[CombatActions] 스킬 {skill.Data.Id}({skill.Data.SkillName})의 시전 시간(castTime)이 잘못됐습니다: {skill.Data.CastTime}. 0보다 커야 합니다.");
+        return false;
+    }
+
+    private static bool IsPositiveFinite(double value) => value > 0.0 && !double.IsInfinity(value);
 
     private Skill TakeRequest(double t)
     {

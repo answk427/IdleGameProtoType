@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 플레이어의 스킬 런타임 상태(docs/COMBAT_ARCHITECTURE.md 7-6). 순수 C#.
+// 전투원의 스킬 런타임 상태(docs/COMBAT_ARCHITECTURE.md 7-6). 순수 C#. 플레이어는 장착 슬롯 5칸, 몬스터는 데이터의 스킬 1칸.
 //
 // 쿨다운은 슬롯이 아니라 스킬 id에 붙는다. 처음 장착할 때 인스턴스를 만들고, 장착을 풀어도 버리지 않는다.
 // 예전에는 슬롯마다 인스턴스를 새로 만들어서, 스킬을 다른 슬롯으로 옮기기만 해도 쿨다운이 0이 됐다.
@@ -23,6 +23,24 @@ public sealed class SkillLoadout
     }
 
     public int SlotCount => slots.Length;
+
+    public bool HasAnySkill
+    {
+        get
+        {
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i] != null) return true;
+            }
+            return false;
+        }
+    }
+
+    // 풀에서 다시 꺼낸 몬스터처럼 새 생을 시작할 때. 플레이어는 부르지 않는다(스테이지를 넘어도 쿨다운 유지).
+    public void ResetCooldowns()
+    {
+        foreach (Skill skill in skillsById.Values) skill.ResetCooldown();
+    }
 
     public Skill GetSlot(int slotIndex) =>
         slotIndex >= 0 && slotIndex < slots.Length ? slots[slotIndex] : null;

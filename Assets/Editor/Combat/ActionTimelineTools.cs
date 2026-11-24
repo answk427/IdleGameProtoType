@@ -135,11 +135,12 @@ public static class ActionTimelineTools
         return errors;
     }
 
-    // 전투 데이터 전체 검사(행동 시간표 + 스킬 시전 시간). 비어 있으면 정상.
+    // 전투 데이터 전체 검사(행동 시간표, 스킬 시전 시간, 데이터와 프리팹의 짝). 비어 있으면 정상.
     public static List<string> ValidateCombatData()
     {
         List<string> errors = ValidateAll();
         errors.AddRange(ValidateSkills());
+        errors.AddRange(CombatDataValidator.ValidateDatabases());
         return errors;
     }
 

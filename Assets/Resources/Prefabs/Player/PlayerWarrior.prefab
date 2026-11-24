@@ -130,13 +130,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 283aa570bcd651143bff62128df4da72, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
-  attackRange: 0.1
-  timelines: {fileID: 11400000, guid: 44baef13b6d9b0c41ac60d8aba8dcc89, type: 2}
   view: {fileID: 9023516119955059861}
-  baseRunSpeed: 3.4
+  timelines: {fileID: 11400000, guid: 44baef13b6d9b0c41ac60d8aba8dcc89, type: 2}
   hitboxProfile:
-    halfWidthOverride: 0.4
-    hitPositionOffset: {x: 0, y: 0}
+    halfWidth: 0.4
+    bodyOffset: {x: 0, y: 0}
   groundOffset: 1.08
 --- !u!114 &7381849167385634018
 MonoBehaviour:

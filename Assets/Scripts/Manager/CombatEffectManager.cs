@@ -54,18 +54,18 @@ public class CombatEffectManager : MonoBehaviour
 
     // 데미지 숫자는 출처와 무관하게 항상 표시하되, 맞은 대상이 플레이어인지에 따라
     // 색만 다르게 한다 (플레이어가 맞으면 빨강, 몬스터가 맞으면 기존 흰색 유지).
-    private void HandleAnyTargetDamaged(IDamageable target, int damage, Vector3 position)
+    private void HandleAnyTargetDamaged(Combatant target, GameNumber damage, Vector3 position)
     {
-        Color color = target is PlayerController ? playerDamageColor : monsterDamageColor;
+        Color color = target.Team == Team.Ally ? playerDamageColor : monsterDamageColor;
         SpawnDamageText(damage, position, color);
     }
 
-    private void HandleHealed(int amount, Vector3 position)
+    private void HandleHealed(GameNumber amount, Vector3 position)
     {
         SpawnDamageText(amount, position, healColor, "+");
     }
 
-    public void SpawnDamageText(int amount, Vector3 worldPos, Color color, string prefix = "")
+    public void SpawnDamageText(GameNumber amount, Vector3 worldPos, Color color, string prefix = "")
     {
         GameObject obj = PoolManager.Instance.Spawn(
             damageTextPrefab,
@@ -85,15 +85,15 @@ public class CombatEffectManager : MonoBehaviour
         damageText.Play(amount, worldPos, dynamicCanvas, canvasRect, ReturnDamageText, color, prefix);
     }
 
-    // 어떤 이펙트를 쓸지는 "맞은 대상이 플레이어인가"로 결정한다 (데미지 텍스트 색 판단과 동일한 기준).
-    public void SpawnHitParticle(IDamageable target)
+    // 어떤 이펙트를 쓸지는 "맞은 대상이 아군(플레이어)인가"로 결정한다 (데미지 텍스트 색 판단과 동일한 기준).
+    public void SpawnHitParticle(Combatant target)
     {
-        bool isPlayerHit = target is PlayerController;
+        bool isPlayerHit = target.Team == Team.Ally;
         GameObject prefab = isPlayerHit && playerHitParticlePrefab != null
             ? playerHitParticlePrefab
             : hitParticlePrefab;
 
-        Vector3 worldPos = target.Position;
+        Vector3 worldPos = CombatantHost.EffectPositionOf(target);
         GameObject obj = PoolManager.Instance.Spawn(
             prefab,
             worldPos,

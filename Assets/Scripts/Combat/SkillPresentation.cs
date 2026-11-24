@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // 스킬 시전/타격 연출(이펙트, 소리). 플레이어와 보스가 같이 쓴다.
@@ -16,18 +17,21 @@ public static class SkillPresentation
             AudioSource.PlayClipAtPoint(entry.castSfx, casterPosition);
     }
 
-    public static void PlayHit(Skill skill, Vector3[] hitPositions)
+    // 맞은 전투원마다 그 몸 위치에 재생한다.
+    public static void PlayHit(Skill skill, IReadOnlyList<Combatant> hitTargets)
     {
         SkillEntry entry = skill?.Entry;
-        if (entry == null || hitPositions == null) return;
+        if (entry == null || hitTargets == null) return;
 
-        for (int i = 0; i < hitPositions.Length; i++)
+        for (int i = 0; i < hitTargets.Count; i++)
         {
+            Vector3 position = CombatantHost.EffectPositionOf(hitTargets[i]);
+
             if (entry.hitVfxPrefab != null && CombatEffectManager.Instance != null)
-                CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, hitPositions[i]);
+                CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, position);
 
             if (entry.hitSfx != null)
-                AudioSource.PlayClipAtPoint(entry.hitSfx, hitPositions[i]);
+                AudioSource.PlayClipAtPoint(entry.hitSfx, position);
         }
     }
 }

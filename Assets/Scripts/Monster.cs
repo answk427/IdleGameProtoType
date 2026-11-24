@@ -1,178 +1,75 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 
-public class Monster : MonoBehaviour, IHasHp, IDamageable
+// 몬스터의 호스트. 일반 몬스터와 보스가 모두 이 클래스다(docs/COMBAT_ARCHITECTURE.md 8-3).
+// 전투 규칙은 Combatant가 갖고, 둘의 차이는 데이터다:
+//   공격 간격 > 0이면 기본 공격, skillId가 있으면 스킬, movePolicy가 Approach면 다가온다.
+// 보스인지는 스폰할 때 정하는 역할이고, 처치 알림(BossKilled)에만 쓴다.
+public class Monster : CombatantHost
 {
     [SerializeField] private FloatingHpBar hpBar;
-    // 애니메이션은 재생만 한다. 전투 로직은 애니메이터에서 아무것도 읽지 않는다(docs/COMBAT_ARCHITECTURE.md 7-5).
-    [SerializeField] protected CharacterAnimationView view;
 
-    [SerializeField] protected HitboxProfile hitboxProfile = new();
+    private readonly int[] skillSlot = { SkillLoadout.EmptySlot };
+    private SkillLoadout skills;
+    private GameNumber goldReward;
+    private int expReward;
+    private bool isBoss;
 
-    [SerializeField] private int maxHp = 10;
-    [SerializeField] private int expReward = 0;
+    protected override Team Team => Team.Enemy;
 
-    public event Action<int> OnDamaged;
-    public event Action<float, float> OnHpChanged;
-
-    public StateMachine fsm { get; private set; }
-
-    private int currentHp;
-
-    // 처치 보상 골드. 스테이지 배율로 지수적으로 커지므로 GameNumber. 스폰 시 Initialize()가 데이터로 채운다.
-    private GameNumber goldReward = 1;
-
-    // 보간용 직전/현재 고정 단계의 위치
-    private Vector3 previousSimulatedPosition;
-    private Vector3 currentSimulatedPosition;
-
-    public bool IsAlive { get; protected set; }
-    public Vector3 Position => hitboxProfile.GetPosition(transform);
-    public float HalfWidth { get; protected set; }
+    // 처치 보상 골드. 스테이지 배율로 지수적으로 커지므로 GameNumber.
     public GameNumber GoldReward => goldReward;
     public int ExpReward => expReward;
+    public bool IsBoss => isBoss;
     public GameObject OriginPrefab { get; set; }
 
-    protected virtual void Awake()
+    protected override void Awake()
     {
-        if (view == null)
-            view = GetComponent<CharacterAnimationView>();
-        if (view == null)
-            Debug.LogError($"[Monster] {name}에 CharacterAnimationView가 없습니다.");
-
-        if (hpBar == null)
-            hpBar = GetComponentInChildren<FloatingHpBar>();
-
-        fsm = new StateMachine();
-
-        currentHp = maxHp;
-        IsAlive = true;
-    }
-
-    protected virtual void OnEnable()
-    {
-        IsAlive = true;
-        HalfWidth = hitboxProfile.GetHalfWidth(gameObject);
-        fsm.ChangeState(new MonsterIdleState(this));
-
-        // 죽으면서 숨겼던 체력바를 풀에서 재사용될 때 다시 보이게 한다.
-        if (hpBar != null) hpBar.gameObject.SetActive(true);
+        base.Awake();
+        if (hpBar == null) hpBar = GetComponentInChildren<FloatingHpBar>();
+        skills = new SkillLoadout(1, id => GameDatabaseManager.Instance?.GetSkill(id));
     }
 
     private void OnDisable()
     {
-        IsAlive = false;
-        if (fsm != null)
-            fsm.ChangeState(null);
+        // 정상 경로는 스포너가 풀에 돌려주기 전에 월드에서 뺀다. 다른 경로로 꺼져도 월드에 남지 않게 한다.
+        Combatant?.World?.Remove(Combatant);
     }
 
-    // 시뮬레이션 시계. 고정 단계의 "상태 전이와 이동" 국면에서 CombatSimulation이 넘겨준다(이동량 계산에 쓴다).
-    public SimClock Clock { get; private set; }
-
-    // CombatSimulation이 고정 단계의 "상태 전이와 이동" 국면에 부른다(docs/COMBAT_ARCHITECTURE.md 7-11).
-    public virtual void Tick(SimClock clock)
+    // 스포너가 위치를 정한 뒤에 부른다(풀에서 꺼낸 같은 객체를 다시 쓰므로 이전 상태를 모두 지운다).
+    public void Spawn(MonsterData data, double hpMultiplier, double damageMultiplier, double goldMultiplier, bool isBoss)
     {
-        Clock = clock;
-        fsm.Update();
-    }
+        this.isBoss = isBoss;
+        goldReward = GameNumber.Round(data.GoldReward * goldMultiplier);
+        expReward = data.ExpReward;
 
-    // ── 보간(docs/COMBAT_DESIGN.md 3-3) ──
-    // 전투 로직은 transform.position을 그대로 읽고 쓴다. CombatSimulation이 단계 앞에서 시뮬레이션 위치로 되돌리고(Restore),
-    // 단계 뒤에서 기록하며(Capture), 화면 프레임에서는 직전 두 단계 사이를 그린다(ApplyRenderPose).
+        skillSlot[0] = data.SkillId > 0 ? data.SkillId : SkillLoadout.EmptySlot;
+        skills.SetSlots(skillSlot);
+        skills.ResetCooldowns();
 
-    public void RestoreSimulatedPose() => transform.position = currentSimulatedPosition;
-
-    public void CaptureSimulatedPose()
-    {
-        previousSimulatedPosition = currentSimulatedPosition;
-        currentSimulatedPosition = transform.position;
-    }
-
-    public void ApplyRenderPose(float alpha) =>
-        transform.position = Vector3.LerpUnclamped(previousSimulatedPosition, currentSimulatedPosition, alpha);
-
-    // 위치를 직접 정한 직후(스폰)에 부른다. 안 하면 풀에서 꺼낸 몬스터가 예전 자리에서 미끄러져 오는 게 보인다.
-    private void SnapSimulatedPose()
-    {
-        previousSimulatedPosition = transform.position;
-        currentSimulatedPosition = transform.position;
-    }
-
-    // 스포너가 위치를 정한 뒤에 부른다(PoolManager.Spawn이 위치를 정하는 건 OnEnable 이후라 여기서 맞춘다).
-    public virtual void Initialize(MonsterData monsterData, float goldMultiplier, float hpMultiplier, float dmgMultiplier)
-    {
-        this.maxHp = Mathf.RoundToInt(monsterData.MaxHp * hpMultiplier);
-        this.currentHp = this.maxHp;
-        this.goldReward = GameNumber.Round((double)monsterData.GoldReward * goldMultiplier);
-        this.expReward = monsterData.ExpReward;
-
-        IsAlive = true;
-        OnHpChanged?.Invoke(currentHp, maxHp);
-        SnapSimulatedPose();
-    }
-
-    public void TakeDamage(int damage)
-    {
-        if (!IsAlive) return;
-
-        currentHp = Mathf.Max(currentHp - damage, 0);
-        OnHpChanged?.Invoke(currentHp, maxHp);
-        OnDamaged?.Invoke(damage);
-        GlobalCombatEvents.TriggerAnyTargetDamaged(this, damage, transform.position);
-
-        if (currentHp <= 0)
+        var stats = new CombatantStats
         {
-            Die();
-            return;
-        }
+            MaxHp = GameNumber.Round(data.MaxHp * hpMultiplier),
+            AttackDamage = GameNumber.Round(data.AttackDamage * damageMultiplier),
+            AttackInterval = data.AttackInterval,
+            AttackRange = data.AttackRange,
+            MoveSpeed = 0f, // 3단계 전까지 몬스터는 스크롤 속도로 움직인다(CombatWorld.ScrollSpeed)
+            MovePolicy = data.MovePolicy,
+        };
+
+        // 체력바가 먼저 켜져 있어야 스폰 때 HP 알림을 받는다.
+        if (hpBar != null) hpBar.gameObject.SetActive(true);
+        Combatant.Spawn(stats, BodyCenterX(transform.position.x), hitboxProfile.HalfWidth, timelines, skills);
     }
 
-    // 회복이 필요한 서브클래스(BossMonster 등)가 이 메서드를 통해서만 currentHp를 건드리게 한다.
-    protected void HealInternal(int amount)
+    public override void HandleDied(Combatant self)
     {
-        if (!IsAlive) return;
+        base.HandleDied(self);
 
-        currentHp = Mathf.Min(currentHp + amount, maxHp);
-        OnHpChanged?.Invoke(currentHp, maxHp);
-    }
-
-    protected virtual void Die()
-    {
-        IsAlive = false;
-        // 골드/경험치 지급은 GlobalCombatEvents.OnMonsterDied 구독자(GameManager)가 처리한다.
-        fsm?.ChangeState(new MonsterDieState(this));
-
-        // 시체는 인카운터가 끝날 때까지(ClearEncounter) 풀로 안 돌아가고 화면에 남아있는데,
-        // 체력바까지 같이 떠있으면 죽은 몬스터 위에 빈 체력바가 계속 보이는 문제가 있었다.
+        // 시체는 인카운터가 끝날 때까지 화면에 남으므로 빈 체력바를 숨긴다.
         if (hpBar != null) hpBar.gameObject.SetActive(false);
-    }
 
-    public void PlayIdleAnimation()
-    {
-        if (view != null) view.PlayLocomotion(false);
-    }
-
-    public void PlayDeathAnimation()
-    {
-        if (view != null) view.PlayDeath();
-    }
-
-    public void moveToPlayer()
-    {
-        PlayerController player = GameManager.Instance != null ? GameManager.Instance.GetPlayer() : null;
-        if (player == null) return;
-
-        if (Clock == null) return;
-
-        Vector3 position = transform.position;
-        float next = position.x - player.RunSpeed * (float)Clock.StepLength;
-
-        // CCD(docs/COMBAT_DESIGN.md 3-4): 살아 있는 몬스터는 플레이어 몸을 통과하지 못한다.
-        // 접촉선(두 몸이 닿는 위치) 앞이면 거기서 멈추고, 이미 겹쳐 있으면(순간이동 등) 더 파고들지 않는다.
-        // 한 단계 이동량과 상관없이 성립하고, 접촉선에서는 표면 사이 거리가 0이라 교전이 반드시 시작된다.
-        float contactX = player.transform.position.x + player.HalfWidth + HalfWidth;
-        position.x = Mathf.Max(next, Mathf.Min(position.x, contactX));
-
-        transform.position = position;
+        // 골드/경험치 지급은 GlobalCombatEvents.OnMonsterDied 구독자(GameManager)가 처리한다.
+        GlobalCombatEvents.TriggerMonsterDied(this, goldReward, transform.position);
+        if (isBoss) GlobalGameEvents.TriggerBossKilled();
     }
 }

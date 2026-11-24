@@ -1,8 +1,9 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "MonsterDatabase", menuName = "Data/Monster Database")]
-public class MonsterDatabase : ScriptableObject
+public class MonsterDatabase : ScriptableObject, IDataTable
 {
     public List<MonsterEntry> entries = new List<MonsterEntry>();
 
@@ -30,4 +31,8 @@ public class MonsterDatabase : ScriptableObject
     {
         lookup = null; // 인스펙터에서 직접 수정하면 캐시 무효화
     }
+
+    Type IDataTable.DataType => typeof(MonsterData);
+    int IDataTable.RowCount => entries.Count;
+    IData IDataTable.GetRow(int index) => entries[index]?.data;
 }

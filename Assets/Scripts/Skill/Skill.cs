@@ -28,15 +28,18 @@ public class Skill
         ReadyAt = castTime + Data.Cooldown;
     }
 
+    // 다시 쓰는 전투원(풀에서 꺼낸 몬스터)이 이전 생의 쿨다운을 물려받지 않게 한다.
+    public void ResetCooldown() => ReadyAt = double.NegativeInfinity;
+
     public double RemainingCooldown(double now) => ReadyAt > now ? ReadyAt - now : 0.0;
 
     public float CooldownRatio(double now) =>
         Data.Cooldown > 0f ? UnityEngine.Mathf.Clamp01((float)(RemainingCooldown(now) / Data.Cooldown)) : 0f;
 
-    // 타격 표식마다 한 번 부른다. 반환값은 효과가 실제로 적용된 위치들(이펙트 기준점).
-    public UnityEngine.Vector3[] Apply(ISkillCaster caster, IDamageable target)
+    // 타격 표식마다 한 번 부른다. 효과가 실제로 적용된 전투원을 hits에 더한다(이펙트 기준점).
+    public void Apply(Combatant caster, Combatant target, System.Collections.Generic.List<Combatant> hits)
     {
-        return behavior.Execute(caster, target);
+        behavior.Execute(caster, target, hits);
     }
 
     private static ISkillBehavior CreateBehavior(SkillData data)
@@ -48,7 +51,7 @@ public class Skill
             case SkillEffectType.AoeDamage:
                 return new AoeDamageSkillBehavior(data.Value1, data.Value2);
             case SkillEffectType.Heal:
-                return new HealSkillBehavior((int)data.Value1);
+                return new HealSkillBehavior(data.Value1);
             default:
                 throw new System.ArgumentException($"Unknown skill effect type: {data.EffectType}");
         }

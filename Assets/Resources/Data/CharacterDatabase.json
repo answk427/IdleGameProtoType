@@ -1,0 +1,9 @@
+[
+  {
+    "Key": 1,
+    "id": 1,
+    "characterName": "PlayerWarrior",
+    "attackRange": 0.1,
+    "moveSpeed": 3.4
+  }
+]

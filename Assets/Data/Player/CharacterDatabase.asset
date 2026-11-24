@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 950a3031defead34f845eb6a51029216, type: 3}
+  m_Name: CharacterDatabase
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::CharacterDatabase
+  entries:
+  - data:
+      id: 1
+      characterName: PlayerWarrior
+      attackRange: 0.1
+      moveSpeed: 3.4
+    prefab: {fileID: 6323719953710832613, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}

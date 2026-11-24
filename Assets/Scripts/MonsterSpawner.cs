@@ -1,5 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
+
+// 인카운터·보스 스폰과 정리. 스폰한 몬스터의 전투원은 전투 월드(CombatWorld)에 등록하고, 정리할 때 뺀다.
+// 대상 찾기와 범위 판정은 여기가 아니라 CombatWorld의 규칙 하나가 한다(docs/COMBAT_ARCHITECTURE.md 8-4).
 
 public class MonsterSpawner : MonoBehaviour
 {
@@ -9,8 +13,12 @@ public class MonsterSpawner : MonoBehaviour
     [SerializeField] private Vector3 firstMonsterPosition = new Vector3(0f, 0f, 0f);
 
     private readonly List<Monster> activeMonsters = new List<Monster>();
+    private CombatWorld world;
 
     public IReadOnlyList<Monster> ActiveMonsters => activeMonsters;
+
+    // CombatSimulation.Initialize가 연결한다. 그 전에는 스폰하지 않는다.
+    public void Attach(CombatWorld combatWorld) => world = combatWorld;
 
     public List<Monster> SpawnEncounter(StageData stage)
     {
@@ -46,8 +54,8 @@ public class MonsterSpawner : MonoBehaviour
         for (int i = 0; i < stage.MonstersPerEncounter; i++)
         {
             Vector3 spawnPosition = basePosition + Vector3.right * stage.MonsterSpacing * i;
-            Monster monster = SpawnMonster(monsterData, stage, monsterPrefab, spawnPosition, Quaternion.identity);
-            activeMonsters.Add(monster);
+            Monster monster = SpawnMonster(monsterData, stage, monsterPrefab, spawnPosition, null, false);
+            if (monster != null) activeMonsters.Add(monster);
         }
 
         return activeMonsters;
@@ -58,53 +66,16 @@ public class MonsterSpawner : MonoBehaviour
         for (int i = activeMonsters.Count - 1; i >= 0; i--)
         {
             Monster monster = activeMonsters[i];
-            if (monster != null)
-                PoolManager.Instance.Despawn(monster.OriginPrefab, monster.gameObject);
+            if (monster == null) continue;
+
+            world?.Remove(monster.Combatant);
+            PoolManager.Instance.Despawn(monster.OriginPrefab, monster.gameObject);
         }
         activeMonsters.Clear();
     }
 
-    public Monster GetClosestMonster(float originX)
-    {
-        Monster closestMonster = null;
-        float minDistance = float.MaxValue;
-
-        for (int i = 0; i < activeMonsters.Count; i++)
-        {
-            Monster m = activeMonsters[i];
-            if (m == null || !m.IsAlive) continue;
-
-            float distance = m.transform.position.x - originX;
-            if (distance > 0 && distance < minDistance)
-            {
-                minDistance = distance;
-                closestMonster = m;
-            }
-        }
-        return closestMonster;
-    }
-
-    public List<Monster> GetMonstersInRange(float originX, float radius)
-    {
-        List<Monster> result = new List<Monster>();
-        for (int i = 0; i < activeMonsters.Count; i++)
-        {
-            Monster m = activeMonsters[i];
-            if (m == null || !m.IsAlive) continue;
-
-            float distance = Mathf.Abs(m.transform.position.x - originX);
-            if (distance <= radius)
-            {
-                result.Add(m);
-            }
-        }
-        return result;
-    }
-
     public bool AllDie()
     {
-        if (activeMonsters.Count == 0) return true;
-
         for (int i = 0; i < activeMonsters.Count; i++)
         {
             if (activeMonsters[i].IsAlive) return false;
@@ -112,23 +83,31 @@ public class MonsterSpawner : MonoBehaviour
         return true;
     }
 
-    public Monster SpawnMonster(MonsterData monsterData, StageData stageData, GameObject monsterPrefab, Vector3 spawnPosition, Quaternion quaternion)
+    // parent: 일반 몬스터는 부모 없이(예전과 같음), 보스는 spawnRoot 아래에 둔다.
+    private Monster SpawnMonster(MonsterData monsterData, StageData stageData, GameObject monsterPrefab, Vector3 spawnPosition, Transform parent, bool isBoss)
     {
-        GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, quaternion);
+        if (world == null)
+        {
+            Debug.LogError("[MonsterSpawner] 전투 월드가 연결되지 않아 스폰하지 않습니다(CombatSimulation.Initialize 전).");
+            return null;
+        }
 
-        Monster monster = monsterObject.GetComponent<Monster>();
-        if (monster == null)
-            monster = monsterObject.AddComponent<Monster>();
+        GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, Quaternion.identity, parent);
+        if (!monsterObject.TryGetComponent(out Monster monster))
+        {
+            Debug.LogError($"[MonsterSpawner] {monsterPrefab.name} 프리팹에 Monster 컴포넌트가 없습니다.");
+            PoolManager.Instance.Despawn(monsterPrefab, monsterObject);
+            return null;
+        }
 
         monster.OriginPrefab = monsterPrefab;
-
-        CalcStageMultiplier(stageData, out float hpMult, out float dmgMult, out float goldMult);
-        monster.Initialize(monsterData, goldMult, hpMult, dmgMult);
-
+        CalcStageMultiplier(stageData, out double hpMult, out double dmgMult, out double goldMult);
+        monster.Spawn(monsterData, hpMult, dmgMult, goldMult, isBoss);
+        world.Add(monster.Combatant);
         return monster;
     }
 
-    public BossMonster SpawnBoss(StageData stage)
+    public Monster SpawnBoss(StageData stage)
     {
         ClearEncounter();
 
@@ -139,7 +118,6 @@ public class MonsterSpawner : MonoBehaviour
             return null;
         }
 
-        MonsterData monsterData = bossEntry.data;
         GameObject bossPrefab = bossEntry.prefab;
         if (bossPrefab == null)
         {
@@ -149,24 +127,10 @@ public class MonsterSpawner : MonoBehaviour
 
         Vector3 spawnPosition = firstMonsterPosition + (spawnAnchor != null ? spawnAnchor.position : Vector3.zero);
         spawnPosition.y = GetGroundY(spawnPosition.y) + bossEntry.groundOffset;
-        GameObject obj = PoolManager.Instance.Spawn(bossPrefab, spawnPosition, Quaternion.identity, spawnRoot);
 
-        // 보스 프리팹엔 BossMonster 컴포넌트가 붙어있어야 함
-        BossMonster boss = obj.GetComponent<BossMonster>();
-        if (boss == null)
-        {
-            Debug.LogError($"{bossPrefab.name} prefab에 BossMonster 컴포넌트가 없습니다.");
-            PoolManager.Instance.Despawn(bossPrefab, obj);
-            return null;
-        }
-
-        boss.OriginPrefab = bossPrefab;
-
-        CalcStageMultiplier(stage, out float hpMult, out float dmgMult, out float goldMult);
-        boss.Initialize(monsterData, goldMult, hpMult, dmgMult);
-
-        activeMonsters.Add(boss);
-
+        // 보스와 일반 몬스터는 같은 Monster다. 차이는 데이터(스킬, 이동 정책, 공격)와 처치 알림용 역할뿐이다.
+        Monster boss = SpawnMonster(bossEntry.data, stage, bossPrefab, spawnPosition, spawnRoot, true);
+        if (boss != null) activeMonsters.Add(boss);
         return boss;
     }
 
@@ -177,12 +141,12 @@ public class MonsterSpawner : MonoBehaviour
         return PlayAreaBounds.Instance != null ? PlayAreaBounds.Instance.GroundY : fallbackY;
     }
 
-    private static void CalcStageMultiplier(StageData stageData, out float hpMult, out float dmgMult, out float goldMult)
+    // 스테이지 성장 배율. double로 계산한다(float 지수는 큰 스테이지에서 정밀도를 잃고, 결과는 GameNumber로 간다).
+    private static void CalcStageMultiplier(StageData stageData, out double hpMult, out double dmgMult, out double goldMult)
     {
         BalanceConfig balance = GameDatabaseManager.Instance.Balance;
-
-        hpMult = Mathf.Pow(balance.hpGrowthBase, stageData.StageNumber);
-        dmgMult = Mathf.Pow(balance.damageGrowthBase, stageData.StageNumber);
-        goldMult = Mathf.Pow(balance.goldGrowthBase, stageData.StageNumber);
+        hpMult = Math.Pow(balance.hpGrowthBase, stageData.StageNumber);
+        dmgMult = Math.Pow(balance.damageGrowthBase, stageData.StageNumber);
+        goldMult = Math.Pow(balance.goldGrowthBase, stageData.StageNumber);
     }
 }

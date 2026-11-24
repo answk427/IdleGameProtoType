@@ -59,9 +59,9 @@ public class PlayerStats
     public int RequiredExp => statData?.GetRequiredExp(Level) ?? 999;
     public bool IsMaxLevel => Level >= (statData?.MaxLevel ?? 1);
 
-    // 최종 스탯 = 기본 + 업그레이드 보너스
-    public int MaxHp => BaseStat.BaseMaxHp + (saveData?.hpUpgradeLevel ?? 0) * upgradeConfig.settings.hpPerUpgrade;
-    public int AttackDamage => BaseStat.BaseAttackDamage + (saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade;
+    // 최종 스탯 = 기본 + 업그레이드 보너스. HP·공격력은 전투 수치라 GameNumber다(D14, 계산은 double이라 int처럼 넘치지 않는다).
+    public GameNumber MaxHp => GameNumber.FromDouble((double)BaseStat.BaseMaxHp + (double)(saveData?.hpUpgradeLevel ?? 0) * upgradeConfig.settings.hpPerUpgrade);
+    public GameNumber AttackDamage => GameNumber.FromDouble((double)BaseStat.BaseAttackDamage + (double)(saveData?.attackUpgradeLevel ?? 0) * upgradeConfig.settings.attackPerUpgrade);
     public float AttackInterval => Mathf.Max(0.1f, BaseStat.BaseAttackInterval - (saveData?.attackSpeedUpgradeLevel ?? 0) * upgradeConfig.settings.attackSpeedPerUpgrade);
 
     private PlayerStatData BaseStat => statData.GetByLevel(Level);

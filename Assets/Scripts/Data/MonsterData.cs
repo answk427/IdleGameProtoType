@@ -15,6 +15,8 @@ public class MonsterData : IData
     [SerializeField] private float attackInterval;
     [SerializeField] private float attackRange;
     [SerializeField] private int skillId;
+    // 교전하지 않을 때 움직이는 방식(Hold: 제자리, Approach: 다가옴). 기본값 Hold(docs/COMBAT_ARCHITECTURE.md 8-4).
+    [SerializeField] private MovePolicy movePolicy;
 
     [JsonProperty("id")]
     public int Id { get => id; private set => id = value; }
@@ -34,5 +36,7 @@ public class MonsterData : IData
     public float AttackRange { get => attackRange; private set => attackRange = value; }
     [JsonProperty("skillId")]
     public int SkillId { get => skillId; private set => skillId = value; }
+    [JsonProperty("movePolicy")]
+    public MovePolicy MovePolicy { get => movePolicy; private set => movePolicy = value; }
 }
 

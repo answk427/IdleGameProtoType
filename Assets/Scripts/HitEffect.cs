@@ -9,14 +9,14 @@ public class HitEffect : MonoBehaviour
 
     private Color originalColor;
 
-    private IDamageable owner;
+    private CombatantHost owner;
 
     private void Awake()
     {
         if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
         originalColor = spriteRenderer.color;
 
-        owner = GetComponentInParent<IDamageable>();
+        owner = GetComponentInParent<CombatantHost>();
     }
 
     private void OnEnable()
@@ -35,7 +35,7 @@ public class HitEffect : MonoBehaviour
         }
     }
 
-    private void HandleDamaged(int damage)
+    private void HandleDamaged()
     {
         StopAllCoroutines();
         StartCoroutine(Flash());

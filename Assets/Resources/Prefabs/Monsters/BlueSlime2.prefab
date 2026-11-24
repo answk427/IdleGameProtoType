@@ -130,13 +130,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7038cfd9a69e22418f08090497687b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Monster
-  hpBar: {fileID: 0}
   view: {fileID: 1403092447647989472}
+  timelines: {fileID: 11400000, guid: 9bdb788fceae10048ac18505b653f311, type: 2}
   hitboxProfile:
-    halfWidthOverride: 0.4
-    hitPositionOffset: {x: 0, y: 0}
-  maxHp: 10
-  expReward: 0
+    halfWidth: 0.4
+    bodyOffset: {x: 0, y: 0}
+  hpBar: {fileID: 0}
 --- !u!114 &3184703108519338795
 MonoBehaviour:
   m_ObjectHideFlags: 0

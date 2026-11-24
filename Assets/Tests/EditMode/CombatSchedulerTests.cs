@@ -30,6 +30,7 @@ public class CombatSchedulerTests
         public readonly Dictionary<string, ActionTimeline> Timelines = new Dictionary<string, ActionTimeline>();
         public readonly List<Skill> Skills = new List<Skill>();
         public double AttackDuration = 1.0;
+        public bool BasicAttack = true;
         public bool Alive = true;
         public bool Target = true;
         public FakeActor Opponent;
@@ -51,6 +52,7 @@ public class CombatSchedulerTests
 
         public bool IsAlive => Alive;
         public bool TryGetTimeline(string key, out ActionTimeline timeline) => Timelines.TryGetValue(key, out timeline);
+        public bool HasBasicAttack => BasicAttack;
         public double BasicAttackDuration => AttackDuration;
         public bool TryAcquireTarget() => Alive && Target && (Opponent == null || Opponent.Alive);
 
@@ -279,19 +281,19 @@ public class CombatSchedulerTests
     [Test]
     public void SkillOnlyActor_CastsExactlyAtReadyTime()
     {
-        // 기본 공격을 할 수 없는 시전자는 행동 없이 기다리다가, 스킬이 준비되는 시각(결정 입력이 바뀌는 사건)에 정확히 시전한다.
-        // 단계 경계(2.96초)로 밀리지 않는다.
+        // 기본 공격이 없는 시전자(데이터: 공격 간격 0)는 행동 없이 기다리다가, 스킬이 준비되는 시각(결정 입력이 바뀌는 사건)에
+        // 정확히 시전한다. 단계 경계(2.96초)로 밀리지 않고, 기본 공격이 없다는 것은 에러가 아니다.
         var clock = new SimClock(Step);
-        var actor = new FakeActor(clock);
-        actor.Timelines.Remove("Attack");
+        var actor = new FakeActor(clock) { BasicAttack = false };
         Skill skill = TestSkills.Create(cooldown: 2.95f, castTime: 0.5f);
         skill.BeginCooldown(0.0);
         double firstReady = skill.ReadyAt;
         actor.Skills.Add(skill);
 
-        LogAssert.Expect(LogType.Error, new Regex("'Attack' 행동 시간표가 없습니다"));
         Run(clock, new CombatScheduler(), 400, actor);
+        LogAssert.NoUnexpectedReceived();
 
+        Assert.IsTrue(actor.Starts.TrueForAll(s => s.Skill != null), "기본 공격을 시작하지 않는다");
         List<StartRecord> skillStarts = actor.SkillStarts();
         Assert.AreEqual(firstReady, skillStarts[0].Time, 0.0);
         Assert.AreEqual(skillStarts[0].Time + skill.Data.Cooldown, skillStarts[1].Time, 0.0);

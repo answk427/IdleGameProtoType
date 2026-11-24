@@ -49,7 +49,8 @@ public class GameInitializer : MonoBehaviour
             return;
         }
 
-        Session = new GameSession(statData, upgradeConfig);
+        // 에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본을 쓴다(빌드에서는 원본 그대로, docs/COMBAT_ARCHITECTURE.md 8-7).
+        Session = new GameSession(DataTuning.Prepare(statData), upgradeConfig);
         Session.Apply(saveData);
 
         PlayerController player = playerSpawner.EnsurePlayer();
@@ -59,7 +60,7 @@ public class GameInitializer : MonoBehaviour
             return;
         }
 
-        player.Initialize(Session.Stats);
+        player.Initialize(Session.Stats, playerSpawner.Character);
         gameManager.Initialize(Session, player);
         combatSimulation.Initialize(player);
         uiRoot.Initialize(Session, GameDatabaseManager.Instance.GetAllSkills(), player);

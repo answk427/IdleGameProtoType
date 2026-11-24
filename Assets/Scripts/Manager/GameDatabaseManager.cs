@@ -31,6 +31,7 @@ public class GameDatabaseManager : MonoBehaviour
     [SerializeField] private MonsterDatabase monsterDatabase;
     [SerializeField] private StageDatabase stageDatabase;
     [SerializeField] private SkillDatabase skillDatabase;
+    [SerializeField] private CharacterDatabase characterDatabase;
     [SerializeField] private BalanceConfig balanceConfig;
 
     private bool isInitialized;
@@ -71,6 +72,13 @@ public class GameDatabaseManager : MonoBehaviour
         if (isInitialized) return;
         isInitialized = true;
 
+        // 에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본을 쓴다(빌드에서는 원본 그대로, docs/COMBAT_ARCHITECTURE.md 8-7).
+        monsterDatabase = DataTuning.Prepare(monsterDatabase);
+        stageDatabase = DataTuning.Prepare(stageDatabase);
+        skillDatabase = DataTuning.Prepare(skillDatabase);
+        characterDatabase = DataTuning.Prepare(characterDatabase);
+
+        if (characterDatabase != null) characterDatabase.EnsureLookup();
         if (monsterDatabase != null) monsterDatabase.EnsureLookup();
         if (stageDatabase != null) stageDatabase.EnsureLookup();
         if (skillDatabase != null) skillDatabase.EnsureLookup();
@@ -94,6 +102,16 @@ public class GameDatabaseManager : MonoBehaviour
             return null;
         }
         return stageDatabase.GetByNumber(stageNumber);
+    }
+
+    public CharacterEntry GetCharacter(int id)
+    {
+        if (characterDatabase == null)
+        {
+            Debug.LogError("[GameDatabaseManager] CharacterDatabase가 연결되어 있지 않습니다.");
+            return null;
+        }
+        return characterDatabase.GetById(id);
     }
 
     public SkillEntry GetSkill(int id)

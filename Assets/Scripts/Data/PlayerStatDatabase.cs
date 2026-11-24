@@ -1,8 +1,9 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "PlayerStatDatabase", menuName = "Data/Player Stat Database")]
-public class PlayerStatDatabase : ScriptableObject
+public class PlayerStatDatabase : ScriptableObject, IDataTable
 {
     public List<PlayerStatData> entries = new List<PlayerStatData>();
 
@@ -44,4 +45,8 @@ public class PlayerStatDatabase : ScriptableObject
     {
         lookup = null; // 인스펙터에서 직접 수정하면 캐시 무효화
     }
+
+    Type IDataTable.DataType => typeof(PlayerStatData);
+    int IDataTable.RowCount => entries.Count;
+    IData IDataTable.GetRow(int index) => entries[index];
 }

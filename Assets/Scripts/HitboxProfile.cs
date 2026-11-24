@@ -1,20 +1,22 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
-// 사거리 판정용 반너비(HalfWidth)와 이펙트 스폰 위치 보정값을 한 곳에 모은 합성용 데이터.
+// 판정 몸(docs/COMBAT_ARCHITECTURE.md 8-4, D9). 몸의 중심 = 피벗 + 오프셋, 반너비는 필수 값이다.
+// 판정(교전, 대상, 범위)과 이펙트 위치가 같은 몸을 쓴다.
+//
+// 예전에는 반너비가 0이면 스프라이트 바운드로 자동 계산했는데, 그 값은 애니메이션 프레임마다 달라져서(공격 모션의 여백 등)
+// 판정이 프레임에 따라 흔들렸다. 그래서 자동 계산을 지우고, 0 이하이면 에디터·빌드 검사가 에러를 낸다.
 [System.Serializable]
 public class HitboxProfile
 {
-    // 스프라이트 셀에는 공격 모션 등을 위한 여백이 포함돼 있어 자동 계산(SpriteRenderer/Collider 바운드)이
-    // 실제 캐릭터 폭보다 훨씬 크게 잡히는 문제가 있다. 0보다 크면 이 값을 그대로 반너비로 사용한다.
-    [SerializeField] private float halfWidthOverride = 0f;
+    [Tooltip("판정 몸의 반너비(월드 유닛). 0보다 커야 한다")]
+    [FormerlySerializedAs("halfWidthOverride")]
+    [SerializeField] private float halfWidth = 0f;
 
-    // 공격 모션 등으로 손/무기가 뻗는 프레임은 그 프레임만 트림된 스프라이트 영역이 비대칭이라
-    // SpriteRenderer.bounds.center가 재생 중인 애니메이션 프레임에 따라 들쭉날쭉해진다(halfWidthOverride와 같은 이유).
-    // 그래서 자동 계산 대신 디자이너가 직접 "몸통 중앙"으로 보정하는 고정 오프셋을 둔다.
-    [SerializeField] private Vector2 hitPositionOffset = Vector2.zero;
+    [Tooltip("피벗에서 몸 중심까지의 오프셋. x는 판정과 이펙트에, y는 이펙트 높이에 쓴다")]
+    [FormerlySerializedAs("hitPositionOffset")]
+    [SerializeField] private Vector2 bodyOffset = Vector2.zero;
 
-    public float GetHalfWidth(GameObject target) =>
-        halfWidthOverride > 0f ? halfWidthOverride : CombatRangeUtility.GetHalfWidth(target);
-
-    public Vector3 GetPosition(Transform t) => t.position + (Vector3)hitPositionOffset;
+    public float HalfWidth => halfWidth;
+    public Vector2 BodyOffset => bodyOffset;
 }

@@ -65,10 +65,10 @@ public class PlayerHud : UIHud
 
     private void RefreshHpBar() => UpdateHpBar(player.CurrentHp, player.MaxHp);
 
-    private void UpdateHpBar(float currentHp, float maxHp)
+    private void UpdateHpBar(GameNumber currentHp, GameNumber maxHp)
     {
-        if (hpFillImage != null && maxHp > 0) hpFillImage.fillAmount = currentHp / maxHp;
-        if (hpText != null) hpText.text = $"{NumberFormatUtility.Format(Mathf.CeilToInt(currentHp))} / {NumberFormatUtility.Format(Mathf.CeilToInt(maxHp))}";
+        if (hpFillImage != null && maxHp > GameNumber.Zero) hpFillImage.fillAmount = (float)(currentHp.ToDouble() / maxHp.ToDouble());
+        if (hpText != null) hpText.text = $"{NumberFormatUtility.Format(currentHp)} / {NumberFormatUtility.Format(maxHp)}";
     }
 
     private void UpdateExpBar(int currentExp, int requiredExp)

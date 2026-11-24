@@ -1,15 +1,18 @@
+using System.Collections.Generic;
+
+// 시전자 회복.
 public class HealSkillBehavior : ISkillBehavior
 {
-    private readonly int healAmount;
+    private readonly GameNumber healAmount;
 
-    public HealSkillBehavior(int healAmount)
+    public HealSkillBehavior(float healAmount)
     {
-        this.healAmount = healAmount;
+        this.healAmount = GameNumber.Round(healAmount);
     }
 
-    public UnityEngine.Vector3[] Execute(ISkillCaster caster, IDamageable target)
+    public void Execute(Combatant caster, Combatant target, List<Combatant> hits)
     {
         caster.Heal(healAmount);
-        return new[] { caster.Position };
+        hits.Add(caster);
     }
 }

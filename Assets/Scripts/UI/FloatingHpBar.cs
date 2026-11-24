@@ -26,11 +26,11 @@ public class FloatingHpBar : MonoBehaviour
         if (myOwner != null) myOwner.OnHpChanged -= UpdateHpBar;
     }
 
-    public void UpdateHpBar(float currentHp, float maxHp)
+    public void UpdateHpBar(GameNumber currentHp, GameNumber maxHp)
     {
-        if (fillImage != null && maxHp > 0)
+        if (fillImage != null && maxHp > GameNumber.Zero)
         {
-            fillImage.fillAmount = currentHp / maxHp;
+            fillImage.fillAmount = (float)(currentHp.ToDouble() / maxHp.ToDouble());
         }
     }
 }

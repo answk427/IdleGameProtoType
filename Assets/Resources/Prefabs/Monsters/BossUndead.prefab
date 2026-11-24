@@ -127,19 +127,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 4813688462502952101}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1be2ad114674774449924e804e877bb1, type: 3}
+  m_Script: {fileID: 11500000, guid: b7038cfd9a69e22418f08090497687b0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BossMonster
-  hpBar: {fileID: 0}
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::Monster
   view: {fileID: 8381791553889091782}
-  hitboxProfile:
-    halfWidthOverride: 0.1
-    hitPositionOffset: {x: 1.1, y: 0}
-  maxHp: 10
-  expReward: 0
-  attackRange: 0.1
-  attackInterval: 2
   timelines: {fileID: 11400000, guid: 4d87de1f4e294174582c69eb316e5882, type: 2}
+  hitboxProfile:
+    halfWidth: 0.1
+    bodyOffset: {x: 1.1, y: 0}
+  hpBar: {fileID: 0}
 --- !u!114 &7220386100751836
 MonoBehaviour:
   m_ObjectHideFlags: 0

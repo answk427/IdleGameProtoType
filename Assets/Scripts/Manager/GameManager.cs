@@ -71,8 +71,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 1. 게임 시작! 플레이어는 '달리는' 상태로 시작한다.
-        player.fsm.ChangeState(new PlayerRunState(player));
+        // 1. 게임 시작! 플레이어는 '달리는'(이동) 단계로 시작한다(PlayerController.Initialize에서 스폰된 상태).
 
         // 게임이 시작됐다는 사실만 알린다. HUD 표시는 각 UI가 이 이벤트를 구독해서 결정한다.
         GlobalGameEvents.TriggerGameStarted();
@@ -215,18 +214,6 @@ public class GameManager : MonoBehaviour
     }
 
     public PlayerController GetPlayer() => player;
-
-    public Monster GetClosestMonster(float originX)
-    {
-        if (monsterSpawner == null) return null;
-        return monsterSpawner.GetClosestMonster(originX);
-    }
-
-    public List<Monster> GetMonstersInRange(float originX, float radius)
-    {
-        if (monsterSpawner == null) return new List<Monster>();
-        return monsterSpawner.GetMonstersInRange(originX, radius);
-    }
 
     public void EnterBossBattle()
     {

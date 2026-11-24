@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "SkillDatabase", menuName = "Data/Skill Database")]
-public class SkillDatabase : ScriptableObject
+public class SkillDatabase : ScriptableObject, IDataTable
 {
     public List<SkillEntry> entries = new List<SkillEntry>();
 
@@ -35,4 +36,8 @@ public class SkillDatabase : ScriptableObject
     {
         lookup = null; // 인스펙터에서 직접 수정하면 캐시 무효화
     }
+
+    Type IDataTable.DataType => typeof(SkillData);
+    int IDataTable.RowCount => entries.Count;
+    IData IDataTable.GetRow(int index) => entries[index]?.data;
 }

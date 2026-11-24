@@ -53,8 +53,8 @@ public class PlayerStatsTests
     public void FreshPlayer_StartsAtLevel1_WithBaseStats()
     {
         Assert.AreEqual(1, stats.Level);
-        Assert.AreEqual(50, stats.MaxHp);
-        Assert.AreEqual(10, stats.AttackDamage);
+        Assert.AreEqual((GameNumber)50, stats.MaxHp);
+        Assert.AreEqual((GameNumber)10, stats.AttackDamage);
     }
 
     [Test]
@@ -71,7 +71,7 @@ public class PlayerStatsTests
         stats.AddExp(100);
         Assert.AreEqual(2, stats.Level);
         Assert.AreEqual(0, stats.CurrentExp);
-        Assert.AreEqual(70, stats.MaxHp);
+        Assert.AreEqual((GameNumber)70, stats.MaxHp);
     }
 
     [Test]
@@ -82,13 +82,13 @@ public class PlayerStatsTests
 
         Assert.AreEqual(3, stats.Level);
         Assert.AreEqual(50, stats.CurrentExp);
-        Assert.AreEqual(18, stats.AttackDamage);
+        Assert.AreEqual((GameNumber)18, stats.AttackDamage);
     }
 
     [Test]
     public void Upgrade_IncreasesAttackDamageByConfiguredAmount()
     {
-        int before = stats.AttackDamage;
+        GameNumber before = stats.AttackDamage;
 
         stats.Upgrade(UpgradeStatType.Attack);
 

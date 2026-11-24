@@ -1,8 +1,9 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "StageDatabase", menuName = "Data/Stage Database")]
-public class StageDatabase : ScriptableObject
+public class StageDatabase : ScriptableObject, IDataTable
 {
     public List<StageEntry> entries = new List<StageEntry>();
 
@@ -30,4 +31,8 @@ public class StageDatabase : ScriptableObject
     {
         lookup = null;
     }
+
+    Type IDataTable.DataType => typeof(StageData);
+    int IDataTable.RowCount => entries.Count;
+    IData IDataTable.GetRow(int index) => entries[index]?.data;
 }

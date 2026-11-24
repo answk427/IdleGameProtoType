@@ -1381,6 +1381,7 @@ MonoBehaviour:
   monsterDatabase: {fileID: 11400000, guid: a896b59cbbd51184ab5ba5ed927379b3, type: 2}
   stageDatabase: {fileID: 11400000, guid: 937c96dd749b2044dbd790777f0d16cf, type: 2}
   skillDatabase: {fileID: 11400000, guid: 800e941405285a24986c3f9a63149977, type: 2}
+  characterDatabase: {fileID: 11400000, guid: 10c47468da2341545aecd91a93e1750d, type: 2}
   balanceConfig: {fileID: 11400000, guid: a1dae11590d510a45aa64b4c1447d3cd, type: 2}
 --- !u!4 &1177051874
 Transform:
@@ -2150,7 +2151,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 966c1eb03c25e134889569732f499175, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpawner
-  playerPrefab: {fileID: 6323719953710832613, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
+  characterId: 1
   defaultSpawnPoint: {fileID: 1891042250}
 --- !u!4 &1881273562
 Transform:
