@@ -34,12 +34,19 @@ public class MonsterDatabaseSyncer : IDataSyncer
         {
             string prefabPath = $"Assets/Resources/Prefabs/Monsters/{data.MonsterName}.prefab";
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            existingById.TryGetValue(data.Id, out var existing);
 
             if (prefab != null) matchedPrefab++;
+            else if (existing?.prefab != null)
+            {
+                // 이름으로 찾지 못하면 기존 연결을 유지한다(동기화로 몬스터 프리팹이 사라지지 않게).
+                prefab = existing.prefab;
+                log?.Invoke($"[SO 동기화 경고] '{data.MonsterName}' 프리팹을 {prefabPath} 에서 찾지 못해 기존 연결({prefab.name})을 유지합니다. monsterName과 프리팹 이름을 맞추세요.");
+            }
             else log?.Invoke($"[SO 동기화 경고] '{data.MonsterName}' 프리팹을 {prefabPath} 에서 찾지 못했습니다.");
 
             float groundOffset = 0f;
-            if (existingById.TryGetValue(data.Id, out var existing))
+            if (existing != null)
             {
                 groundOffset = existing.groundOffset;
                 preserved++;

@@ -4,11 +4,11 @@
     "clearType": 0,
     "stageNumber": 1,
     "normalMonsterId": 1001,
-    "bossMonsterId": 2001,
+    "bossMonsterId": 2002,
     "monstersPerEncounter": 2,
     "encountersToComplete": 2,
-    "monsterSpacing": 3.0,
-    "bgTexturePath": null
+    "monsterSpacing": 1.5,
+    "bgTexturePath": "Textures/Backgrounds/BG_volcano_1024"
   },
   {
     "Key": 2,
@@ -17,9 +17,9 @@
     "normalMonsterId": 1002,
     "bossMonsterId": 2001,
     "monstersPerEncounter": 3,
-    "encountersToComplete": 2,
-    "monsterSpacing": 3.0,
-    "bgTexturePath": null
+    "encountersToComplete": 1,
+    "monsterSpacing": 1.5,
+    "bgTexturePath": "Textures/Backgrounds/BG_mountains_sunset_1024"
   },
   {
     "Key": 3,
@@ -27,9 +27,9 @@
     "stageNumber": 3,
     "normalMonsterId": 1001,
     "bossMonsterId": 2001,
-    "monstersPerEncounter": 1,
-    "encountersToComplete": 2,
-    "monsterSpacing": 3.0,
-    "bgTexturePath": null
+    "monstersPerEncounter": 4,
+    "encountersToComplete": 1,
+    "monsterSpacing": 1.5,
+    "bgTexturePath": "Textures/Backgrounds/BG_desert_night2_1024"
   }
 ]
