@@ -18,12 +18,13 @@ Excel(DataTables/GameData.xlsx) → ExcelToJsonConverter(Editor, 메뉴 Tools/Ex
             → *DatabaseSyncer.cs → ScriptableObject(.asset)로 동기화 (게임이 읽는 것은 .asset뿐)
 ```
 
-- **원본은 `DataTables/GameData.xlsx`**(프로젝트 루트, Assets 밖이라 엑셀이 여는 임시 파일을 Unity가 가져오지 않는다). 데이터 시트 4개(`MonsterDatabase`, `StageDatabase`, `SkillDatabase`, `PlayerStatDatabase`, 시트 이름 = JSON 파일 이름)와 `설명` 시트가 있다. 예전 원본 엑셀을 찾지 못해 2026-11-24에 당시 `.asset` 값으로 새로 만들었다(변환을 한 바퀴 돌려 `.asset` 값이 바뀌지 않음을 확인). **데이터를 고칠 때는 엑셀을 고치고 변환한다.** `.asset`의 데이터 값을 직접 고치면 다음 변환에서 엑셀 값으로 덮어써진다.
+- **원본은 `DataTables/GameData.xlsx`**(프로젝트 루트, Assets 밖이라 엑셀이 여는 임시 파일을 Unity가 가져오지 않는다). 데이터 시트 5개(`MonsterDatabase`, `StageDatabase`, `SkillDatabase`, `PlayerStatDatabase`, `CharacterDatabase`. 시트 이름 = JSON 파일 이름 = 데이터베이스 에셋 이름)와 `설명` 시트가 있다. 예전 원본 엑셀을 찾지 못해 2026-11-24에 당시 `.asset` 값으로 새로 만들었다(변환을 한 바퀴 돌려 `.asset` 값이 바뀌지 않음을 확인). **데이터를 고칠 때는 엑셀을 고치고 변환한다.** `.asset`의 데이터 값을 직접 고치면 다음 변환에서 엑셀 값으로 덮어써진다.
 
-- `IData` 인터페이스(`int Key { get; }`)를 구현하는 데이터 클래스: `MonsterData`, `StageData`, `SkillData`, `PlayerStatData` (전부 `Assets/Scripts/Data/`)
+- `IData` 인터페이스(`int Key { get; }`)를 구현하는 데이터 클래스: `MonsterData`, `StageData`, `SkillData`, `PlayerStatData`, `CharacterData` (전부 `Assets/Scripts/Data/`). 데이터베이스 SO는 공통 접점 `IDataTable`을 구현한다.
+- **캐릭터 표(`CharacterData`, D12):** 플레이어 캐릭터(직업)의 사거리와 이동 속도. 레벨에 따라 변하는 HP·공격력·공격 간격은 `PlayerStatData`다. 플레이어는 이 표의 캐릭터(`PlayerSpawner.characterId`, 지금은 1 = 전사)로 스폰하고, 프리팹은 `characterName`으로 자동 연결된다.
 - 각 데이터 클래스는 `[SerializeField] private`필드 + PascalCase 프로퍼티 + `[JsonProperty("camelCase이름")]` 패턴. **엑셀 열 이름은 C# 필드 이름**(변환기가 필드 → 프로퍼티 이름 순으로 대소문자 무시 매칭), **JSON 키는 `JsonProperty` 문자열**이다. 지금은 셋이 같다. 필드 이름을 바꾸면 엑셀 열 이름도 같이 바꿔야 한다(안 바꾸면 변환기가 거부한다. 아래 "직렬화 함정"도 같이 볼 것).
 - **변환기는 검사를 모두 통과해야만 JSON과 `.asset`을 바꾼다**(`ExcelToJsonConverter.TryReadSheet`, 대화상자 없는 핵심 함수). 거부하는 것: 클래스에 없는 열, 같은 열 이름 두 번, **클래스의 직렬화 필드에 해당하는 열이 없음**(새 필드를 추가하고 엑셀에 열을 안 넣은 경우. 예전에는 조용히 0이 됐다), 형식이 틀린 값(정수 칸의 소수, 없는 enum 값, 숫자 칸의 글자), 같은 키. 빈 칸은 기본값. 리플렉션 기반이라 새 데이터 타입을 추가해도 변환기는 고칠 필요 없음.
-- `*DatabaseSyncer.cs`(`Assets/Editor/DataImporter/`)는 `IDataSyncer` 구현체로, 몬스터 프리팹(`monsterName`)과 스테이지 배경(`bgTexturePath`)을 자동 매칭하고 **찾지 못하면 기존 연결을 유지**한다(경고). `groundOffset`, 스킬 아이콘·VFX·SFX처럼 엑셀에 없는 값은 보존하면서 데이터만 갈아끼움.
+- `*DatabaseSyncer.cs`(`Assets/Editor/DataImporter/`)는 `IDataSyncer` 구현체로, 몬스터 프리팹(`monsterName`), 캐릭터 프리팹(`characterName`), 스테이지 배경(`bgTexturePath`)을 자동 매칭하고 **찾지 못하면 기존 연결을 유지**한다(경고). `groundOffset`, 스킬 아이콘·VFX·SFX처럼 엑셀에 없는 값은 보존하면서 데이터만 갈아끼움.
 
 ### ⚠️ 직렬화 함정 (실제로 한 번 게임을 망가뜨렸던 이슈)
 
@@ -33,25 +34,31 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 이게 원인이 돼서 한 번 "캐릭터가 안 달리고 배경도 안 바뀌고 진행이 안 되는" 버그가 났던 적 있음 (`StageDatabase.asset`의 `_stageNumber`가 코드의 `stageNumber`와 안 맞아서 `GetByNumber(1)`이 실패 → `StageManager.Initialize()` 실패 → 당시 `GameManager.Start()`(지금은 `GameManager.Initialize()`) 조기 return → 그 아래 있던 달리기 시작/배경 갱신/스폰 루프가 전부 실행 안 됨).
 
+- **값을 바꿔 보기는 튜닝 덮어쓰기로**(메뉴 `IdleGame/Data/Tuning Overrides`, `docs/COMBAT_ARCHITECTURE.md` 8-7 D15). "표 / 키 / 열 / 값"을 적으면 에디터 플레이에서만 데이터베이스 사본(`DataTuning.Prepare`)에 덮어쓴다. 엑셀과 `.asset`은 그대로이고, 목록은 내 PC 전용 파일(`UserSettings/IdleGame/TuningOverrides.asset`)이다. 켜져 있으면 플레이 시작 때 경고하고, 빌드에는 이 코드가 없다(빌드 전에 남은 항목을 경고). 플레이 중에 바꾸면 바로 다시 적용된다(플레이어 즉시, 몬스터는 다음 스폰). 정한 값은 엑셀로 옮긴다. **Claude가 검증하려고 값을 바꿀 때도 엑셀이 아니라 이것을 쓰고, 끝나면 지운다.**
+
 **필드 이름을 바꿀 일이 있으면**: `[FormerlySerializedAs("옛이름")]`을 붙이거나, 엑셀 열 이름을 같이 바꾸고 재동기화(Syncer 재실행)하거나, `.asset` YAML을 직접 패치해서 코드와 데이터 양쪽을 같이 맞출 것. 코드만 고치고 끝내면 안 됨.
 
-## FSM 패턴
+## 전투원 모델 (`docs/COMBAT_ARCHITECTURE.md` 8절)
 
-`Assets/Scripts/FSM/` — `IState`/`StateMachine` 기반. 플레이어는 `PlayerRunState` / `PlayerCombatState` / `PlayerDieState`, 보스는 `BossRunState` / `BossCombatState` / `MonsterDieState`, 일반 몬스터는 `MonsterIdleState` / `MonsterRunState` / `MonsterDieState`.
-
-- **교전 상태 하나가 기본 공격과 스킬을 다 한다.** 무엇을 언제 할지는 상태가 아니라 `CombatActions`(아래 "전투/스킬")가 정한다. 상태는 "교전 중인가"만 나눈다. 달리기 ↔ 교전 전환은 양쪽이 같은 판정(`HasTarget`)을 써서 기준이 어긋나 떨지 않게 한다.
-- 상태 객체는 아직 전이마다 `new`로 만든다(2단계에서 정리, `docs/COMBAT_ARCHITECTURE.md` 3-9).
+- **플레이어, 일반 몬스터, 보스는 모두 `Combatant`(순수 C#, `Assets/Scripts/Combat/`) 하나다.** 차이는 데이터다: 공격 간격 > 0이면 기본 공격, `skillId`가 있으면 스킬, 몬스터 표의 `movePolicy`(Hold: 제자리 / Approach: 다가옴)가 이동 방식. 기본 공격도 스킬도 없으면 교전하지 않는다(지금의 일반 슬라임). 엑셀에서 슬라임의 공격 간격을 넣으면 코드 수정 없이 공격한다(슬라임 프리팹에 공격 동작과 시간표를 미리 둠).
+- **호스트(MonoBehaviour)는 그리기와 Unity 연결만 한다.** 공통 기반 `CombatantHost`(뷰, 시간표, 판정 몸, 위치 보간, HP 이벤트) ← `PlayerController`(진행도와 캐릭터 표 → 능력치, UI 입구), `Monster`(몬스터 표 × 스테이지 배율 → 능력치, 보상, 풀). `BossMonster`는 없다: 보스인지는 스폰할 때 정하는 역할이고 처치 알림(`BossKilled`)에만 쓴다. `Combatant` → 호스트 알림은 `ICombatantHost` 하나로 모았다(5단계에서 이벤트로 분리).
+- **`CombatWorld`(순수 C#)가 전투원 전체와 규칙을 갖는다.** 처리 순서는 아군 → 적, 각 팀 안에서는 등록 순이다(플레이어는 시작 때, 몬스터는 스폰 때 등록하고 정리할 때 해제). 처리 도중의 등록·해제는 그 국면이 끝난 뒤에 반영한다.
+- **거리 규칙 하나: 표면 거리**(`CombatWorld.Gap` = 중심 거리 − 두 반너비, 겹치면 음수). 교전, 단일 대상, 범위 스킬 반경이 모두 이것이다. **대상은 반대 팀의 살아 있는 가장 가까운 전투원**(앞뒤 무관, 같은 거리면 등록 순)이고, 지금 대상이 유효하면 바꾸지 않는다.
+- **판정 몸은 프리팹의 `HitboxProfile`**: 중심 = 피벗 + `bodyOffset.x`, `halfWidth` > 0 필수(스프라이트 바운드 자동 계산은 없앴다). 판정과 이펙트 위치가 같은 몸을 쓴다.
+- **상태는 단계 값 하나**(`CombatantPhase`: Inactive / Moving / Engaged / Dead). 상태 객체와 `StateMachine`은 없다. 이동 ↔ 교전 전환은 양쪽이 같은 판정(`TryAcquireTarget`)을 써서 떨지 않는다. 사망 시간표가 있으면(플레이어) 그것이 끝날 때 호스트에 알리고(`HandleDeathCompleted` → 재시작 요청), 없으면 바로 알린다.
+- **HP·데미지는 `GameNumber`**(D5, D14). 데미지는 `GameNumber.Round(공격력 × 배율)`, 몬스터 성장 배율은 `Math.Pow`(double). `PlayerStats.MaxHp`/`AttackDamage`도 `GameNumber`다(업그레이드 표시 API `IUpgradeStat`는 아직 float, UI 이관 때 정리).
+- **전투 진행 중 할당 0**(R6): 상태 객체 없음, 범위·스킬 결과는 재사용 버퍼, 몬스터의 `Combatant`는 풀 객체마다 하나를 다시 쓴다(`Spawn`이 이전 상태를 지움). `CombatAllocationTests`가 확인한다.
+- **데이터와 프리팹의 짝은 에디터·빌드가 검사한다**(`CombatDataValidator`, `ActionTimelineTools.ValidateCombatData`에서 호출): 몬스터의 공격 간격 > 0이면 프리팹 시간표에 `Attack`, `skillId`의 스킬과 그 행동 키, 캐릭터 프리팹의 `Attack`·`Death`와 배울 수 있는 모든 스킬의 행동 키, 스테이지가 가리키는 몬스터, 모든 전투원 프리팹의 판정 몸·시간표·뷰.
 
 ## 매니저/유틸리티
 
-- `GameDatabaseManager` — `MonsterDatabase`/`StageDatabase`/`SkillDatabase`/`BalanceConfig`(SO) 4개를 들고 있는 조회 파사드. `GetMonster(id)`/`GetStage(stageNumber)`/`GetSkill(id)`/`Balance`(스테이지 성장 곡선)로 다른 코드가 SO를 직접 참조하지 않고 항상 이 매니저를 거치게 함. `Instance` getter가 지연 초기화라 다른 매니저의 `Awake()` 실행 순서에 의존하지 않음.
+- `GameDatabaseManager` — `MonsterDatabase`/`StageDatabase`/`SkillDatabase`/`CharacterDatabase`/`BalanceConfig`(SO)를 들고 있는 조회 파사드(에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본). `GetMonster(id)`/`GetStage(stageNumber)`/`GetSkill(id)`/`GetCharacter(id)`/`Balance`(스테이지 성장 곡선)로 다른 코드가 SO를 직접 참조하지 않고 항상 이 매니저를 거치게 함. `Instance` getter가 지연 초기화라 다른 매니저의 `Awake()` 실행 순서에 의존하지 않음.
 - `PoolManager` — Unity 내장 `UnityEngine.Pool.ObjectPool<T>` 래퍼. 프리팹별로 풀을 따로 관리(`Dictionary<GameObject, IObjectPool<GameObject>>`). 몬스터/보스 스폰에 사용. 스테이지 전환 시 `ClearPool(prefab)`으로 이전 스테이지 몬스터 풀을 정리함.
 - `PlayAreaBounds` — 화면 하단 UI 비율(`bottomUiScreenRatio`)을 기준으로 "캐릭터가 서 있을 수 있는 월드 Y(`GroundY`)"를 계산하는 단일 소스. `MonsterSpawner`/`PlayerController`의 스폰 위치 계산이 전부 여기서 나온 값을 씀 — 하단 UI 비율이 바뀌면 이 한 곳만 고치면 됨.
-- `CombatRangeUtility` — 사거리 판정용 "반너비" 계산. 중심점 거리만으로 판정하면 덩치 큰 몬스터가 실제 몸 안으로 파고들어야 맞는 문제가 있어서, `SpriteRenderer.bounds`를 우선 쓰고 없으면 `Collider2D.bounds`로 대체. **주의**: 감지용 트리거 콜라이더(예: GroundSensor)가 있는 캐릭터는 `Collider2D`를 먼저 읽으면 그 작은 센서 크기가 잡혀서 반너비가 실제보다 훨씬 작게 계산되는 버그가 있었음 — 그래서 SpriteRenderer를 우선시함.
 
 ## 전투/스킬
 
-목표 구조와 단계는 `docs/COMBAT_ARCHITECTURE.md`(1단계 완료, 2~5단계 남음). 고정 타임스텝 수정의 설계·검증 기록은 `docs/COMBAT_DESIGN.md`.
+목표 구조와 단계는 `docs/COMBAT_ARCHITECTURE.md`(1·2단계 완료, 3~5단계 남음). 고정 타임스텝 수정의 설계·검증 기록은 `docs/COMBAT_DESIGN.md`.
 
 - **전투 규칙을 애니메이션이 정하지 않는다.** 행동의 길이는 게임 데이터가, 타격 시점(행동 안의 비율)은 행동 시간표가 정하고, 전투 로직은 애니메이션 이벤트와 애니메이터 전이를 하나도 읽지 않는다. 애니메이터를 꺼도 처치 시각이 같다(검증함).
   - **행동 시간표**(`ActionTimeline`, 캐릭터마다 `ActionTimelineSet` 에셋, `Assets/Data/Combat/Timelines/`): 키(= 애니메이터 상태 이름), 클립, 그리고 클립에서 구운 값(클립 길이, 타격 비율들). 타이밍은 스킬이 아니라 **시전자의 애니메이션**에 속한다(같은 스킬 1번을 플레이어와 BossSlime이 다른 클립으로 쓴다). 스킬의 키는 `SkillData.AnimationTrigger`(이름은 옛 그대로, 의미는 "행동 키").
@@ -60,25 +67,24 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **시간 모델: 시계 하나, 절대 시각, 시간 순서 사건 처리**(`docs/COMBAT_ARCHITECTURE.md` 7-11).
   - `SimClock`(순수 C#)이 전투의 유일한 시계다. 모든 시각은 절대 시각(초, double)이고, 단계 경계는 `단계 번호 × 단계 길이`. **전투 코드는 `Time.deltaTime`을 쓰지 않는다.** 시각과 단계 길이는 시계에서 받는다.
   - **시간을 갖는 상태는 남은 시간이 아니라 절대 시각으로 저장한다.** 행동은 시작·끝·표식 시각, 스킬은 준비 시각(`Skill.ReadyAt`). **시각은 한 번 계산해 저장하고 다시 계산하지 않는다**(같은 시각 비교가 정확히 같다. 여유값(epsilon)을 두지 않는다).
-  - `CombatScheduler`가 한 단계 [t0, t1] 안에서 교전 중인 모든 전투원의 사건을 시각 순서로 처리한다: 가장 이른 사건 시각으로 시계를 옮기고 → 그 시각의 표식을 모두 처리(타격 등) → 모두 결정. 같은 시각이면 플레이어 → 몬스터 생성 순. 사건 중 죽은 전투원은 뒤 사건이 없다. 전투원당 단계 사건 상한 256, 넘으면 에러.
+  - `CombatScheduler`가 한 단계 [t0, t1] 안에서 교전 중인 모든 전투원의 사건을 시각 순서로 처리한다: 가장 이른 사건 시각으로 시계를 옮기고 → 그 시각의 표식을 모두 처리(타격 등) → 모두 결정. 같은 시각이면 아군 → 적, 각 팀은 등록 순. 사건 중 죽은 전투원은 뒤 사건이 없다. 전투원당 단계 사건 상한 256, 넘으면 에러.
   - 사건 = 행동 표식(타격, 완료) + 행동이 없을 때 **결정 입력이 바뀌는 시각**(`ICombatActor.NextDecisionInputChange`: 지금은 장착 스킬 준비 시각, 그리고 수동 요청의 준비 시각). 시간에 따라 바뀌는 결정 입력이 늘면 그 함수에 더한다. 반복문에 사례를 끼워 넣지 않는다.
-- **`ActionRunner`(순수 C#)가 행동 하나의 표식 시각을 갖고, `CombatActions`(플레이어·보스 공용)가 다음 행동을 정한다.** 시전자는 `ICombatActor`, 스케줄러 참여는 `ICombatParticipant`(`PlayerController`, `BossMonster`).
+- **`ActionRunner`(순수 C#)가 행동 하나의 표식 시각을 갖고, `CombatActions`(전투원마다 하나)가 다음 행동을 정한다.** 시전자 계약은 `ICombatActor`(`Combatant`가 구현, 테스트는 가짜 시전자).
   - 기본 공격끼리는 앞 공격이 **완료**된 시각에 이어진다. 그래서 공격 간격이 데이터 값 그대로다(실측: 간격의 float 값과 비트 단위로 같음, 타격 시각은 단계 경계와 무관).
   - **취소 없음**(`docs/COMBAT_ARCHITECTURE.md` 7-13): 모든 행동(기본 공격, 스킬)은 끝까지 하고, 다음 행동은 지금 행동이 **완료**된 시각에 정한다(수동 요청 → 슬롯 순서 → 기본 공격). 어떤 행동도 다른 행동을 끊지 못하고, 행동을 끊는 것은 사망과 교전 종료뿐이다. 쿨다운은 시전 시작 시각부터.
   - 타격 순간에 대상을 다시 확인한다. 죽었거나 사거리 밖이면 사거리 안에서 다시 찾고, 없으면 헛친다.
   - 수동 스킬(스킬 슬롯 탭)은 요청으로 남았다가, 준비돼 있고 사거리 안에 대상이 있는 다음 결정 시점에 쓴다. 달리는 중에 누르면 교전이 시작될 때 쓴다.
-  - 교전 상태(`PlayerCombatState`/`BossCombatState`)는 "교전 중" 표시(`Engage`/`Disengage`)만 하고 시간을 진행하지 않는다.
+  - 교전은 전투원의 단계 값(`Engaged`)이고, 그 전환은 `Engage`/`Disengage` 표시만 하며 시간을 진행하지 않는다.
 - **스킬 쿨다운은 스킬 id에 붙는다**(`SkillLoadout`). 슬롯을 옮기거나 장착을 풀었다 껴도 유지되고, 준비 시각이 절대 시각이라 장착하지 않은 동안에도 흐른다(`Tick` 없음). UI는 `PlayerController.GetSkillCooldownRatio`(시계 기준)로 표시한다. 저장하지는 않는다.
 - **애니메이터는 재생기다**(`CharacterAnimationView`). 컨트롤러는 조건 전이 없는 상태 모음이고, 상태를 이름으로 `Play`/`CrossFade`한다. 행동 상태(Attack, Skill, Healing)의 속도는 `ActionSpeed` 파라미터(`클립 길이 ÷ 실제 길이`). Animator Update Mode는 Normal.
 
-- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 국면 순서로 진행한다: ① 몬스터 위치 되돌리기 → ② 전투 사건(`CombatScheduler`) → ③ 상태 전이와 이동(`PlayerController.Tick(clock)`, 몬스터 `Tick(clock)`) → ④ `BackgroundScroller.Tick(clock)` → ⑤ 보간용 기록, 시계 진행. 플레이어·몬스터·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각이 같다(검증함).
+- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 국면 순서로 진행한다: ② 전투 사건(`CombatWorld.RunEvents` → `CombatScheduler`) → ③ 단계 전이와 이동(`CombatWorld.StepPhases`, 아군 → 적) → ④ `BackgroundScroller.Tick(clock)` → ⑤ 보간용 기록(`CombatWorld.CaptureStep`), 시계 진행. (① "보간 위치 되돌리기"는 2단계에서 없어졌다: 로직이 `transform`을 읽지 않는다.) 전투원·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각이 같다(검증함).
   - **시간 규칙:** 위치를 읽거나 움직이는 전투 로직과 전투 시간은 고정 단계 안에서만 돈다. 행동·쿨다운은 ②에서 단계 안의 정확한 시각으로, 이동과 달리기↔교전 전환은 ③에서 단계 단위로(위치를 단계마다 적분하는 모델. 3단계에서 정밀화 가능). UI 입력 중 위치를 읽는 것(스킬 슬롯 탭)은 `PlayerController.RequestSkillSlot`으로 다음 단계에 처리한다. `GameManager`의 스폰 루프는 `WaitForFixedUpdate`와 단계 수로 기다린다(`WaitForSeconds`/`yield return null` 쓰지 말 것). 스테이지 전환 페이드만 화면 시간이다.
-  - **보간:** 화면 프레임에서는 몬스터 위치와 배경 UV를 직전 두 단계 사이로 그린다(최대 0.02초 늦게 보임). 몬스터를 스폰하거나 위치를 직접 정하면 보간 기준을 맞춰야 한다(`Monster.Initialize`가 함). 안 하면 예전 자리에서 미끄러져 온다.
-- **CCD: 살아 있는 몬스터는 플레이어 몸을 통과하지 못한다**(`Monster.moveToPlayer`). 접촉선(플레이어 x + 두 반너비)에서 멈추고, 이미 겹쳐 있으면 더 파고들지 않는다. 한 단계 이동량과 무관하게 성립한다(이동속도 100에서 확인). 예전에는 긴 프레임 한 번에 몬스터가 플레이어 뒤로 순간이동해 진행이 영구히 멈췄다.
-- **스크롤(`GameManager.IsScrolling`)의 주인은 `PlayerRunState`다.** `Enter`가 켜고 `Exit`가 끈다. 달리기가 아닌 상태(공격, 수동 스킬 시전, 사망)에서는 배경과 몬스터가 멈춘다.
-- `Monster`(베이스) → `BossMonster`(상속) — 일반 몬스터와 보스는 같은 `IHasHp`/`IDamageable` 계약을 따르되 보스만 공격한다(`ICombatActor`, `BossRunState`/`BossCombatState`). 플레이어·보스·일반 몬스터를 `Combatant` 하나로 합치는 것은 2단계.
-- `Skill` 런타임 클래스가 `SkillData`(밸런스 수치) + `ISkillBehavior`(실제 효과 실행)를 묶음. `ISkillBehavior` 구현체: `DamageSkillBehavior`/`AoeDamageSkillBehavior`/`HealSkillBehavior` — `SkillEffectType`에 따라 `Skill.CreateBehavior()`에서 분기 생성. 새 효과 타입을 추가하려면 `ISkillBehavior` 구현체 추가 + 그 switch문에 분기 추가.
-- 데미지/힐 텍스트는 색으로 구분: 플레이어가 받는 데미지=빨강, 몬스터가 받는 데미지=흰색, 힐="+N" 초록.
+  - **보간:** 위치의 주인은 `Combatant.X`(판정 몸 중심)이고, 화면 프레임에서는 호스트(`CombatantHost.ApplyRenderPose`)가 직전 두 단계 사이를 그린다(최대 0.02초 늦게 보임). 배경 UV도 같다. 위치를 직접 정할 때는 `Combatant.Place`/`Spawn`을 쓴다(보간 기준도 같이 맞춘다). 안 하면 예전 자리에서 미끄러져 온다.
+- **CCD: 움직이는 전투원은 상대 몸을 통과하지 못한다**(`Combatant.MoveTowardNearestOpponent`, 양방향). 접촉선(상대 중심 ± 두 반너비)에서 멈추고, 이미 겹쳐 있으면 더 파고들지 않는다. 한 단계 이동량과 무관하게 성립한다(이동속도 100에서 확인). 예전에는 긴 프레임 한 번에 몬스터가 플레이어 뒤로 순간이동해 진행이 영구히 멈췄다.
+- **스크롤의 주인은 "전진 정책의 아군(플레이어)이 이동 단계인가"다**(`CombatWorld.IsAllyAdvancing`). ③에서 아군을 먼저 처리하므로 같은 단계의 적 이동이 이 값을 읽고, `CombatSimulation`이 ③ 뒤에 `GameManager.IsScrolling`(배경이 구독)에 반영한다. 교전·사망 중에는 배경과 Hold 몬스터가 멈춘다. 3단계(월드 좌표 + 카메라)에서 스크롤 개념 자체가 없어진다.
+- `Skill` 런타임 클래스가 `SkillData`(밸런스 수치) + `ISkillBehavior`(실제 효과 실행, `Execute(시전자, 대상, 맞은 전투원 버퍼)`)를 묶음. `ISkillBehavior` 구현체: `DamageSkillBehavior`/`AoeDamageSkillBehavior`/`HealSkillBehavior` — `SkillEffectType`에 따라 `Skill.CreateBehavior()`에서 분기 생성. 새 효과 타입을 추가하려면 `ISkillBehavior` 구현체 추가 + 그 switch문에 분기 추가.
+- 데미지/힐 텍스트는 색으로 구분(팀 기준): 아군(플레이어)이 받는 데미지=빨강, 적이 받는 데미지=흰색, 힐="+N" 초록.
 
 ## 엔지니어링 스타일 (이 프로젝트에서 합의된 방향)
 
@@ -110,7 +116,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 ## 저장 시스템
 
 - **`PlayerSaveData`(최상위, `Assets/Scripts/Player/PlayerSaveData.cs`)와 `PlayerStatsSaveData`(`PlayerStats` 전용 슬라이스)로 분리돼 있음.** `PlayerSaveData`는 `{ stats: PlayerStatsSaveData, gold, currentStageNumber }` 형태 — 저장 파일 전체에 대응. `PlayerStatsSaveData`는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯처럼 `PlayerStats`가 실제로 읽고 쓰는 것만 담음. 골드/스테이지 번호는 `PlayerStats`가 전혀 쓰지 않는 데이터라(`GameManager`만 씀) 같은 클래스에 두면 안 된다고 판단해서 분리함.
-- **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, FSM)는 캐릭터(`PlayerController`)가 갖는다.
+- **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, 전투 단계)는 전투원(`Combatant`, 호스트 `PlayerController`)이 갖는다.
 - **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()`(예외면 여기서 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `GameManager.Initialize(session, player)` → `CombatSimulation.Initialize(player)` → `UIRoot.Initialize(session, 스킬 목록, player)`. 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
 - **저장 데이터 변환은 `GameSession.Apply(PlayerSaveData)` / `GameSession.ToSaveData()` 두 곳뿐.** `Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다(세션/Stats/Wallet을 참조하는 쪽이 옛 객체를 붙잡지 않게). 세이브 로드와 이후 서버 롤백(`docs/SERVER_DESIGN.md`)이 같은 경로를 쓴다.
 - **저장 백엔드는 `ISaveStorage`로 추상화**(`Assets/Scripts/Player/ISaveStorage.cs`, 최상위 `PlayerSaveData` 기준). `LocalFileSaveStorage`가 현재 구현체(JSON을 `Application.persistentDataPath/player_save.json`에 입출력). `SaveStorageProvider.Current`가 스위치 지점 — 나중에 서버 저장으로 바꿀 때 `ServerSaveStorage : ISaveStorage`를 새로 만들고 `SaveStorageProvider.Current`에 대입하는 한 줄만 바꾸면 됨. `Load()`는 동기(`GameInitializer.Start()`에서 즉시 써야 해서), `Save()`는 `IEnumerator`(코루틴) — 호출부가 기다리지 않는 fire-and-forget이라 서버 지연을 흡수할 수 있게 미리 비동기 모양으로 잡아둔 것.
@@ -122,7 +128,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - ⚠️ **`PlayerSaveData`/`PlayerStatsSaveData`의 필드나 슬롯 수를 바꾸면 기존 세이브가 깨짐** — ScriptableObject `.asset`의 "직렬화 함정"과 같은 종류(`JsonUtility`도 필드 이름으로 매칭). 검사 대상 필드의 이름이나 슬롯 수를 바꾸면 기존 세이브가 **손상으로 차단되고**, 새로 추가한 필드는 검사되지 않아 **조용히 기본값으로 채워진다.** 새 필드를 필수로 검사하려면 버전 변환이 먼저다(`docs/TODO.md` "저장"). 구조를 바꿀 땐 `%LOCALAPPDATA%\..\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`을 직접 새 스키마로 마이그레이션할 것.
 - **`OnApplicationQuit`/`OnApplicationPause(true)`는 `SaveGameImmediate()`로 동기 처리.** `StartCoroutine`으로 예약하면 앱이 곧 종료/일시정지돼서 코루틴이 실행될 프레임을 못 받을 수 있어, 이 두 경로만 `IEnumerator.MoveNext()`를 끝까지 직접 돌려서 저장이 확실히 끝나게 함. (로컬 저장 기준 안전 — 서버 구현체로 바뀌면 응답을 못 기다리고 끊길 수 있는데, 그건 그때 "종료 직전 저장을 어떻게 보장할지" product 차원에서 다시 봐야 함.)
 - **자동저장 체크포인트**: 종료/일시정지, 스테이지 전환 완료, 업그레이드, 스킬 학습/장착. 주기적(타이머) 자동저장은 의도적으로 안 둠.
-- **스테이지 중간 진행도(인카운터 진행 수)는 저장 안 함** — 의도된 범위 제한. 저장된 스테이지 번호로 복귀하면 그 스테이지를 처음부터(인카운터 1부터) 다시 시작한다. 전투 중 HP/몬스터 상태까지 직렬화하려면 FSM/스포너 상태까지 손대야 해서 범위 밖으로 뺌.
+- **스테이지 중간 진행도(인카운터 진행 수)는 저장 안 함** — 의도된 범위 제한. 저장된 스테이지 번호로 복귀하면 그 스테이지를 처음부터(인카운터 1부터) 다시 시작한다. 전투 중 HP/몬스터 상태까지 직렬화하려면 전투원/스포너 상태까지 손대야 해서 범위 밖으로 뺌.
 - 세이브 파일 경로: `C:\Users\<user>\AppData\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`
 - **에디터 검증용 세이브 프로필**(`SaveProfile`, `Assets/Scripts/Player/SaveProfile.cs`): 에디터에서만 켤 수 있고, 켜면 세이브 폴더가 `persistentDataPath/profiles/<이름>/`로 바뀐다(형식과 저장 코드는 같음). 값은 `SessionState`라 에디터를 끄면 기본으로 돌아오고, 플레이 중에는 바꿀 수 없다. 메뉴는 `IdleGame/Save Profile/...`, `IdleGame/Reset Save Data`는 지금 켜진 프로필의 세이브를 지운다. 빌드에는 프로필 코드가 없어서 항상 기본 경로를 쓴다.
 
@@ -159,5 +165,5 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
    - **adb는 PC 전체에서 한 버전만 쓴다.** adb 서버는 PC에 하나(포트 5037)이고, 버전이 다른 adb가 명령을 보내면 서버를 끄고 자기 버전으로 다시 띄운다. 그래서 다른 프로젝트(liveeye_kr 웹 개발)와 같은 PC에서 쓰면 서로의 서버를 꺼 버린다. 기준은 **Unity에 딸린 adb**이고, 다른 도구가 쓰는 SDK의 `platform-tools`도 같은 것으로 맞춰 둔다(회사 PC: `~/android-dev/sdk/platform-tools`를 Unity 것으로 교체, 원본은 `platform-tools-37.0.1-backup`). **Unity를 업그레이드하면 adb 버전이 바뀌므로 그쪽 `platform-tools`도 다시 맞춘다.**
    - 설정은 PC별 `.claude/settings.local.json`(원본: claude-sync `setup/`)의 `env`에 있다: `ADB`(Unity의 adb 경로), `ANDROID_SERIAL`(이 프로젝트 테스트 기기). `ANDROID_SERIAL`이 있으면 adb가 `-s` 없이도 그 기기에만 명령을 보낸다. 같은 PC에 다른 프로젝트가 쓰는 기기가 함께 연결돼 있을 수 있으므로 다른 기기에는 설치·실행·입력을 하지 않는다.
    - `adb kill-server`/`start-server`는 권한 규칙으로 막혀 있다(두 프로젝트 모두). 서버를 다시 띄우는 판단은 사용자가 한다.
-   - 빌드: 배치 모드 `-buildTarget Android`로 APK만 만들고(Build & Run을 쓰지 않음), 설치는 `"$ADB" install -r <apk>`. 확인은 `screencap`, `logcat -s Unity:*`, `shell input`.
+   - 빌드: 배치 모드 `-buildTarget Android`로 APK만 만들고(Build & Run을 쓰지 않음), 설치는 `"$ADB" install -r <apk>`. 확인은 `screencap`, `logcat -s Unity:*`, `shell input`. **배치 모드 에디터는 종료할 때 출력 폴더 `Temp/AndroidBuild/`를 지운다**(2026-11-24 확인). 설치는 빌드 캐시의 `Library/Bee/Android/Prj/IL2CPP/Gradle/launcher/build/outputs/apk/release/launcher-release.apk`에서 하거나, 출력을 `Temp` 밖(무시되는 폴더)에 둔다. 배치 빌드에는 임시 `-executeMethod` 스크립트(`BuildPipeline.BuildPlayer`)를 쓰고 끝나면 지운다.
 4. **Unity MCP(`mcp__UnityMCP__*`)** — 과거 세션에서 쓰던 방식. 세션에 연결돼 있을 때만 쓸 수 있다. `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.
