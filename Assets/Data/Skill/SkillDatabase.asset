@@ -17,6 +17,7 @@ MonoBehaviour:
       id: 1
       skillName: "\uAC15\uD0C0"
       cooldown: 5
+      castTime: 1
       animationTrigger: Skill
       effectType: 0
       value1: 2.5
@@ -31,6 +32,7 @@ MonoBehaviour:
       id: 2
       skillName: "\uC9C0\uC9C4"
       cooldown: 8
+      castTime: 1
       animationTrigger: Skill
       effectType: 1
       value1: 1.5
@@ -45,6 +47,7 @@ MonoBehaviour:
       id: 3
       skillName: "\uD790\uB9C1"
       cooldown: 10
+      castTime: 0.6
       animationTrigger: Healing
       effectType: 2
       value1: 30
@@ -59,6 +62,7 @@ MonoBehaviour:
       id: 4
       skillName: "\uD63C\uC2E0\uC758\uC77C\uACA9"
       cooldown: 7
+      castTime: 1
       animationTrigger: Skill
       effectType: 0
       value1: 4
@@ -73,6 +77,7 @@ MonoBehaviour:
       id: 5
       skillName: "\uB54C\uB9AC\uAE30"
       cooldown: 12
+      castTime: 1
       animationTrigger: Skill
       effectType: 1
       value1: 3
@@ -87,6 +92,7 @@ MonoBehaviour:
       id: 6
       skillName: "\uC800\uC8FC"
       cooldown: 6
+      castTime: 0.9
       animationTrigger: Skill
       effectType: 0
       value1: 5

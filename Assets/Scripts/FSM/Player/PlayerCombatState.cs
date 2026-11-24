@@ -1,60 +1,32 @@
-public abstract class PlayerCombatState : IState
+// 교전 상태(docs/COMBAT_ARCHITECTURE.md 7-4, 7-11).
+// "교전 중"이라는 표시만 한다. 기본 공격과 스킬의 결정·진행은 CombatActions가 하고, 시간 진행은 CombatScheduler가
+// 모든 전투원의 사건을 시각 순서로 처리하며 한다. 이 상태는 시간을 진행하지 않는다.
+// 예전의 공격 상태와 스킬 상태(애니메이션 끝 이벤트를 기다리던 isAnimationFinished 방식)를 이 상태 하나가 대신한다.
+// 지금 행동이 끝났고(취소 없음, 7-13) 사거리 안에 대상이 없으면 달리기로 돌아간다(상태 전이 국면, 단계 단위).
+public class PlayerCombatState : IState
 {
-    protected PlayerController player;
-    protected IDamageable target;
+    private readonly PlayerController player;
 
-    //애니메이션이 완전히 끝났는지 확인
-    protected bool isAnimationFinished = false;
-
-    public PlayerCombatState(PlayerController player, IDamageable target)
+    public PlayerCombatState(PlayerController player)
     {
         this.player = player;
-        this.target = target;
     }
 
-    public virtual void Enter()
+    public void Enter()
     {
-        player.OnHitEvent += HandleHitInternal;
-        player.OnAttackEndEvent += HandleAttackEndInternal;
-
-        isAnimationFinished = false;
+        player.Combat.Engage();
     }
 
     public void Execute()
     {
-        // 대상이 사라졌고 공격 애니메이션까지 끝났다면 달림
-        if ((target == null || !target.IsAlive ) && isAnimationFinished)
+        if (player.Combat.IsFree && !player.TryAcquireTarget())
         {
             player.fsm.ChangeState(new PlayerRunState(player));
-            return;
-        }
-
-        // 대상이 아직 살아있을 때만 자식들의 고유 행동(쿨타임 계산 등)을 실행
-        if (target != null && target.IsAlive)
-        {
-            DoAction();
         }
     }
 
     public void Exit()
     {
-        player.OnHitEvent -= HandleHitInternal;
-        player.OnAttackEndEvent -= HandleAttackEndInternal;
+        player.Combat.Disengage();
     }
-
-    private void HandleHitInternal()
-    {
-        if (target != null && target.IsAlive)
-        {
-            OnHitImpact();
-        }
-    }
-
-    private void HandleAttackEndInternal()
-    {
-        isAnimationFinished = true;
-    }
-
-    protected abstract void DoAction(); // 쿨타임 및 공격 지시 로직
-    protected abstract void OnHitImpact(); // 진짜 데미지를 주는 로직
 }

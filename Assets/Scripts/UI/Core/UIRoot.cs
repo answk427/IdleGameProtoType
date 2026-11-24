@@ -54,7 +54,8 @@ public class UIRoot : MonoBehaviour
     private void BindWindows(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerController player)
     {
         // 쿨다운은 저장되지 않는 전투 상태라 세션이 아니라 캐릭터가 갖는다. Presenter에는 읽는 함수만 넘긴다.
-        float CooldownRatio(int slot) => player.GetEquippedSkill(slot)?.CooldownRatio ?? 0f;
+        // 쿨다운은 시뮬레이션 시계 기준의 준비 시각이라, 지금 시각을 아는 캐릭터에게 비율을 묻는다.
+        float CooldownRatio(int slot) => player.GetSkillCooldownRatio(slot);
 
         windows.Bind<SkillManageWindow, SkillManageArgs>((view, args, window) =>
             new SkillManagePresenter(view, session.Stats, skills, CooldownRatio, window));

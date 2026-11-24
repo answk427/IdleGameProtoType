@@ -4,7 +4,8 @@ using UnityEngine;
 public class Monster : MonoBehaviour, IHasHp, IDamageable
 {
     [SerializeField] private FloatingHpBar hpBar;
-    [SerializeField] protected Animator animator;
+    // 애니메이션은 재생만 한다. 전투 로직은 애니메이터에서 아무것도 읽지 않는다(docs/COMBAT_ARCHITECTURE.md 7-5).
+    [SerializeField] protected CharacterAnimationView view;
 
     [SerializeField] protected HitboxProfile hitboxProfile = new();
 
@@ -34,8 +35,10 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
 
     protected virtual void Awake()
     {
-        if (animator == null)
-            animator = GetComponent<Animator>();
+        if (view == null)
+            view = GetComponent<CharacterAnimationView>();
+        if (view == null)
+            Debug.LogError($"[Monster] {name}에 CharacterAnimationView가 없습니다.");
 
         if (hpBar == null)
             hpBar = GetComponentInChildren<FloatingHpBar>();
@@ -63,9 +66,13 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
             fsm.ChangeState(null);
     }
 
-    // CombatSimulation이 고정 단계마다 부른다(docs/COMBAT_DESIGN.md 3-1).
-    public virtual void Tick()
+    // 시뮬레이션 시계. 고정 단계의 "상태 전이와 이동" 국면에서 CombatSimulation이 넘겨준다(이동량 계산에 쓴다).
+    public SimClock Clock { get; private set; }
+
+    // CombatSimulation이 고정 단계의 "상태 전이와 이동" 국면에 부른다(docs/COMBAT_ARCHITECTURE.md 7-11).
+    public virtual void Tick(SimClock clock)
     {
+        Clock = clock;
         fsm.Update();
     }
 
@@ -140,20 +147,14 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         if (hpBar != null) hpBar.gameObject.SetActive(false);
     }
 
-    protected void PlayTrigger(string triggerName)
-    {
-        if (animator != null)
-            animator.SetTrigger(triggerName);
-    }
-
     public void PlayIdleAnimation()
     {
-        animator.Play("Idle");
+        if (view != null) view.PlayLocomotion(false);
     }
 
     public void PlayDeathAnimation()
     {
-        PlayTrigger("Death");
+        if (view != null) view.PlayDeath();
     }
 
     public void moveToPlayer()
@@ -161,8 +162,10 @@ public class Monster : MonoBehaviour, IHasHp, IDamageable
         PlayerController player = GameManager.Instance != null ? GameManager.Instance.GetPlayer() : null;
         if (player == null) return;
 
+        if (Clock == null) return;
+
         Vector3 position = transform.position;
-        float next = position.x - player.RunSpeed * Time.deltaTime;
+        float next = position.x - player.RunSpeed * (float)Clock.StepLength;
 
         // CCD(docs/COMBAT_DESIGN.md 3-4): 살아 있는 몬스터는 플레이어 몸을 통과하지 못한다.
         // 접촉선(두 몸이 닿는 위치) 앞이면 거기서 멈추고, 이미 겹쳐 있으면(순간이동 등) 더 파고들지 않는다.

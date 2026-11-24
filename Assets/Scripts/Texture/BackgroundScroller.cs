@@ -40,13 +40,13 @@ public class BackgroundScroller : MonoBehaviour
     }
 
     // CombatSimulation이 고정 단계마다 부른다. 몬스터와 같은 단계에서 같은 속도로 움직여야 서로 미끄러져 보이지 않는다.
-    public void Tick()
+    public void Tick(SimClock clock)
     {
         previousOffsetX = currentOffsetX;
         if (!IsActiveScroll) return;
 
         float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.RunSpeed ?? 0f : 0f;
-        currentOffsetX += runSpeed * scrollScale * Time.deltaTime;
+        currentOffsetX += runSpeed * scrollScale * (float)clock.StepLength;
 
         // 1을 넘기면 둘에서 똑같이 빼서, 보간이 0~1 사이를 거꾸로 훑지 않게 한다.
         if (currentOffsetX >= 1f)

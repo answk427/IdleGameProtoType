@@ -83,7 +83,7 @@ public class SkillSlotBar : UITabPanel
             }
             else
             {
-                slotWidgets[i].SetSkill(skill.Entry.icon, skill.CooldownRatio);
+                slotWidgets[i].SetSkill(skill.Entry.icon, player.GetSkillCooldownRatio(i));
             }
         }
     }
@@ -95,7 +95,7 @@ public class SkillSlotBar : UITabPanel
             Skill skill = player.GetEquippedSkill(i);
             if (skill != null)
             {
-                slotWidgets[i].SetSkill(skill.Entry.icon, skill.CooldownRatio);
+                slotWidgets[i].SetSkill(skill.Entry.icon, player.GetSkillCooldownRatio(i));
             }
         }
     }

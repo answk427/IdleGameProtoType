@@ -1,94 +1,60 @@
-using System.Reflection;
 using NUnit.Framework;
-using Newtonsoft.Json;
 
+// 스킬 쿨다운은 "준비 시각"(시뮬레이션 시계의 절대 시각)이다(docs/COMBAT_ARCHITECTURE.md 7-11).
+// 시전할 때 한 번 계산해 저장하므로, 그 시각과 정확히 같은 시각에 준비된 것으로 판정된다(여유값 없음).
 [TestFixture]
 public class SkillCooldownTests
 {
-    private static readonly FieldInfo CooldownField =
-        typeof(Skill).GetField("currentCooldown", BindingFlags.NonPublic | BindingFlags.Instance);
-
-    private Skill CreateSkill(float cooldown, SkillEffectType effectType = SkillEffectType.Damage)
+    [Test]
+    public void NewSkill_IsReadyAtAnyTime()
     {
-        string json = "{" +
-            "\"id\":1," +
-            "\"skillName\":\"Test Skill\"," +
-            $"\"cooldown\":{cooldown}," +
-            "\"animationTrigger\":\"Skill\"," +
-            $"\"effectType\":{(int)effectType}," +
-            "\"value1\":1.0," +
-            "\"value2\":0.0," +
-            "\"requiredLevel\":1" +
-            "}";
-
-        SkillData data = JsonConvert.DeserializeObject<SkillData>(json);
-        SkillEntry entry = new SkillEntry { data = data };
-        return new Skill(entry);
-    }
-
-    // Skill.Use()는 PlayerController/IDamageable 실행까지 거치므로, 쿨다운 상태 전이만
-    // 떼어서 검증하기 위해 private 필드를 직접 조작해 "방금 사용한 직후" 상태를 재현한다.
-    private void SimulateUse(Skill skill)
-    {
-        float cooldown = skill.Data.Cooldown;
-        CooldownField.SetValue(skill, cooldown);
+        Skill skill = TestSkills.Create(cooldown: 5f);
+        Assert.IsTrue(skill.IsReadyAt(0.0));
+        Assert.AreEqual(0.0, skill.RemainingCooldown(0.0));
+        Assert.AreEqual(0f, skill.CooldownRatio(0.0));
     }
 
     [Test]
-    public void NewSkill_IsReadyImmediately()
+    public void Cooldown_StartsAtCastTime_AndEndsExactlyAtReadyAt()
     {
-        Skill skill = CreateSkill(5f);
-        Assert.IsTrue(skill.IsReady);
-        Assert.AreEqual(0f, skill.CooldownRatio);
+        Skill skill = TestSkills.Create(cooldown: 5f);
+        skill.BeginCooldown(2.0);
+
+        Assert.AreEqual(7.0, skill.ReadyAt);
+        Assert.IsFalse(skill.IsReadyAt(6.999));
+        Assert.IsTrue(skill.IsReadyAt(7.0));
+        Assert.AreEqual(2.0, skill.RemainingCooldown(5.0), 1e-12);
+        Assert.AreEqual(0.4f, skill.CooldownRatio(5.0), 1e-6f);
     }
 
     [Test]
-    public void AfterUse_IsNotReady_UntilCooldownElapses()
+    public void CastMidStep_ReadyAtExactlyStoredTime()
     {
-        Skill skill = CreateSkill(5f);
-        SimulateUse(skill);
+        Skill skill = TestSkills.Create(cooldown: 1f);
+        skill.BeginCooldown(1.013);
 
-        Assert.IsFalse(skill.IsReady);
-        Assert.AreEqual(1f, skill.CooldownRatio, 0.0001f);
-
-        skill.Tick(2f);
-        Assert.IsFalse(skill.IsReady);
-        Assert.AreEqual(0.6f, skill.CooldownRatio, 0.0001f);
-
-        skill.Tick(3f);
-        Assert.IsTrue(skill.IsReady);
-        Assert.AreEqual(0f, skill.CooldownRatio, 0.0001f);
+        double readyAt = skill.ReadyAt;
+        Assert.IsTrue(skill.IsReadyAt(readyAt), "저장된 준비 시각 그대로 비교하면 정확히 준비");
+        Assert.IsFalse(skill.IsReadyAt(readyAt - 1e-12));
     }
 
     [Test]
-    public void Tick_Overshoot_DoesNotProduceNegativeRatio()
+    public void RemainingCooldown_NeverNegative()
     {
-        Skill skill = CreateSkill(5f);
-        SimulateUse(skill);
+        Skill skill = TestSkills.Create(cooldown: 5f);
+        skill.BeginCooldown(0.0);
 
-        // 쿨다운보다 큰 deltaTime이 한 번에 들어와도 비율이 음수로 새지 않아야 한다.
-        skill.Tick(100f);
-
-        Assert.IsTrue(skill.IsReady);
-        Assert.AreEqual(0f, skill.CooldownRatio);
+        Assert.AreEqual(0.0, skill.RemainingCooldown(100.0));
+        Assert.AreEqual(0f, skill.CooldownRatio(100.0));
     }
 
     [Test]
-    public void Tick_WhileAlreadyReady_StaysReady()
+    public void ZeroCooldown_IsReadyAtCastTime()
     {
-        Skill skill = CreateSkill(5f);
+        Skill skill = TestSkills.Create(cooldown: 0f);
+        skill.BeginCooldown(3.0);
 
-        skill.Tick(1f);
-
-        Assert.IsTrue(skill.IsReady);
-    }
-
-    [Test]
-    public void ZeroCooldownSkill_RatioIsAlwaysZero()
-    {
-        Skill skill = CreateSkill(0f);
-        SimulateUse(skill);
-
-        Assert.AreEqual(0f, skill.CooldownRatio);
+        Assert.IsTrue(skill.IsReadyAt(3.0));
+        Assert.AreEqual(0f, skill.CooldownRatio(3.0));
     }
 }

@@ -1,53 +1,31 @@
-﻿using UnityEngine;
-
-public abstract class BossCombatState : IState
+﻿// 보스의 교전 상태(docs/COMBAT_ARCHITECTURE.md 7-4, 7-11). 플레이어와 같은 방식이다.
+// "교전 중"이라는 표시만 하고, 행동의 결정·진행은 CombatActions가, 시간 진행은 CombatScheduler가 한다.
+// 예전의 보스 공격 상태와 스킬 상태를 이 상태 하나가 대신한다.
+// 지금 행동이 끝났고(취소 없음, 7-13) 대상(사거리 안의 살아 있는 플레이어)이 없으면 접근 상태로 돌아간다.
+public class BossCombatState : IState
 {
-    protected BossMonster boss;
-    protected IDamageable target;
+    private readonly BossMonster boss;
 
-    protected bool isAnimationFinished = false;
-
-    public BossCombatState(BossMonster boss, IDamageable target)
+    public BossCombatState(BossMonster boss)
     {
         this.boss = boss;
-        this.target = target;
     }
 
-    public virtual void Enter()
+    public void Enter()
     {
-        boss.OnHitEvent += HandleHitInternal;
-        boss.OnAttackEndEvent += HandleAttackEndInternal;
-
-        isAnimationFinished = false;
+        boss.Combat.Engage();
     }
 
     public void Execute()
     {
-        if (target != null && target.IsAlive)
+        if (boss.Combat.IsFree && !boss.TryAcquireTarget())
         {
-            DoAction();
+            boss.fsm.ChangeState(new BossRunState(boss));
         }
     }
 
-    public virtual void Exit()
+    public void Exit()
     {
-        boss.OnHitEvent -= HandleHitInternal;
-        boss.OnAttackEndEvent -= HandleAttackEndInternal;
+        boss.Combat.Disengage();
     }
-
-    private void HandleHitInternal()
-    {
-        if (target != null && target.IsAlive)
-        {
-            OnHitImpact();
-        }
-    }
-
-    private void HandleAttackEndInternal()
-    {
-        isAnimationFinished = true;
-    }
-
-    protected abstract void DoAction();    // 쿨타임 및 공격 지시 로직
-    protected abstract void OnHitImpact(); // 실제 데미지 처리
 }

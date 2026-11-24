@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a734fb5dee587345adadbab84c76fb1, type: 3}
+  m_Name: PlayerWarrior
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::ActionTimelineSet
+  timelines:
+  - key: Attack
+    clip: {fileID: 7400000, guid: d580f1d1a428cb040b4d98afe8ba4e60, type: 2}
+    clipLength: 1.2
+    hitFractions:
+    - 0.5833333
+    bakedSignature: 1.2|AE_OnHit@0.7
+  - key: Skill
+    clip: {fileID: 7400000, guid: 11822cbe6f25108459fd2ef98cc9255c, type: 2}
+    clipLength: 1
+    hitFractions:
+    - 0.4
+    bakedSignature: 1|AE_OnHit@0.4
+  - key: Healing
+    clip: {fileID: 7400000, guid: 86b139d11aaba54458842c1e10da363f, type: 2}
+    clipLength: 0.6
+    hitFractions:
+    - 0.3333333
+    bakedSignature: 0.6|AE_OnHit@0.2
+  - key: Death
+    clip: {fileID: 7400000, guid: 36684c15dec018a4ca8dcf9c646e3c15, type: 2}
+    clipLength: 1.1
+    hitFractions: []
+    bakedSignature: 1.1

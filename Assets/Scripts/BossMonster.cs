@@ -1,22 +1,30 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
-public class BossMonster : Monster, ISkillCaster
+// 보스. 전투 행동의 결정과 진행은 플레이어와 같은 CombatActions가 하고, 이 클래스는 ICombatActor를 제공한다.
+// 기본 공격 한 번의 길이는 데이터의 공격 간격(MonsterData.AttackInterval)이고, 클립은 그 길이에 맞춰 재생된다
+// (docs/COMBAT_ARCHITECTURE.md 7장). 2단계에서 플레이어와 함께 Combatant로 합친다.
+public class BossMonster : Monster, ISkillCaster, ICombatActor, ICombatParticipant
 {
     [SerializeField] private float attackRange = 1.5f;
     [SerializeField] private float attackInterval = 2.0f;
+    [SerializeField] private ActionTimelineSet timelines;
 
     private int attackDamage;
     private Skill skill;
-
-    public event Action OnHitEvent;
-    public event Action OnAttackEndEvent;
 
     public float AttackRange => attackRange;
     public float AttackInterval => attackInterval;
     public int AttackDamage => attackDamage;
     public Skill Skill => skill;
+    public CombatActions Combat { get; private set; }
+
+    protected override void Awake()
+    {
+        base.Awake();
+        Combat = new CombatActions(this);
+        if (timelines == null) Debug.LogError($"[BossMonster] {name}에 ActionTimelineSet이 연결되지 않았습니다.");
+    }
 
     protected override void OnEnable()
     {
@@ -25,21 +33,10 @@ public class BossMonster : Monster, ISkillCaster
         fsm.ChangeState(new BossRunState(this));
     }
 
-    public override void Tick()
-    {
-        base.Tick();
-        skill?.Tick(Time.deltaTime);
-    }
-
     protected override void Die()
     {
         base.Die();
         GlobalGameEvents.TriggerBossKilled();
-    }
-
-    public void Attack()
-    {
-        PlayAttackAnimation();
     }
 
     public override void Initialize(MonsterData monsterData, float goldMultiplier, float hpMultiplier, float dmgMultiplier)
@@ -51,6 +48,10 @@ public class BossMonster : Monster, ISkillCaster
 
         SkillEntry entry = monsterData.SkillId > 0 ? GameDatabaseManager.Instance?.GetSkill(monsterData.SkillId) : null;
         this.skill = entry?.data != null ? new Skill(entry) : null;
+
+        // 데이터가 가리키는 스킬이 없으면 스킬 없이 싸운다. 조용히 넘어가지 않고 알린다.
+        if (monsterData.SkillId > 0 && this.skill == null)
+            Debug.LogError($"[BossMonster] {monsterData.MonsterName}의 스킬 {monsterData.SkillId}이 SkillDatabase에 없습니다. 스킬 없이 싸웁니다.");
     }
 
     public int GetCalculatedDamage()
@@ -79,25 +80,59 @@ public class BossMonster : Monster, ISkillCaster
         return result;
     }
 
-    public void PlayAnimationTrigger(string triggerName)
+    // ── 대상 ──
+
+    // 플레이어가 살아 있고 사거리 안이면 대상, 아니면 null.
+    public PlayerController AcquireTarget()
     {
-        PlayTrigger(triggerName);
+        PlayerController player = GameManager.Instance != null ? GameManager.Instance.GetPlayer() : null;
+        if (player == null || !player.IsAlive) return null;
+
+        return CombatRangeUtility.IsWithinAttackRange(transform.position, HalfWidth, attackRange, player.transform.position, player.HalfWidth)
+            ? player
+            : null;
     }
 
-    // 애니메이션 이벤트가 호출할 함수 (Hit 타이밍)
-    public void AE_OnHit()
+    // ── ICombatActor ──
+
+    public bool TryGetTimeline(string key, out ActionTimeline timeline)
     {
-        OnHitEvent?.Invoke();
+        timeline = null;
+        return timelines != null && timelines.TryGet(key, out timeline);
     }
 
-    // 애니메이션 이벤트가 호출할 함수 (애니메이션 끝난 시점)
-    public void AE_OnAttackEnd()
+    public double BasicAttackDuration => attackInterval;
+
+    public bool TryAcquireTarget() => IsAlive && AcquireTarget() != null;
+
+    public Skill PickReadySkill(double now) => skill != null && skill.IsReadyAt(now) ? skill : null;
+
+    public double NextDecisionInputChange(double now) =>
+        skill != null && skill.ReadyAt > now ? skill.ReadyAt : double.PositiveInfinity;
+
+    public void ApplyBasicAttackHit()
     {
-        OnAttackEndEvent?.Invoke();
+        PlayerController target = AcquireTarget();
+        if (target == null) return; // 헛침
+
+        target.TakeDamage(GetCalculatedDamage());
+        if (CombatEffectManager.Instance != null) CombatEffectManager.Instance.SpawnHitParticle(target);
     }
 
-    public void PlayAttackAnimation()
+    public void ApplySkillHit(Skill castSkill)
     {
-        PlayTrigger("Attack");
+        Vector3[] hitPositions = castSkill.Apply(this, AcquireTarget());
+        SkillPresentation.PlayHit(castSkill, hitPositions);
+    }
+
+    public void OnActionStarted(ActionTimeline action, double duration, Skill castSkill)
+    {
+        if (view != null) view.PlayAction(action, (float)duration);
+        if (castSkill != null) SkillPresentation.PlayCast(castSkill, transform.position);
+    }
+
+    public void OnActionsIdle()
+    {
+        if (view != null) view.PlayLocomotion(false);
     }
 }
