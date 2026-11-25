@@ -107,7 +107,7 @@ public sealed class DevPanel
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("지금 스테이지 처음부터", button)) commands.RestartStage();
-        if (GUILayout.Button("보스전 시작", button)) commands.StartBoss();
+        if (GUILayout.Button("보스 도전", button)) commands.ChallengeBoss();
         GUILayout.EndHorizontal();
     }
 

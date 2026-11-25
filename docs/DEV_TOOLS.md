@@ -48,6 +48,7 @@
 - **지금의 두 갈래를 이 하나로 합친다.** 사망은 `RestartAt(지금 스테이지)`, 클리어는 `RestartAt(다음 스테이지, 마지막이면 그 스테이지)`가 된다(마지막 스테이지를 다시 하는 지금 동작을 유지). 지금 `TransitionToStageInternal(canNext)`에 있는 분기(인자 없는 `stageManager.Initialize()`로 다시 초기화하는 갈래 포함)가 사라진다. 도구의 스테이지 이동도 같은 길을 쓴다.
 - 전환 중(페이드 중)에 다시 부르면 무시하고 경고한다.
 - 4단계에서 EncounterDirector로 옮길 때 이 입구 하나만 옮기면 된다.
+- **옮김(2026-11-25, 전투 4-A):** 입구는 `EncounterDirector.RestartAt(스테이지)`가 됐다. 결과(`Accepted`/`Busy`/`NoSuchStage`)를 바로 돌려주고 실행은 다음 고정 단계에서 한다. 전환은 시뮬레이션 시간이고, 사망·클리어도 디렉터 안에서 같은 전환을 쓴다([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10절). `GameManager.RestartAt`과 `IsTransitioning`은 없어졌다. `LoadSnapshot`(T5)은 재시작을 먼저 받아 둔 뒤 `Apply`한다(받지 못하면 진행도를 바꾸지 않는다).
 
 ### T5. 진행도 교체: `GameManager.LoadSnapshot(PlayerSaveData)`
 
@@ -71,8 +72,8 @@
 
 | 묶음 | 명령 | 지나는 길 |
 |---|---|---|
-| 스테이지 | 번호로 이동, 이전/다음, 지금 스테이지 처음부터 | `RestartAt` |
-| | 보스전 바로 시작 | `GameManager.EnterBossBattle`(보스 도전 버튼이 부르는 입구와 같음) |
+| 스테이지 | 번호로 이동, 이전/다음, 지금 스테이지 처음부터 | `RestartAt`(4-A부터 `EncounterDirector.RestartAt`) |
+| | 보스전 바로 시작 → **4-A부터 "보스 도전"**(도전 가능할 때만) | 처음에는 `GameManager.EnterBossBattle`(가능 여부를 건너뜀). 4-A에서 보스 도전 버튼과 같은 명령 `EncounterDirector.RequestBossChallenge`로 바꿨다(D27: 건너뛰려면 개발 도구 전용 입구가 필요해 2장 원칙 2에 걸린다). 빨리 보려면 배속을 올린다 |
 | 진행도 | 골드 더하기 | `Wallet.AddGold`(처치 보상과 같은 길) |
 | | 경험치 더하기(다음 레벨 필요량만큼). 레벨업은 기존 LEVEL UP 버튼으로 | `PlayerStats.AddExp` |
 | | 레벨 지정 | 스냅샷의 레벨을 고쳐 `LoadSnapshot` |

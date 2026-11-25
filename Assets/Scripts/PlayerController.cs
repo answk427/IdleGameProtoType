@@ -109,13 +109,11 @@ public class PlayerController : CombatantHost
         if (view != null) view.PlayLocomotion(moving);
     }
 
-    // 사망 동작이 끝나면 재시작을 알린다(흐름은 4단계에서 EncounterDirector로).
-    public override void HandleDeathCompleted(Combatant self) => GlobalGameEvents.TriggerPlayerDied();
+    // 사망 동작이 끝나도 알리지 않는다: 흐름(EncounterDirector)이 다음 단계 ①에서 아군 전멸을 월드에 묻는다.
+    // 부활·회복도 흐름이 전투원(Combatant)에 직접 한다.
 
-    // ── 흐름(GameManager)이 부른다 ──
+    // ── 보상(GameManager)이 부른다 ──
 
-    public void Revive() => Combatant.Revive();
-    public void FullHeal() => Combatant.Heal(Combatant.MaxHp);
     public void AddExp(int amount) => stats.AddExp(amount);
     public void SaveProgress() => GameManager.Instance?.SaveGame();
 

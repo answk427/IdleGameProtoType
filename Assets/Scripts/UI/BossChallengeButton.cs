@@ -1,26 +1,17 @@
+using System;
 using UnityEngine;
 
-public class BossChallengeButton : UIHud
+// 보스 도전 버튼의 View(docs/UI_DESIGN.md 5-7). 보일지는 BossChallengePresenter가 정하고, 여기는 눌렸다고 알리기만 한다.
+// 씬에 배치된 HUD 위젯이고, UIRoot가 Presenter를 만들어 연결한다.
+public class BossChallengeButton : MonoBehaviour, IBossChallengeView
 {
-    // 게임 시작과 함께 뜨지 않고, 보스 도전이 가능해졌을 때만 뜬다.
-    protected override bool ShowOnGameStart => false;
+    public event Action Clicked;
 
-    public override void Initialize()
+    public void SetVisible(bool visible)
     {
-        base.Initialize();
-        GlobalGameEvents.OnBossChallengeAvailable += Show;
+        if (gameObject.activeSelf != visible) gameObject.SetActive(visible);
     }
 
-    protected override void OnDestroy()
-    {
-        base.OnDestroy();
-        GlobalGameEvents.OnBossChallengeAvailable -= Show;
-    }
-
-    // 인스펙터 OnClick()에 연결될 함수
-    public void OnClickChallenge()
-    {
-        Hide();
-        if (GameManager.Instance != null) GameManager.Instance.EnterBossBattle();
-    }
+    // 버튼의 OnClick()에 인스펙터로 연결돼 있다.
+    public void OnClickChallenge() => Clicked?.Invoke();
 }

@@ -74,23 +74,12 @@ public abstract class UIBase : MonoBehaviour
     protected virtual void OnDestroy() { }
 }
 
-// 상시 표시되는 HUD. 게임이 시작되면 자동으로 켜진다.
+// 상시 표시되는 HUD. 조립이 끝나면 UIRoot가 켠다(이관 기간 연결). 예전의 "게임 시작" 사건(OnGameStarted)은
+// GameInitializer가 UI를 조립한 뒤에 흐름을 시작해서 필요 없어졌다(docs/COMBAT_ARCHITECTURE.md 10-5).
+// 4-B에서 PlayerHud가 View + Presenter가 되면 이 클래스는 없어진다.
 public abstract class UIHud : UIBase
 {
     public override UILayer Layer => UILayer.Hud;
-
-    // 게임 시작 시 자동으로 켤지. 조건부로 뜨는 HUD(예: 보스 도전 버튼)는 false로 오버라이드한다.
-    protected virtual bool ShowOnGameStart => true;
-
-    public override void Initialize()
-    {
-        if (ShowOnGameStart) GlobalGameEvents.OnGameStarted += Show;
-    }
-
-    protected override void OnDestroy()
-    {
-        GlobalGameEvents.OnGameStarted -= Show;
-    }
 }
 
 // 탭 하나만 선택되는 패널. 열면 스택을 비우고 자기가 바닥이 된다.

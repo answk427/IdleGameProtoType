@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 
 // 전투원 전체와 그 사이의 규칙(거리, 대상, 처리 순서)을 갖는다(docs/COMBAT_ARCHITECTURE.md 8-3, 8-4). 순수 C#.
-// CombatSimulation(드라이버)이 고정 단계마다 국면 순서로 부른다: ② RunEvents → ③ StepPhases → ⑤ CaptureStep.
+// CombatSimulation(드라이버)이 고정 단계마다 국면 순서로 부른다: (① 흐름) → ② RunEvents → ③ StepPhases → ⑤ CaptureStep.
 // 위치는 월드 x다(3단계). 좌표가 커지지 않게 인카운터를 스폰할 때마다 원점을 재설정한다(ShiftOrigin).
 //
 // 처리 순서는 아군 → 적, 각 팀 안에서는 등록 순서다. 같은 시각의 전투 사건(CombatScheduler)도 이 순서다.
-// 처리 도중의 등록·해제(사망 알림을 받은 흐름 코드가 부르는 경우)는 그 국면이 끝난 뒤에 반영한다.
+// 처리 도중의 등록·해제(사망 알림을 받은 연출 코드가 부르는 경우)는 그 국면이 끝난 뒤에 반영한다.
+// 흐름(스폰, 정리, 원점 재설정)은 처리 밖인 국면 ①(EncounterDirector)에서 한다.
 public sealed class CombatWorld
 {
     private readonly List<Combatant> combatants = new List<Combatant>(16);
@@ -43,6 +44,38 @@ public sealed class CombatWorld
             }
             return null;
         }
+    }
+
+    // 마지막으로 진전(피해 > 0, 사망, 이동)이 있었던 단계. 흐름의 진전 감시(EncounterDirector)가 본다.
+    public long LastProgressStep { get; private set; }
+
+    internal void NoteProgress() => LastProgressStep = Clock.StepIndex;
+
+    // ── 팀 (흐름이 지난 단계의 결과를 묻는다) ──
+
+    public int CountAlive(Team team)
+    {
+        int count = 0;
+        for (int i = 0; i < combatants.Count; i++)
+        {
+            Combatant c = combatants[i];
+            if (c.Team == team && c.IsAlive) count++;
+        }
+        return count;
+    }
+
+    // 그 팀이 하나 이상 있고, 모두 죽어서 사망 행동까지 마쳤다(아군 전멸).
+    public bool IsDefeated(Team team)
+    {
+        bool any = false;
+        for (int i = 0; i < combatants.Count; i++)
+        {
+            Combatant c = combatants[i];
+            if (c.Team != team || c.Phase == CombatantPhase.Inactive) continue;
+            if (!c.IsDeathComplete) return false;
+            any = true;
+        }
+        return any;
     }
 
     // ── 등록 ──
@@ -128,7 +161,7 @@ public sealed class CombatWorld
         for (int i = 0; i < combatants.Count; i++) combatants[i].CaptureStep();
     }
 
-    // 원점 재설정(D16): 모든 위치에서 delta를 뺀다. 고정 단계 밖(스폰 루프)에서만 부른다.
+    // 원점 재설정(D16): 모든 위치에서 delta를 뺀다. 처리 밖(흐름 국면 ①의 스폰)에서만 부른다.
     // 거리, 대상, 단계는 그대로이고(모두 상대 위치), 그려지는 위치도 끊기지 않는다(보간 기준도 같이 옮김).
     public void ShiftOrigin(float delta)
     {

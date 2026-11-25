@@ -3,27 +3,35 @@ using UnityEngine;
 // 배경(docs/COMBAT_ARCHITECTURE.md 9-3). 카메라를 따라 화면을 덮고, 텍스처는 월드가 이동한 거리만큼 흐른다(패럴랙스).
 // 시뮬레이션과 무관한 그림이라 고정 단계가 아니라 화면 프레임(CameraRig.LateUpdate)에서 그린다.
 // 그래서 플레이어가 달리면 그 속도로 흐르고, 멈추면 멈춘다(예전의 "스크롤 중" 상태가 필요 없다).
-// 스테이지가 바뀌면 그 스테이지의 배경 텍스처로 바꾼다.
+// 스테이지가 바뀌면 그 스테이지의 배경 텍스처로 바꾼다(흐름의 스테이지 번호를 구독, GameInitializer가 연결).
 public class BackgroundScroller : MonoBehaviour
 {
     [Tooltip("월드 이동 거리(유닛)를 텍스처 오프셋(0~1)으로 바꾸는 배율(패럴랙스). 텍스처·쿼드 크기에 따라 배경마다 조정한다")]
     [SerializeField] private float scrollScale = 0.25f;
 
     private Material mat;
+    private System.IDisposable stageSubscription;
 
     private void Awake()
     {
         mat = GetComponent<Renderer>().material;
-        GlobalGameEvents.OnStageChanged += HandleStageChanged;
+    }
+
+    // 0은 아직 스테이지에 들어가지 않은 것이다(처음 값).
+    public void Bind(IReadOnlyReactiveProperty<int> stageNumber)
+    {
+        stageSubscription?.Dispose();
+        stageSubscription = stageNumber.Subscribe(HandleStageChanged);
     }
 
     private void OnDestroy()
     {
-        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
+        stageSubscription?.Dispose();
     }
 
     private void HandleStageChanged(int stageNumber)
     {
+        if (stageNumber <= 0) return;
         StageEntry entry = GameDatabaseManager.Instance != null ? GameDatabaseManager.Instance.GetStage(stageNumber) : null;
         if (entry != null) SetBackground(entry.backgroundTexture);
     }

@@ -18,6 +18,10 @@ public class UIRoot : MonoBehaviour
     [SerializeField] private Canvas fadeLayer;
     [SerializeField] private FadeController fadeController;
 
+    [Header("HUD 위젯 (View, Presenter는 여기서 만든다)")]
+    [SerializeField] private BossChallengeButton bossChallengeButton;
+    [SerializeField] private StageAnnouncement stageAnnouncement;
+
     [Header("이관 기간 연결 (기존 UIManager 쪽)")]
     [SerializeField] private UIManager uiManager;
     [SerializeField] private SkillSlotBar skillSlotBar;
@@ -31,7 +35,7 @@ public class UIRoot : MonoBehaviour
     // Initialize 뒤에만 있다. 창이 아닌 화면(개발 도구 패널)도 같은 입력 차단을 쓴다.
     public InputBlocker InputBlocker => inputBlocker;
 
-    public void Initialize(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerController player)
+    public void Initialize(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerController player, EncounterDirector flow)
     {
         if (windows != null || !ValidateReferences()) return;
 
@@ -39,9 +43,10 @@ public class UIRoot : MonoBehaviour
 
         inputBlocker = new InputBlocker(transform);
         windows = new WindowManager(transform, registry, inputBlocker);
-        fadeController.Initialize(inputBlocker);
+        fadeController.Initialize(inputBlocker, flow);
 
         BindWindows(session, skills, player);
+        BindHudWidgets(flow);
 
         inputBlocker.IsBlocked.Subscribe(_ => RefreshNavigation()).AddTo(disposables);
         windows.HasModal.Subscribe(_ => RefreshNavigation()).AddTo(disposables);
@@ -62,6 +67,13 @@ public class UIRoot : MonoBehaviour
 
         windows.Bind<SkillManageWindow, SkillManageArgs>((view, args, window) =>
             new SkillManagePresenter(view, session.Stats, skills, CooldownRatio, window));
+    }
+
+    // 씬에 배치된 HUD 위젯. 창이 아니라 WindowManager를 거치지 않고, Presenter의 수명은 UIRoot와 같다.
+    private void BindHudWidgets(EncounterDirector flow)
+    {
+        new BossChallengePresenter(bossChallengeButton, flow).AddTo(disposables);
+        new StageAnnouncementPresenter(stageAnnouncement, flow.CurrentStageNumber).AddTo(disposables);
     }
 
     private void Update()
@@ -107,6 +119,9 @@ public class UIRoot : MonoBehaviour
     {
         skillSlotBar.SkillManageRequested += OpenSkillManage;
         uiManager.OnTabChanged += HandleTabChanged;
+
+        // HUD는 조립이 끝나면 켠다(예전에는 OnGameStarted 사건으로 켜졌다). 4-B에서 PlayerHud가 Presenter로 바뀌면 없어진다.
+        uiManager.ShowUI<PlayerHud>();
     }
 
     private void DisconnectLegacyUI()
@@ -126,6 +141,8 @@ public class UIRoot : MonoBehaviour
         if (registry == null) { Debug.LogError("[UIRoot] registry(WindowRegistry)가 연결되지 않았습니다."); ok = false; }
         if (fadeLayer == null) { Debug.LogError("[UIRoot] fadeLayer가 연결되지 않았습니다."); ok = false; }
         if (fadeController == null) { Debug.LogError("[UIRoot] fadeController가 연결되지 않았습니다."); ok = false; }
+        if (bossChallengeButton == null) { Debug.LogError("[UIRoot] bossChallengeButton이 연결되지 않았습니다."); ok = false; }
+        if (stageAnnouncement == null) { Debug.LogError("[UIRoot] stageAnnouncement가 연결되지 않았습니다."); ok = false; }
         if (uiManager == null) { Debug.LogError("[UIRoot] uiManager가 연결되지 않았습니다."); ok = false; }
         if (skillSlotBar == null) { Debug.LogError("[UIRoot] skillSlotBar가 연결되지 않았습니다."); ok = false; }
         return ok;

@@ -7,7 +7,7 @@ Unity 2D 방치형(idle) 액션 게임 프로토타입. Unity 6000.4.9f1.
 
 ## 핵심 게임 루프
 
-`GameInitializer.Start()`(세이브 로드 → `GameSession` 생성 → 플레이어 스폰) → `GameManager.Initialize(session, player)` → `StageManager.Initialize(stage)` → 몬스터 인카운터 반복 스폰(`MonsterSpawner`) → 인카운터 다 죽이면 보스 도전 가능 → 보스 클리어 시 다음 스테이지로 전환. 스테이지를 처음부터 시작하는 길은 `GameManager.RestartAt(스테이지)` 하나다(사망 = 같은 스테이지, 클리어 = 다음, 마지막이면 그 스테이지. 개발자 도구의 이동과 진행도 교체도 이 길). 플레이어는 자동 전투(타겟 자동 탐색 + 공격)만 하며 조작 입력은 없음 — 스탯 업그레이드와 스킬 장착만 플레이어가 직접 함.
+`GameInitializer.Start()`(세이브 로드 → `GameSession` 생성 → 플레이어 스폰 → 전투 월드와 흐름 생성 → 구독 연결) → `director.Begin(스테이지)`. 흐름은 `EncounterDirector`(아래 "흐름")가 갖는다: 인카운터 반복 → `encountersToComplete`번 깨면 보스 도전 가능 → 도전 → 보스 처치 → 전환(가운데에서 다음 스테이지 입장). 스테이지를 처음부터 시작하는 길은 `EncounterDirector.RestartAt(스테이지)`(전환) 하나다: 아군 전멸·보스 제한 시간 초과 = 같은 스테이지, 클리어 = 다음(마지막이면 그 스테이지), 개발자 도구의 이동과 진행도 교체(`GameManager.LoadSnapshot`)도 이 길. 플레이어는 자동 전투(타겟 자동 탐색 + 공격)만 하며 조작 입력은 없음 — 스탯 업그레이드와 스킬 장착, 보스 도전만 플레이어가 직접 함.
 
 ## 데이터 아키텍처 (Excel → JSON → ScriptableObject)
 
@@ -32,7 +32,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 → `MonsterData`/`StageData` 등의 `[SerializeField] private` 필드 이름을 바꾸면(예: `_id` → `id`), 기존 `.asset` 파일의 YAML 키(`_id: 1001`)와 더 이상 매칭이 안 돼서 **그 값이 조용히 기본값(0/null)으로 리셋됨.** 컴파일 에러도, 런타임 에러도 안 남고 그냥 데이터가 사라짐.
 
-이게 원인이 돼서 한 번 "캐릭터가 안 달리고 배경도 안 바뀌고 진행이 안 되는" 버그가 났던 적 있음 (`StageDatabase.asset`의 `_stageNumber`가 코드의 `stageNumber`와 안 맞아서 `GetByNumber(1)`이 실패 → `StageManager.Initialize()` 실패 → 당시 `GameManager.Start()`(지금은 `GameManager.Initialize()`) 조기 return → 그 아래 있던 달리기 시작/배경 갱신/스폰 루프가 전부 실행 안 됨).
+이게 원인이 돼서 한 번 "캐릭터가 안 달리고 배경도 안 바뀌고 진행이 안 되는" 버그가 났던 적 있음 (`StageDatabase.asset`의 `_stageNumber`가 코드의 `stageNumber`와 안 맞아서 `GetByNumber(1)`이 실패 → 당시의 `StageManager.Initialize()` 실패 → `GameManager.Start()` 조기 return → 그 아래 있던 달리기 시작/배경 갱신/스폰 루프가 전부 실행 안 됨. 지금은 `GameInitializer`가 저장된 스테이지를 먼저 확인하고 에러를 낸다).
 
 - **값을 바꿔 보기는 튜닝 덮어쓰기로**(메뉴 `IdleGame/Data/Tuning Overrides`, `docs/COMBAT_ARCHITECTURE.md` 8-7 D15). "표 / 키 / 열 / 값"을 적으면 에디터 플레이에서만 데이터베이스 사본(`DataTuning.Prepare`)에 덮어쓴다. 엑셀과 `.asset`은 그대로이고, 목록은 내 PC 전용 파일(`UserSettings/IdleGame/TuningOverrides.asset`)이다. 켜져 있으면 플레이 시작 때 경고하고, 빌드에는 이 코드가 없다(빌드 전에 남은 항목을 경고). 플레이 중에 바꾸면 바로 다시 적용된다(플레이어 즉시, 몬스터는 다음 스폰). 정한 값은 엑셀로 옮긴다. **Claude가 검증하려고 값을 바꿀 때도 엑셀이 아니라 이것을 쓰고, 끝나면 지운다.**
 
@@ -50,15 +50,25 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **전투 진행 중 할당 0**(R6): 상태 객체 없음, 범위·스킬 결과는 재사용 버퍼, 몬스터의 `Combatant`는 풀 객체마다 하나를 다시 쓴다(`Spawn`이 이전 상태를 지움). `CombatAllocationTests`가 확인한다.
 - **데이터와 프리팹의 짝은 에디터·빌드가 검사한다**(`CombatDataValidator`, `ActionTimelineTools.ValidateCombatData`에서 호출): 몬스터의 공격 간격 > 0이면 프리팹 시간표에 `Attack`, `skillId`의 스킬과 그 행동 키, 캐릭터 프리팹의 `Attack`·`Death`와 배울 수 있는 모든 스킬의 행동 키, 스테이지가 가리키는 몬스터, 모든 전투원 프리팹의 판정 몸·시간표·뷰.
 
+## 흐름 (`docs/COMBAT_ARCHITECTURE.md` 10절, 4-A)
+
+- **`EncounterDirector`(순수 C#, `Assets/Scripts/Flow/`)가 인카운터·보스·스테이지 흐름 전체를 갖는다.** 고정 단계 ①에서 돌고, 지난 단계의 결과(보스 처치, 아군 전멸)를 월드에 묻는다. 전투 알림(사망 등)은 흐름을 부르지 않는다(재진입 없음). `StageManager`, `GlobalGameEvents`, `GameManager`의 흐름 코루틴은 없어졌다.
+- **상태는 단계 값 하나**(`FlowPhase`: Starting → Encounter → EncounterCleared → … → BossIntro → Boss → Transition). 대기는 끝나는 단계 번호로 저장한다. 같은 단계에 보스 처치와 전멸이 보이면 클리어가 먼저다.
+- **명령은 검사·결과는 즉시, 실행은 다음 ①**(D23): `RequestBossChallenge()`(Accepted/NotAvailable/Busy), `RestartAt(스테이지)`(Accepted/Busy/NoSuchStage). 보스 버튼, 개발자 도구, `LoadSnapshot`이 모두 이것만 부른다. 사건을 받는 쪽이 명령을 불러도 그 사건 안에서는 실행되지 않는다.
+- **바깥으로 내는 것:** 상태 `Phase`, `CurrentStageNumber`(0 = 시작 전), `BossChallengeAvailable`(도전을 받거나 전환이 시작되면 꺼진다), 사건 `StageEntered(스테이지, 이유)`(`GameManager`가 세션 스테이지 번호 + 저장, 시작은 저장 안 함), 매 프레임 값의 원인 `Transition`(시각), `BossDeadline`, 경고 `Stalled`(진전 감시: 게임 시간 30초 동안 피해·사망·이동·흐름 변화가 없으면, 에디터·개발 빌드).
+- **스폰 규칙(원점 재설정, 위치, 몇 마리)은 디렉터, 뷰는 `IEncounterHost`**(`MonsterSpawner`: 풀에서 꺼내 능력치를 넣은 전투원을 돌려주고, 스테이지를 떠날 때 풀을 비운다). 인카운터의 끝은 "살아 있는 적이 없다"(월드에 묻는다).
+- **흐름 시간은 데이터:** 정리 대기·보스 등장 대기·전환 길이는 `BalanceConfig`(D24), 보스전 제한 시간은 스테이지 표 `bossTimeLimit`(0 = 없음, 넘기면 전멸과 같다, D25). 0이면 그 대기가 없다(같은 ①에서 다음 단계로). 대기는 "n × 단계 ≥ 대기"인 가장 작은 n 단계라서, **흐름 시간 데이터는 double**이다(float면 0.1 같은 값이 한 단계 늘어난다).
+- 테스트는 `EncounterDirectorTests`(진짜 `CombatWorld`·`Combatant` + 가짜 호스트): 정확한 대기, 명령 결과, 전멸·클리어 순서, 결정성, 무작위 데이터 장시간 진행, 할당 0.
+
 ## 매니저/유틸리티
 
 - `GameDatabaseManager` — `MonsterDatabase`/`StageDatabase`/`SkillDatabase`/`CharacterDatabase`/`BalanceConfig`(SO)를 들고 있는 조회 파사드(에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본). `GetMonster(id)`/`GetStage(stageNumber)`/`GetSkill(id)`/`GetCharacter(id)`/`Balance`(스테이지 성장 곡선)로 다른 코드가 SO를 직접 참조하지 않고 항상 이 매니저를 거치게 함. `Instance` getter가 지연 초기화라 다른 매니저의 `Awake()` 실행 순서에 의존하지 않음.
-- `PoolManager` — Unity 내장 `UnityEngine.Pool.ObjectPool<T>` 래퍼. 프리팹별로 풀을 따로 관리(`Dictionary<GameObject, IObjectPool<GameObject>>`). 몬스터/보스 스폰에 사용. 스테이지 전환 시 `ClearPool(prefab)`으로 이전 스테이지 몬스터 풀을 정리함.
+- `PoolManager` — Unity 내장 `UnityEngine.Pool.ObjectPool<T>` 래퍼. 프리팹별로 풀을 따로 관리(`Dictionary<GameObject, IObjectPool<GameObject>>`). 몬스터/보스 스폰에 사용. 다른 스테이지에 들어갈 때 `MonsterSpawner.ReleaseStage`가 `ClearPool(prefab)`으로 이전 스테이지 몬스터 풀을 정리함.
 - `PlayAreaBounds` — 화면 하단 UI 비율(`bottomUiScreenRatio`)을 기준으로 "캐릭터가 서 있을 수 있는 월드 Y(`GroundY`)"를 계산하는 단일 소스. `MonsterSpawner`/`PlayerController`의 스폰 위치 계산이 전부 여기서 나온 값을 씀 — 하단 UI 비율이 바뀌면 이 한 곳만 고치면 됨.
 
 ## 전투/스킬
 
-목표 구조와 단계는 `docs/COMBAT_ARCHITECTURE.md`(1~3단계 완료, 4·5단계 남음). 고정 타임스텝 수정의 설계·검증 기록은 `docs/COMBAT_DESIGN.md`.
+목표 구조와 단계는 `docs/COMBAT_ARCHITECTURE.md`(1~3단계와 4-A(흐름) 완료, 4-B·5단계 남음). 고정 타임스텝 수정의 설계·검증 기록은 `docs/COMBAT_DESIGN.md`.
 
 - **전투 규칙을 애니메이션이 정하지 않는다.** 행동의 길이는 게임 데이터가, 타격 시점(행동 안의 비율)은 행동 시간표가 정하고, 전투 로직은 애니메이션 이벤트와 애니메이터 전이를 하나도 읽지 않는다. 애니메이터를 꺼도 처치 시각이 같다(검증함).
   - **행동 시간표**(`ActionTimeline`, 캐릭터마다 `ActionTimelineSet` 에셋, `Assets/Data/Combat/Timelines/`): 키(= 애니메이터 상태 이름), 클립, 그리고 클립에서 구운 값(클립 길이, 타격 비율들). 타이밍은 스킬이 아니라 **시전자의 애니메이션**에 속한다(같은 스킬 1번을 플레이어와 BossSlime이 다른 클립으로 쓴다). 스킬의 키는 `SkillData.AnimationTrigger`(이름은 옛 그대로, 의미는 "행동 키").
@@ -78,12 +88,13 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **스킬 쿨다운은 스킬 id에 붙는다**(`SkillLoadout`). 슬롯을 옮기거나 장착을 풀었다 껴도 유지되고, 준비 시각이 절대 시각이라 장착하지 않은 동안에도 흐른다(`Tick` 없음). UI는 `PlayerController.GetSkillCooldownRatio`(시계 기준)로 표시한다. 저장하지는 않는다.
 - **애니메이터는 재생기다**(`CharacterAnimationView`). 컨트롤러는 조건 전이 없는 상태 모음이고, 상태를 이름으로 `Play`/`CrossFade`한다. 행동 상태(Attack, Skill, Healing)의 속도는 `ActionSpeed` 파라미터(`클립 길이 ÷ 실제 길이`). Animator Update Mode는 Normal.
 
-- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 국면 순서로 진행한다: ② 전투 사건(`CombatWorld.RunEvents` → `CombatScheduler`) → ③ 단계 전이와 이동(`CombatWorld.StepPhases`, 아군 → 적) → ⑤ 보간용 기록(`CombatWorld.CaptureStep`), 시계 진행. (① 보간 위치 되돌리기는 2단계에서, ④ 배경은 3단계에서 없어졌다.) 전투원·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각이 같다(검증함).
-  - **시간 규칙:** 위치를 읽거나 움직이는 전투 로직과 전투 시간은 고정 단계 안에서만 돈다. 행동·쿨다운은 ②에서 단계 안의 정확한 시각으로, 이동과 달리기↔교전 전환은 ③에서 단계 단위로(위치를 단계마다 적분하는 모델. 교전 시작을 단계 안의 접촉 시각으로 정밀화하는 것은 하지 않기로 했다, D19). UI 입력 중 위치를 읽는 것(스킬 슬롯 탭)은 `PlayerController.RequestSkillSlot`으로 다음 단계에 처리한다. `GameManager`의 스폰 루프는 `WaitForFixedUpdate`와 단계 수로 기다린다(`WaitForSeconds`/`yield return null` 쓰지 말 것). 스테이지 전환 페이드만 화면 시간이다.
+- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 국면 순서로 진행한다: ① 흐름(`EncounterDirector.Tick`) → ② 전투 사건(`CombatWorld.RunEvents` → `CombatScheduler`) → ③ 단계 전이와 이동(`CombatWorld.StepPhases`, 아군 → 적) → ⑤ 보간용 기록(`CombatWorld.CaptureStep`), 시계 진행. (④ 배경은 3단계에서 없어졌다.) 전투원·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각과 스테이지 입장 시각이 같다(검증함).
+  - **단계 길이는 설정값 그대로(0.02):** Unity 6은 고정 단계를 유리수로 저장해서 `Time.fixedDeltaTime`이 0.0199999921로 들어온다. 시계는 `CombatSimulation.StepLengthOf`(유효숫자 6자리)로 설정이 뜻하는 값을 쓴다. 안 그러면 데이터의 초가 단계 수와 맞지 않는다(0.5초 대기가 26단계).
+  - **시간 규칙:** 위치를 읽거나 움직이는 전투 로직과 전투 시간은 고정 단계 안에서만 돈다. 행동·쿨다운은 ②에서 단계 안의 정확한 시각으로, 이동과 달리기↔교전 전환은 ③에서 단계 단위로(위치를 단계마다 적분하는 모델. 교전 시작을 단계 안의 접촉 시각으로 정밀화하는 것은 하지 않기로 했다, D19). UI 입력 중 위치를 읽는 것(스킬 슬롯 탭)은 `PlayerController.RequestSkillSlot`으로 다음 단계에 처리한다. 흐름(스폰, 대기, 스테이지 전환)도 ①의 시뮬레이션 시간이다. 페이드는 그 시간을 그리기만 한다(배속에서 같이 빨라진다). 화면 시간(`unscaledDeltaTime`)은 UI 애니메이션(스테이지 안내 등)뿐이다. 코루틴으로 흐름을 기다리지 말 것.
   - **보간:** 위치의 주인은 `Combatant.X`(판정 몸 중심, 월드 x)이고, 화면 프레임에서는 호스트(`CombatantHost.ApplyRenderPose`)가 직전 두 단계 사이를 그린다(최대 0.02초 늦게 보임). 위치를 직접 정할 때는 `Combatant.Place`/`Spawn`을 쓴다(보간 기준도 같이 맞춘다). 안 하면 예전 자리에서 미끄러져 온다.
 - **공간은 월드 x + 카메라다**(3단계, `docs/COMBAT_ARCHITECTURE.md` 9절). 플레이어(전진 정책)가 이동 단계에서 실제로 앞(+x)으로 가고, `CameraRig`(Main Camera, LateUpdate)가 처음의 카메라-플레이어 거리를 유지하며 따라간다. 일반 몬스터(Hold)는 움직이지 않고, 보스(Approach)는 자기 `moveSpeed`로 다가온다. 그래서 시체·동전·이펙트처럼 가만히 있는 것은 아무 처리 없이 화면에서 지나간다. "스크롤" 개념(`IsScrolling`, `OnScrollChanged`)은 없다. 배경(`BackgroundScroller.Follow`)은 카메라를 따라 화면을 덮고, 텍스처는 월드 이동 거리 × `scrollScale`만큼 흐른다.
 - **이동은 sweep 하나**(`Combatant.Sweep`, `CombatWorld.FindBlockingContact`): 그 방향의 가장 가까운 살아 있는 상대 몸(접촉선)까지만 간다. 이미 겹쳐 있으면 더 파고들지 않는다. 한 단계 이동량과 무관하게 성립한다(이동 속도 1e6에서 테스트). 시체와 뒤쪽 적은 막지 않는다. 예전에는 긴 프레임 한 번에 몬스터가 플레이어 뒤로 순간이동해 진행이 영구히 멈췄다.
-- **원점 재설정(D16):** 인카운터·보스를 스폰할 때마다(`MonsterSpawner`) 대열 앞장의 위치 정수 부분만큼 모든 좌표를 뺀다(`CombatWorld.RecenterOn`/`ShiftOrigin`, 고정 단계 밖에서만, 처리 중이면 예외). 누적량(`TotalShift`)으로 배경이 이어지고, 살아 있는 연출(동전, 이펙트, 데미지 숫자 기준점)은 `CombatEffectManager.ShiftOrigin`이 옮긴다. 그래서 이펙트 프리팹의 파티클은 로컬 시뮬레이션 공간이어야 한다(데이터 검사가 잡는다). 데미지 숫자는 월드 기준점을 매 프레임 화면 좌표로 바꿔 월드를 따른다.
+- **원점 재설정(D16):** 인카운터·보스를 스폰할 때마다(`EncounterDirector`, 국면 ①) 대열 앞장의 위치 정수 부분만큼 모든 좌표를 뺀다(`CombatWorld.RecenterOn`/`ShiftOrigin`, 월드 처리 밖에서만, 처리 중이면 예외). 누적량(`TotalShift`)으로 배경이 이어지고, 살아 있는 연출(동전, 이펙트, 데미지 숫자 기준점)은 `CombatEffectManager.ShiftOrigin`이 옮긴다. 그래서 이펙트 프리팹의 파티클은 로컬 시뮬레이션 공간이어야 한다(데이터 검사가 잡는다). 데미지 숫자는 월드 기준점을 매 프레임 화면 좌표로 바꿔 월드를 따른다.
 - **스폰 위치는 데이터:** 첫 몬스터 피벗 x = 대열 앞장 몸 중심 + 스테이지 표 `spawnDistance`, 둘째부터 `monsterSpacing` 간격. 화면 크기와 무관해서 기기 화면비가 전투를 바꾸지 않는다(D18).
 
 - `Skill` 런타임 클래스가 `SkillData`(밸런스 수치) + `ISkillBehavior`(실제 효과 실행, `Execute(시전자, 대상, 맞은 전투원 버퍼)`)를 묶음. `ISkillBehavior` 구현체: `DamageSkillBehavior`/`AoeDamageSkillBehavior`/`HealSkillBehavior` — `SkillEffectType`에 따라 `Skill.CreateBehavior()`에서 분기 생성. 새 효과 타입을 추가하려면 `ISkillBehavior` 구현체 추가 + 그 switch문에 분기 추가.
@@ -106,32 +117,35 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - 창은 `Update`를 쓰지 않는다(숨겨도 돈다). 매 프레임 값은 Presenter의 `Tick()`.
 - `InputBlocker` — 참조 카운트 입력 차단. **코루틴 지역변수로 `using`하지 말 것**(끊기면 안 풀림, `FadeController` 참고).
 - `SkillManageWindow`(View) + `SkillManagePresenter` + `SkillListItem`/`SkillSlotWidget` — 스킬 학습/슬롯 장착. 첫 이관 사례. (프리팹 파일명은 `SkillManagePopup.prefab` 그대로)
+- **씬의 HUD 위젯도 View + Presenter**(창이 아니라 `WindowManager`를 거치지 않는다): `BossChallengeButton`(보이기 = `BossChallengeAvailable`, 누르면 `RequestBossChallenge`), `StageAnnouncement`(스테이지 번호가 바뀌면 "Stage N"). Presenter는 `Assets/Scripts/UI/Flow/`, `UIRoot.BindHudWidgets`가 만들고 수명을 갖는다. 위젯이 스스로 숨거나 게임 쪽을 직접 부르지 않는다.
+- `FadeController` — 흐름의 전환 시각(`EncounterDirector.Transition`)을 그리기만 한다(시작 0 → 가운데 1 → 끝 0). 전환 중에는 입력을 막는다.
 
 기존 구조 (HUD, 탭 — 이관 예정)
-- `UIBase`(`Assets/Scripts/UI/UIBase.cs`) — 기존 패널의 베이스, `UIManager`가 생명주기 관리. 팝업용 서브클래스는 없다.
+- `UIBase`(`Assets/Scripts/UI/UIBase.cs`) — 기존 패널의 베이스, `UIManager`가 생명주기 관리. 팝업용 서브클래스는 없다. `UIHud`는 이제 `PlayerHud`뿐이고 조립이 끝나면 `UIRoot`가 켠다(4-B에서 Presenter로 바뀌면 없어진다).
 - `UITabPanel : UIBase` — 탭(`TabType`)이 있는 패널 전용 서브클래스(`StatUpgradePanel`, `SkillSlotBar`). `TabType`은 `UIBase`가 아니라 여기로 분리돼 있음 — 탭 없는 UI(`StageAnnouncement` 등)는 `UIBase`를 직접 상속.
 - `StatUpgradePanel` + `UpgradeListItem` — 데이터 기반 업그레이드 목록(`PlayerStats.upgradeStats : Dictionary<UpgradeStatType, IUpgradeStat>`로 Strategy 패턴). 새 업그레이드 스탯 추가 시 `IUpgradeStat` 구현체 하나 추가 + 등록만 하면 됨 (`HpUpgradeStat`, `AttackUpgradeStat`, `AttackSpeedUpgradeStat` 참고).
 
 ## 이벤트 버스
 
-`GlobalGameEvents`/`GlobalCombatEvents`(`Assets/Scripts/Event/`) — 정적 이벤트 버스로 매니저 간 직접 참조를 끊음. 예: `Monster`는 죽었다는 사실만 `GlobalCombatEvents.OnMonsterDied`로 알리고, 골드/경험치 지급은 `GameManager`가 구독해서 처리 — `Monster`는 보상 지급 방법을 모름.
+`GlobalCombatEvents`(`Assets/Scripts/Event/`) — 전투 → 연출·보상 방향의 정적 이벤트 버스로 매니저 간 직접 참조를 끊음. 예: `Monster`는 죽었다는 사실만 `GlobalCombatEvents.OnMonsterDied`로 알리고, 골드/경험치 지급은 `GameManager`가 구독해서 처리 — `Monster`는 보상 지급 방법을 모름. 4-B에서 `Subject`로 바꾼다(UI_DESIGN 5-3).
+흐름의 상태와 사건(스테이지, 보스 도전 가능, 입장)은 정적 버스가 아니라 `EncounterDirector`의 반응형 값이다. 예전의 `GlobalGameEvents`(보스 처치 → 클리어 → 전환으로 이어지던 정적 사건 사슬, `OnGameStarted`)는 4-A에서 지웠다.
 
 ## 저장 시스템
 
 - **`PlayerSaveData`(최상위, `Assets/Scripts/Player/PlayerSaveData.cs`)와 `PlayerStatsSaveData`(`PlayerStats` 전용 슬라이스)로 분리돼 있음.** `PlayerSaveData`는 `{ stats: PlayerStatsSaveData, gold, currentStageNumber }` 형태 — 저장 파일 전체에 대응. `PlayerStatsSaveData`는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯처럼 `PlayerStats`가 실제로 읽고 쓰는 것만 담음. 골드/스테이지 번호는 `PlayerStats`가 전혀 쓰지 않는 데이터라(`GameManager`만 씀) 같은 클래스에 두면 안 된다고 판단해서 분리함.
 - **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, 전투 단계)는 전투원(`Combatant`, 호스트 `PlayerController`)이 갖는다.
-- **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()`(예외면 여기서 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `GameManager.Initialize(session, player)` → `CombatSimulation.Initialize(player)` → `UIRoot.Initialize(session, 스킬 목록, player)`. 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
+- **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()`(예외면 여기서 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → (저장된 스테이지가 데이터에 없으면 중단) → `CombatSimulation.Initialize`(월드 + `EncounterDirector`) → `GameManager.Initialize(session, player, director)` → 배경 → `UIRoot.Initialize(session, 스킬 목록, player, director)` → `director.Begin(스테이지)`. 모든 구독이 연결된 뒤에 흐름을 시작하므로 처음 값이 반응형으로 전달된다(예전의 `OnGameStarted`가 필요 없다). 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
 - **저장 데이터 변환은 `GameSession.Apply(PlayerSaveData)` / `GameSession.ToSaveData()` 두 곳뿐.** `Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다(세션/Stats/Wallet을 참조하는 쪽이 옛 객체를 붙잡지 않게). 세이브 로드와 이후 서버 롤백(`docs/SERVER_DESIGN.md`)이 같은 경로를 쓴다.
-- **실행 중 진행도 교체는 `GameManager.LoadSnapshot(스냅샷)`** — 저장과 같은 검사 → JSON 복사본을 `Apply` → 그 스테이지를 `RestartAt`(저장 포함). `Apply`는 넘겨받은 객체를 그대로 붙잡으므로 직접 부를 때는 복사본을 넘긴다. 교체를 알리는 사건은 `PlayerStats.OnReloaded`(저장을 일으키지 않음)이고, 진행도에서 값을 읽어 둔 쪽(캐릭터 능력치·장착 스킬, HUD, 캐릭터 탭, 스킬 슬롯 바)은 여기서 다시 읽는다. 진행도에서 읽은 값을 캐시하는 새 코드도 이것을 구독할 것(안 하면 교체 뒤 옛 값이 남는다. 4단계에서 반응형으로 바뀌면 대체된다).
+- **실행 중 진행도 교체는 `GameManager.LoadSnapshot(스냅샷)`** — 저장과 같은 검사 → 그 스테이지의 재시작을 디렉터에 받아 둔 뒤(받지 못하면 바꾸지 않음) JSON 복사본을 `Apply` → 다음 고정 단계에 전환, 가운데에서 입장(저장). `Apply`는 넘겨받은 객체를 그대로 붙잡으므로 직접 부를 때는 복사본을 넘긴다. 교체를 알리는 사건은 `PlayerStats.OnReloaded`(저장을 일으키지 않음)이고, 진행도에서 값을 읽어 둔 쪽(캐릭터 능력치·장착 스킬, HUD, 캐릭터 탭, 스킬 슬롯 바)은 여기서 다시 읽는다. 진행도에서 읽은 값을 캐시하는 새 코드도 이것을 구독할 것(안 하면 교체 뒤 옛 값이 남는다. 4단계에서 반응형으로 바뀌면 대체된다).
 - **저장 백엔드는 `ISaveStorage`로 추상화**(`Assets/Scripts/Player/ISaveStorage.cs`, 최상위 `PlayerSaveData` 기준). `LocalFileSaveStorage`가 현재 구현체(JSON을 `Application.persistentDataPath/player_save.json`에 입출력). `SaveStorageProvider.Current`가 스위치 지점 — 나중에 서버 저장으로 바꿀 때 `ServerSaveStorage : ISaveStorage`를 새로 만들고 `SaveStorageProvider.Current`에 대입하는 한 줄만 바꾸면 됨. `Load()`는 동기(`GameInitializer.Start()`에서 즉시 써야 해서), `Save()`는 `IEnumerator`(코루틴) — 호출부가 기다리지 않는 fire-and-forget이라 서버 지연을 흡수할 수 있게 미리 비동기 모양으로 잡아둔 것.
 - **손상된 세이브는 새 데이터로 대신하지 않는다.** `Load()`는 파일이 없을 때만 신규 데이터를 주고, 파일이 있는데 온전히 읽을 수 없으면 예외를 던진다. `GameInitializer`가 잡아서 세션 없이 중단하므로 종료 저장을 포함한 어떤 저장도 원본을 건드리지 않는다. 새 저장소 구현체도 이 규칙을 지킬 것.
 - **검사는 `SaveDataValidator`(`Assets/Scripts/Player/SaveDataValidator.cs`) 한 곳.** `JsonUtility`는 없는 필드를 기본값으로 채워 변환 후에는 손상을 알 수 없어서, 변환 전에 `JObject`로 필수 키/타입/하한/슬롯 길이/중복 키를 본다. `Save()`도 같은 검사를 통과한 값만 쓴다(`NaN` 등이면 에러 로그 후 기존 파일 유지). 상한은 보지 않는다(데이터가 줄었을 때 정상 세이브를 막지 않게).
 - **`PlayerStats`는 `ISaveStorage`를 모름.** MonoBehaviour가 아니라 코루틴을 못 돌리는 순수 클래스라서, 실제 저장 트리거(코루틴 시작)는 항상 MonoBehaviour 쪽에서 함. `PlayerStats.Upgrade()`/`LearnSkill()`/`EquipSkill()`/`UnequipSkill()`은 데이터만 바꾸고 이벤트(`OnUpgraded`/`OnSkillLearned`/`OnSkillEquipChanged`)만 쏨. **`GameManager`가 이 이벤트들을 `Initialize()`에서 직접 구독해서 `SaveGame()`을 호출**(`PlayerController`는 거치지 않음) — `PlayerController`는 `RefreshEquippedSkills`처럼 자기 런타임 상태와 진짜 관련 있는 구독만 갖고, 저장은 "언제 저장할지"를 실제로 결정하는 `GameManager`의 책임으로 분리함.
-- **저장은 `GameManager.SaveGame()` 한 곳에서 `session.ToSaveData()`를 저장.** 스테이지 번호는 `GameManager`가 `OnStageChanged`를 받아 세션에 반영해 둔다. 업그레이드/스킬학습/스킬장착/스테이지전환 등 저장이 일어나는 모든 경로가 이 메서드 하나로 모인다.
+- **저장은 `GameManager.SaveGame()` 한 곳에서 `session.ToSaveData()`를 저장.** 스테이지 번호는 `GameManager`가 흐름의 `StageEntered`를 받아 세션에 반영해 둔다. 업그레이드/스킬학습/스킬장착/스테이지전환 등 저장이 일어나는 모든 경로가 이 메서드 하나로 모인다.
 - **재화는 `GameNumber`(`Assets/Scripts/Economy/GameNumber.cs`, 내부 `double`).** 골드, 업그레이드 비용, 몬스터 처치 보상. 저장 DTO(`PlayerSaveData.gold`)는 `double`, 데이터 테이블(`MonsterData.goldReward`)은 `int` 그대로 — 구조체를 직렬화 대상에 넣지 않는다(직렬화 함정). 예전 세이브의 정수 `gold`는 `double` 필드로 그대로 읽힌다(확인함).
 - ⚠️ **`PlayerSaveData`/`PlayerStatsSaveData`의 필드나 슬롯 수를 바꾸면 기존 세이브가 깨짐** — ScriptableObject `.asset`의 "직렬화 함정"과 같은 종류(`JsonUtility`도 필드 이름으로 매칭). 검사 대상 필드의 이름이나 슬롯 수를 바꾸면 기존 세이브가 **손상으로 차단되고**, 새로 추가한 필드는 검사되지 않아 **조용히 기본값으로 채워진다.** 새 필드를 필수로 검사하려면 버전 변환이 먼저다(`docs/TODO.md` "저장"). 구조를 바꿀 땐 `%LOCALAPPDATA%\..\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`을 직접 새 스키마로 마이그레이션할 것.
 - **`OnApplicationQuit`/`OnApplicationPause(true)`는 `SaveGameImmediate()`로 동기 처리.** `StartCoroutine`으로 예약하면 앱이 곧 종료/일시정지돼서 코루틴이 실행될 프레임을 못 받을 수 있어, 이 두 경로만 `IEnumerator.MoveNext()`를 끝까지 직접 돌려서 저장이 확실히 끝나게 함. (로컬 저장 기준 안전 — 서버 구현체로 바뀌면 응답을 못 기다리고 끊길 수 있는데, 그건 그때 "종료 직전 저장을 어떻게 보장할지" product 차원에서 다시 봐야 함.)
-- **자동저장 체크포인트**: 종료/일시정지, 스테이지 전환 완료, 업그레이드, 스킬 학습/장착. 주기적(타이머) 자동저장은 의도적으로 안 둠.
+- **자동저장 체크포인트**: 종료/일시정지, 스테이지 입장(전환 가운데, 게임 시작 제외), 업그레이드, 스킬 학습/장착. 주기적(타이머) 자동저장은 의도적으로 안 둠.
 - **스테이지 중간 진행도(인카운터 진행 수)는 저장 안 함** — 의도된 범위 제한. 저장된 스테이지 번호로 복귀하면 그 스테이지를 처음부터(인카운터 1부터) 다시 시작한다. 전투 중 HP/몬스터 상태까지 직렬화하려면 전투원/스포너 상태까지 손대야 해서 범위 밖으로 뺌.
 - 세이브 파일 경로: `C:\Users\<user>\AppData\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`
 - **에디터 검증용 세이브 프로필**(`SaveProfile`, `Assets/Scripts/Player/SaveProfile.cs`): 에디터에서만 켤 수 있고, 켜면 세이브 폴더가 `persistentDataPath/profiles/<이름>/`로 바뀐다(형식과 저장 코드는 같음). 값은 `SessionState`라 에디터를 끄면 기본으로 돌아오고, 플레이 중에는 바꿀 수 없다. 메뉴는 `IdleGame/Save Profile/...`, `IdleGame/Reset Save Data`는 지금 켜진 프로필의 세이브를 지운다. 빌드에는 프로필 코드가 없어서 항상 기본 경로를 쓴다.
@@ -140,7 +154,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 - **에디터와 개발 빌드에만 있다.** 어셈블리 `IdleGameProtoType.DevTools`(`Assets/Scripts/DevTools/`)의 define constraint가 `UNITY_EDITOR || DEVELOPMENT_BUILD`라 릴리스 빌드에서는 컴파일되지 않는다. 게임 코드는 도구를 모른다(도구가 `GameInitializer.Initialized`에 붙는다). **게임 어셈블리에서 DevTools를 참조하지 말 것**(릴리스 빌드가 깨진다).
 - 화면 오른쪽 위(골드 아래)의 `DEV` 버튼 또는 에디터의 `` ` `` 키로 연다. 패널은 IMGUI다(에셋을 가질 수 없어서 "새 팝업은 UIWindow" 규칙의 예외). 열려 있는 동안 게임 UI 입력은 `InputBlocker`로 막는다.
-- 명령: 스테이지 이동·처음부터·보스전, 골드 x10·경험치 +1레벨분, 레벨 지정, 백업·복원·새로 시작, 배속 x1~x10, 판정 몸 표시. 코드에서는 `DevTools.Commands`(Claude가 플레이 중 `script eval`로 쓸 수 있다).
+- 명령: 스테이지 이동·처음부터·보스 도전(버튼과 같은 명령이라 도전 가능할 때만, D27), 골드 x10·경험치 +1레벨분, 레벨 지정, 백업·복원·새로 시작, 배속 x1~x10, 판정 몸 표시. 스테이지 명령은 흐름(`EncounterDirector`)의 명령을 그대로 부른다. 코드에서는 `DevTools.Commands`(Claude가 플레이 중 `script eval`로 쓸 수 있다).
 - **개발 도구 전용 게임 API를 만들지 않는다.** 더하는 명령은 보상 경로(`Wallet.AddGold`, `PlayerStats.AddExp`), 통째로 바꾸는 명령은 `GameManager.LoadSnapshot` 하나를 지난다. 덮어쓰기 전에는 `<세이브 폴더>/dev_backups/`에 자동 백업하고, 백업이 실패하면 덮어쓰지 않는다.
 
 ## 작업 시 주의사항

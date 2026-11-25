@@ -148,6 +148,7 @@ Q3. 다른 상태들로부터 계산되나?                            예 → �
 - **파생 상태의 위치:** 게임 규칙(레벨업 가능, 구매 가능, 해금)은 모델/게임 서비스에, 표시용 가공(`"EXP 45.20%"`, `"1.2K"`)은 Presenter에.
 - **상태와 사건을 겸하던 이벤트는 둘로 나눈다.** `OnLevelUp` → `Level` + `LevelReached`, `OnStageChanged` → `CurrentStageNumber` + `StageChanged`.
 - **재분류: 보스 도전 가능.** 지금은 `OnBossChallengeAvailable` 사건이지만 "지금 도전 가능한가?"에 답이 있으므로 상태다(`StageManager.BossAvailable`이 이미 존재). 버튼은 `BossAvailable && !보스전 중`을 구독해 켜지고 꺼지기만 하며, 클릭 시 스스로 `Hide()`하던 코드가 사라진다.
+  - **구현(2026-11-25, 전투 4-A):** 주인은 흐름(`EncounterDirector.BossChallengeAvailable`)이다. 도전을 받는 순간, 전환이 시작될 때, 스테이지에 들어갈 때 꺼지므로 "보스전 중"을 따로 볼 필요가 없다. 버튼은 View + Presenter(`BossChallengePresenter`)이고 누르면 명령(`RequestBossChallenge`)의 결과를 받는다([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10절).
 - **적용 경계:** 시스템 경계를 넘는 알림(모델 → UI, `GlobalGameEvents`/`GlobalCombatEvents` 이벤트 버스)은 전부 이 타입들로 통일한다. 한 오브젝트 안의 내부 신호(애니메이션 이벤트 `OnHitEvent` 등)는 C# 이벤트로 둔다.
 - **정적 버스에는 사건만 둔다. 상태는 그 상태의 주인이 `ReactiveProperty`로 갖는다.** 정적 버스에 상태를 두면 어디서든 읽고 쓰는 전역 변수가 되어 정적의 단점이 커진다. 현재 버스 항목의 분류:
 
@@ -155,8 +156,10 @@ Q3. 다른 상태들로부터 계산되나?                            예 → �
   |---|---|---|
   | `OnMonsterDied`, `OnAnyTargetDamaged`, `OnHealed`, `OnBossKilled`, `OnStageCleared`, `OnPlayerDied`, `OnStageChanged`(전환 순간) | 사건 | 버스에 `Subject`로 (이름은 과거형: `MonsterDied` 등) |
   | `OnScrollChanged(bool)` | 상태 | `GameManager.IsScrolling` → `ReactiveProperty` |
-  | `OnBossChallengeAvailable` | 상태 | `StageManager.BossAvailable` → `ReactiveProperty` |
-  | `OnGameStarted` | 판단 보류 | GameInitializer가 생성 순서를 정하면 UI가 준비된 뒤 게임이 시작되므로 불필요해질 수 있음. 구현 때 판단 |
+  | `OnBossChallengeAvailable` | 상태 | `StageManager.BossAvailable` → `ReactiveProperty` (4-A: `EncounterDirector.BossChallengeAvailable`) |
+  | `OnGameStarted` | **없앰(4-A)** | GameInitializer가 모든 구독을 연결한 뒤 흐름을 시작(`director.Begin`)해서 처음 값이 반응형으로 전달된다. HUD는 조립 끝에 `UIRoot`가 켠다 |
+
+  4-A 결과: 흐름 쪽 항목(`OnBossKilled`, `OnStageCleared`, `OnPlayerDied`, `OnStageChanged`)은 버스로 옮기지 않고 없앴다. 흐름이 지난 단계의 결과를 월드에 직접 묻고(처치, 전멸), 스테이지는 `EncounterDirector`의 상태(`CurrentStageNumber`)와 사건(`StageEntered`)이 됐다. `GlobalGameEvents`는 삭제했다. `GlobalCombatEvents`의 `Subject`화는 4-B다.
 
 - **정적 이벤트 버스는 원칙의 예외로 유지한다.** "예외"는 접근 방식(주입 대신 정적)에 대한 것이고, 알림 수단은 다른 경계 알림과 같이 반응형(`Subject`)이다. `GlobalGameEvents`/`GlobalCombatEvents`는 GameInitializer가 넘겨주는 대신 정적으로 남긴다(풀에서 생성되는 몬스터까지 참조를 넘기는 비용 대비 얻는 것이 적다). 대신 `[RuntimeInitializeOnLoadMethod]`로 플레이 시작 시 구독자를 비운다. 도메인 리로드를 끄면(Enter Play Mode Options) 정적 상태가 플레이 세션 사이에 남아, 지난 플레이의 파괴된 구독자에게 알림이 가기 때문이다. 현재 프로젝트 설정은 도메인 리로드를 하므로 지금은 안전하지만 설정이 바뀌어도 안전하게 해 둔다.
 

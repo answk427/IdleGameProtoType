@@ -42,6 +42,7 @@
 - **전투 2단계: 전투원 통합 (2026-11-24):** 플레이어·일반 몬스터·보스가 `Combatant`(순수 C#) 하나이고, 차이는 데이터다(일반 몬스터의 공격도 엑셀만으로 켠다). 판정은 표면 거리 하나, 대상은 앞뒤 무관. HP·데미지 `GameNumber`, 전투 중 할당 0(테스트), 상태 객체 제거. 엑셀 캐릭터 시트(사거리, 이동 속도)와 몬스터 `movePolicy` 열을 더했고, 엑셀을 고치지 않고 값을 바꿔 보는 튜닝 덮어쓰기(`IdleGame/Data/Tuning Overrides`)와 데이터·프리팹 짝 검사를 만들었다. 일반 전투와 BossSlime의 처치·타격 시각이 1단계와 비트 단위로 같다. 결과는 [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 8-11.
 - **전투 3단계: 공간 모델 (2026-11-25):** 플레이어가 월드에서 실제로 전진하고 카메라가 따라간다. 시체·동전·이펙트는 아무 처리 없이 화면에서 지나간다. 이동은 sweep 하나(전진·접근 공통), 인카운터마다 원점 재설정(1시간 달려도 좌표 10 이하), 보스 이동 속도와 스폰 거리는 엑셀 데이터(`moveSpeed`, `spawnDistance`). 스크롤 개념을 지웠다. 결과는 [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 9-7.
 - **개발자 도구 (2026-11-25):** 에디터와 개발 빌드에만 있는 패널(스테이지 이동, 보스전, 골드·경험치, 레벨 지정, 백업·복원·새로 시작, 배속, 판정 몸 표시). 릴리스 빌드에는 어셈블리째 없다. 흐름 입구를 `GameManager.RestartAt` 하나로 합쳤고(사망·클리어·이동), 실행 중 진행도 교체(`LoadSnapshot`, 서버 롤백이 쓸 길)를 만들면서 교체 뒤 HUD·캐릭터 능력치가 옛 값으로 남던 빈틈(`OnReloaded`)을 고쳤다. 검증은 사용자 에디터를 닫지 않고 검증용 사본 프로젝트에서 했다(CLAUDE.md "외부 도구"). 결과는 [DEV_TOOLS.md](DEV_TOOLS.md) 7절.
+- **전투 4-A: 흐름 (2026-11-25):** 인카운터·보스·스테이지 흐름이 `EncounterDirector`(순수 C#, 고정 단계 ①) 한 곳에 있다. `StageManager`, `GlobalGameEvents`, `GameManager`의 흐름 코루틴을 지웠다. 보스 버튼과 스테이지 안내는 View + Presenter로 흐름의 상태를 구독하고(버튼이 상태와 어긋나던 버그 해결), 스테이지 전환이 시뮬레이션 시간이라 프레임률과 무관하게 결정적이다(전에는 페이드가 화면 시간이라 전환 뒤가 갈렸다). 흐름 시간은 데이터(`BalanceConfig`), 보스전 제한 시간 열(`bossTimeLimit`, 지금 모두 0), 진전 감시 경고를 더했다. 측정 중 시뮬레이션 단계 길이가 0.0199999921이던 것을 찾아 0.02로 고쳤다. 결과는 [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10-9.
 - **옛 브랜치 `UIManager_improvement`는 병합하지 않기로 결정:** `.gitignore` 규칙, `BalanceConfig`, 코드리뷰/백로그의 유효 항목만 옮겼다. UIRegistry와 Canvas 정리는 UI_DESIGN이 대체, SingletonBehaviour는 보류(아래 "코드 품질"). 집 PC에만 남은 그 브랜치의 커밋 4개와 stash는 **이어가는 데 필요 없다.**
 
 ### 4. 다음 작업 (2026-11-24 순서 확정)
@@ -54,7 +55,7 @@
 | ~~2~~ | ~~전투 2단계: 전투원 통합~~ | | **완료 2026-11-24** (위 "완료된 것") |
 | ~~3~~ | ~~전투 3단계: 공간 모델~~ | | **완료 2026-11-25** (위 "완료된 것") |
 | ~~3.5~~ | ~~개발자 도구~~ | | **완료 2026-11-25** (위 "완료된 것") |
-| 4 | 전투 4단계: 흐름(EncounterDirector) + HUD·보스 버튼·StageAnnouncement 이관 | 상세 설계 | 5절 검증 통과, 모델(레벨, 경험치, 골드, 보스 가능)과 이벤트 버스가 반응형, `UIManager`의 HUD 역할 제거 |
+| 4 | 전투 4단계: 흐름(EncounterDirector) + HUD·보스 버튼·StageAnnouncement 이관 | 설계 승인(2026-11-25, [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10절, D22~D28). **4-A(흐름) 완료**(위 "완료된 것"), **4-B(진행도 표시) 남음**: `PlayerStats`·`GoldWallet` 반응형, `PlayerHud` Presenter(보스 남은 시간 포함), HUD 정렬, `GlobalCombatEvents`의 `Subject`화, `OnReloaded` 제거(10-5, 10-8) | 5절 검증 통과, 모델(레벨, 경험치, 골드, 보스 가능)과 이벤트 버스가 반응형, `UIManager`의 HUD 역할 제거 |
 | 5 | 세이브 오류 창 | [보완안](UI_REDESIGN_PROPOSAL.md)의 B8(스택 삽입 순서), B9(로드 실패 시 UIRoot 준비) 승인 | 닫히지 않고 탭바를 막으며, 종료해도 세이브 바이트 동일 |
 | 6 | 탭 2개 이관(여기서 UI 1차 끝) | - | `WindowOptions`에 Exclusive 추가, `UIRoot`의 탭 연결 제거, 기존과 동작 동일, `UIManager` 삭제 |
 | 7 | UI 2차(서비스) | UI_DESIGN 9장 | |
@@ -73,6 +74,7 @@
 - **BossUndead(2002) HP 1000 → 10000**을 반영할지. `origin/UIManager_improvement`의 `3c15d5e`에 섞여 있어 일부러 가져오지 않았다.
 - **(WebGL 데모를 낼 때) 웹에서 체크포인트 사이 진행 유실**을 어떻게 막을지. "주기적 자동저장은 두지 않는다"는 기존 결정(CLAUDE.md)과 부딪힐 수 있다.
 - **실패 중인 EditMode 테스트 2개**를 고칠지 지울지(아래 "테스트").
+- **보스전 제한 시간 값(D25).** 구조는 들어가 있고(엑셀 `StageDatabase.bossTimeLimit`, 0 = 없음) 지금 모든 스테이지가 0이다. 몇 초로 할지, 넘겼을 때 지금처럼 스테이지를 처음부터 할지는 게임 디자인 결정이다. 0이면 보스전이 끝난다는 보장이 없다(보스 회복이 플레이어 피해를 넘으면 계속된다).
 - **Android 렌더 프레임률을 올릴지.** 코드에 `Application.targetFrameRate` 설정이 없어 Unity 모바일 기본값(30fps로 알고 있음, 기기에서 미측정)으로 그린다. 이 상태에서 S24 화면의 움직임은 매끄럽다(사용자 확인, 2026-11-23). 60/120으로 올릴지는 배터리와의 선택.
 - **에디터에서 직접 플레이한 눈 확인.** 업그레이드 비용, 골드 HUD, 스킬 창은 Claude가 WebGL 화면으로만 봤다(Android에서는 첫 빌드가 실행돼 전투, HUD, 탭바가 도는 것까지만 확인).
 
@@ -82,10 +84,9 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 
 ## UI
 
-- **`BossChallengeButton` ↔ `GameManager` 양방향 참조 정리**
-  버튼이 스스로 `Hide()`하고 `GameManager.EnterBossBattle()`을 직접 호출한다. UI와 게임 루프가 서로를 알고 있는 관계.
-  UI 구조 정리(패널 종류/스택)와 성격이 달라서 분리함. 이벤트 기반으로 바꾸는 방향 검토.
-  **버그(재현됨):** 보스 도전 가능 상태에서 죽으면 `BossAvailable`은 false가 되는데 버튼은 남고, `EnterBossBattle()`도 가능 여부를 검사하지 않는다. 개발자 도구로 스테이지를 옮기거나 진행도를 바꿔도 같은 이유로 버튼이 남는다. UI_DESIGN 5-3의 `BossAvailable` 상태 전환 때 해결.
+- **(해결, 2026-11-25) `BossChallengeButton` ↔ `GameManager` 양방향 참조, 버튼이 상태와 어긋나는 버그.**
+  예전에는 버튼이 스스로 `Hide()`하고 `GameManager.EnterBossBattle()`을 직접 불렀고, 도전 가능 상태에서 죽거나 개발자 도구로 옮기면 버튼이 남아 누르면 보스전이 시작됐다.
+  전투 4-A에서 버튼은 View + Presenter가 됐다: 보이기는 흐름의 상태(`EncounterDirector.BossChallengeAvailable`) 하나가 정하고, 누르면 명령(`RequestBossChallenge`)이 받을 수 있는지 검사해 결과를 돌려준다. 회귀 테스트 `EncounterDirectorTests.BossChallengeAvailable_ThenWipe_TurnsOffAndRejectsRequest`([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10-9).
 
 - **탭 잠금 규칙이 `TabBarController`에만 있음**
   잠금 상태(`isUnlocked`)를 탭 바가 들고 있어서, 코드에서 `UIManager.ShowUI<탭패널>()`을 직접 부르면 잠금을 우회한다.
@@ -162,7 +163,7 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 
 - **손상된 세이브의 복구 수단 없음**
   손상을 감지해 멈추기만 하면 사용자는 게임을 계속할 방법이 없다. 백업으로 복구하거나, 명시적으로 확인받은 뒤 새로 시작하는 선택지가 필요하다.
-  씬을 다시 로드하는 방식으로 만든다면 주의: 시작에 실패한 씬을 재로드하면 파괴된 `PlayerHud`가 `OnGameStarted` 구독에 남아 다음 시작을 예외로 끊는 현상이 간헐적으로 재현됐다(원인은 확정하지 못함. 지금 게임은 씬을 재로드하지 않음).
+  씬을 다시 로드하는 방식으로 만든다면 주의: 시작에 실패한 씬을 재로드하면 파괴된 `PlayerHud`가 `OnGameStarted` 구독에 남아 다음 시작을 예외로 끊는 현상이 간헐적으로 재현됐다(원인은 확정하지 못함. 지금 게임은 씬을 재로드하지 않음). 전투 4-A에서 `OnGameStarted`(정적 사건)를 없애 이 경로는 사라졌다. 남은 정적 버스 `GlobalCombatEvents`는 4-B에서 플레이 시작 때 구독자를 비운다.
 
 - **클라우드 세이브 / 기기 이전 없음**
   저장 구현체가 로컬 파일뿐이라 재설치나 기기 변경 때 진행도를 잃는다. SERVER_DESIGN의 `ServerSaveStorage`는 업로드와 이상치 검사까지만 정해져 있고, 새 기기로 내려받는 흐름은 없다.
@@ -214,7 +215,7 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 2026-09 코드리뷰에서 미해결이던 항목 중 2026-11-22에 현재 코드에서 다시 확인한 것.
 
 - **개발용 로그가 상시 출력됨**
-  `PlayerHud.UpdateExpBar`는 경험치가 바뀔 때마다 2줄을 찍는다. `PlayerStats`(레벨업, 업그레이드, 학습), `GameManager`(보스전 시작)도 릴리스에 그대로 남는다.
+  `PlayerHud.UpdateExpBar`는 경험치가 바뀔 때마다 2줄을 찍는다. `PlayerStats`(레벨업, 업그레이드, 학습), `GameManager`(스테이지 입장)도 릴리스에 그대로 남는다.
 
 - **`CombatEffectManager` 책임 과다**
   데미지 텍스트, 파티클, 보상 드랍, VFX, 임시 스프라이트 생성을 한 클래스가 한다. 임시 스프라이트는 지금 실제로 쓰이는 경로라, 아트를 연결하기 전에는 지우면 안 된다.

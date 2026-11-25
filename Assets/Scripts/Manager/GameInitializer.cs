@@ -5,9 +5,10 @@ using UnityEngine;
 //   1. 세이브 로드 (실패하면 여기서 중단)
 //   2. GameSession 생성 + 세이브 적용(Apply)
 //   3. 플레이어 캐릭터 스폰 + 진행도 주입
-//   4. GameManager에 세션과 캐릭터를 넘겨 게임 루프 시작
-//   5. CombatSimulation에 캐릭터를 넘겨 고정 단계 전투 시작
-//   6. UIRoot에 세션과 서비스를 넘겨 UI 조립
+//   4. CombatSimulation: 전투 월드와 흐름(EncounterDirector) 생성
+//   5. GameManager(저장, 보상), 배경, UIRoot가 흐름과 진행도를 구독
+//   6. 흐름 시작(director.Begin). 모든 구독이 연결된 뒤라 처음 값(스테이지 번호 등)이 반응형으로 전달되므로
+//      예전의 "게임 시작" 사건(OnGameStarted)이 필요 없다(docs/COMBAT_ARCHITECTURE.md 10-5).
 //
 // 예전에는 이 순서가 여러 Awake/Start에 흩어진 암묵 규칙이었다(캐릭터 Awake가 세이브를 읽고,
 // GameManager.Start가 그 캐릭터에서 골드/스테이지를 꺼내 썼다). 이제 순서를 이 한 곳에서 읽을 수 있다.
@@ -26,6 +27,7 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] private PlayerSpawner playerSpawner;
     [SerializeField] private GameManager gameManager;
     [SerializeField] private CombatSimulation combatSimulation;
+    [SerializeField] private BackgroundScroller background;
     [SerializeField] private UIRoot uiRoot;
 
     public GameSession Session { get; private set; }
@@ -71,9 +73,24 @@ public class GameInitializer : MonoBehaviour
         }
 
         player.Initialize(Session.Stats, playerSpawner.Character);
-        gameManager.Initialize(Session, player);
-        combatSimulation.Initialize(player);
-        uiRoot.Initialize(Session, GameDatabaseManager.Instance.GetAllSkills(), player);
+
+        // 저장된 스테이지가 데이터에 없으면 시작하지 않는다(세이브는 그대로 남는다).
+        GameDatabaseManager database = GameDatabaseManager.Instance;
+        StageData FindStage(int stageNumber) => database.GetStage(stageNumber)?.data;
+        if (FindStage(Session.CurrentStageNumber) == null)
+        {
+            Debug.LogError($"[GameInitializer] 저장된 스테이지 {Session.CurrentStageNumber}가 StageDatabase에 없어 게임을 시작하지 않습니다(세이브 보존).");
+            return;
+        }
+
+        combatSimulation.Initialize(player, FindStage, FlowTimings.From(database.Balance));
+        EncounterDirector director = combatSimulation.Director;
+
+        gameManager.Initialize(Session, player, director);
+        background.Bind(director.CurrentStageNumber);
+        uiRoot.Initialize(Session, database.GetAllSkills(), player, director);
+
+        director.Begin(Session.CurrentStageNumber);
 
         Player = player;
         IsInitialized = true;
@@ -87,11 +104,12 @@ public class GameInitializer : MonoBehaviour
         if (upgradeConfig == null) { Debug.LogError("[GameInitializer] upgradeConfig(PlayerUpgradeConfig)가 연결되지 않았습니다."); ok = false; }
         if (playerSpawner == null) { Debug.LogError("[GameInitializer] playerSpawner가 연결되지 않았습니다."); ok = false; }
         if (gameManager == null) { Debug.LogError("[GameInitializer] gameManager가 연결되지 않았습니다."); ok = false; }
+        if (background == null) { Debug.LogError("[GameInitializer] background(BackgroundScroller)가 연결되지 않았습니다."); ok = false; }
         if (uiRoot == null) { Debug.LogError("[GameInitializer] uiRoot가 연결되지 않았습니다."); ok = false; }
         if (combatSimulation == null) { Debug.LogError("[GameInitializer] combatSimulation이 연결되지 않았습니다."); ok = false; }
         else if (!combatSimulation.ValidateReferences()) ok = false;
 
-        // BalanceConfig는 첫 스폰 때에야 쓰인다. 여기서 막지 않으면 게임이 시작된 뒤 스폰 루프만 예외로 멈춘다.
+        // BalanceConfig(흐름 시간, 성장 곡선)가 없으면 흐름을 만들 수 없다. 여기서 막아 원인을 바로 보이게 한다.
         GameDatabaseManager database = GameDatabaseManager.Instance;
         if (database == null) { Debug.LogError("[GameInitializer] 씬에 GameDatabaseManager가 없습니다."); ok = false; }
         else if (!database.HasBalanceConfig) { Debug.LogError("[GameInitializer] GameDatabaseManager에 balanceConfig(BalanceConfig)가 연결되지 않았습니다."); ok = false; }

@@ -1,152 +1,60 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 
-// 인카운터·보스 스폰과 정리. 스폰한 몬스터의 전투원은 전투 월드(CombatWorld)에 등록하고, 정리할 때 뺀다.
-// 대상 찾기와 범위 판정은 여기가 아니라 CombatWorld의 규칙 하나가 한다(docs/COMBAT_ARCHITECTURE.md 8-4).
-// 스폰 위치는 대열 앞장(플레이어) 기준의 게임 데이터다(스테이지 표 spawnDistance, monsterSpacing, 9-3).
-// 스폰하기 전에 원점을 앞장 근처로 재설정해서 좌표가 커지지 않게 한다(D16).
-
-public class MonsterSpawner : MonoBehaviour
+// 흐름의 뷰(IEncounterHost, docs/COMBAT_ARCHITECTURE.md 10-3). 무엇을, 몇 마리, 어디에, 언제 스폰할지는
+// EncounterDirector가 정하고, 여기는 그 결정을 화면의 객체로 만든다: 풀에서 꺼내 바닥 높이에 세우고 능력치를 넣는다.
+// 월드 등록·해제, 스폰 위치, 원점 재설정은 디렉터가 한다(예전에는 여기 있었다).
+public class MonsterSpawner : MonoBehaviour, IEncounterHost
 {
-    [SerializeField] private GameObject fallbackMonsterPrefab;
+    [Tooltip("보스를 둘 부모(일반 몬스터는 부모 없이 둔다)")]
     [SerializeField] private Transform spawnRoot;
 
-    private readonly List<Monster> activeMonsters = new List<Monster>();
-    private CombatWorld world;
-
-    public IReadOnlyList<Monster> ActiveMonsters => activeMonsters;
-
-    // CombatSimulation.Initialize가 연결한다. 그 전에는 스폰하지 않는다.
-    public void Attach(CombatWorld combatWorld) => world = combatWorld;
-
-    public List<Monster> SpawnEncounter(StageData stage)
+    public Combatant Spawn(int monsterId, StageData stage, float pivotX, bool isBoss)
     {
-        ClearEncounter();
-
-        if (stage == null)
+        MonsterEntry entry = GameDatabaseManager.Instance.GetMonster(monsterId);
+        if (entry == null || entry.data == null)
         {
-            Debug.LogError("MonsterSpawner needs a StageData.");
-            return new List<Monster>();
-        }
-
-        int monsterId = stage.NormalMonsterId;
-        MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
-        if (monsterEntry == null || monsterEntry.data == null)
-        {
-            Debug.LogError($"MonsterData is Not Found. monsterId:{monsterId}");
-            return new List<Monster>();
-        }
-
-        MonsterData monsterData = monsterEntry.data;
-        GameObject monsterPrefab = monsterEntry.prefab;
-        if (monsterPrefab == null)
-        {
-            Debug.LogError($"MonsterSpawner needs a monster prefab. monsterID:{monsterId}, monsterName:{monsterData.MonsterName}");
-            return new List<Monster>();
-        }
-
-        if (!TryPrepareSpawn(stage, out float firstX)) return new List<Monster>();
-        Vector3 basePosition = new Vector3(firstX, GetGroundY(0f) + monsterEntry.groundOffset, 0f);
-
-        for (int i = 0; i < stage.MonstersPerEncounter; i++)
-        {
-            Vector3 spawnPosition = basePosition + Vector3.right * stage.MonsterSpacing * i;
-            Monster monster = SpawnMonster(monsterData, stage, monsterPrefab, spawnPosition, null, false);
-            if (monster != null) activeMonsters.Add(monster);
-        }
-
-        return activeMonsters;
-    }
-
-    public void ClearEncounter()
-    {
-        for (int i = activeMonsters.Count - 1; i >= 0; i--)
-        {
-            Monster monster = activeMonsters[i];
-            if (monster == null) continue;
-
-            world?.Remove(monster.Combatant);
-            PoolManager.Instance.Despawn(monster.OriginPrefab, monster.gameObject);
-        }
-        activeMonsters.Clear();
-    }
-
-    public bool AllDie()
-    {
-        for (int i = 0; i < activeMonsters.Count; i++)
-        {
-            if (activeMonsters[i].IsAlive) return false;
-        }
-        return true;
-    }
-
-    // parent: 일반 몬스터는 부모 없이(예전과 같음), 보스는 spawnRoot 아래에 둔다.
-    private Monster SpawnMonster(MonsterData monsterData, StageData stageData, GameObject monsterPrefab, Vector3 spawnPosition, Transform parent, bool isBoss)
-    {
-        if (world == null)
-        {
-            Debug.LogError("[MonsterSpawner] 전투 월드가 연결되지 않아 스폰하지 않습니다(CombatSimulation.Initialize 전).");
+            Debug.LogError($"[MonsterSpawner] 몬스터 {monsterId}가 MonsterDatabase에 없습니다(스테이지 {stage.StageNumber}).");
             return null;
         }
 
-        GameObject monsterObject = PoolManager.Instance.Spawn(monsterPrefab, spawnPosition, Quaternion.identity, parent);
-        if (!monsterObject.TryGetComponent(out Monster monster))
+        GameObject prefab = entry.prefab;
+        if (prefab == null)
         {
-            Debug.LogError($"[MonsterSpawner] {monsterPrefab.name} 프리팹에 Monster 컴포넌트가 없습니다.");
-            PoolManager.Instance.Despawn(monsterPrefab, monsterObject);
+            Debug.LogError($"[MonsterSpawner] 몬스터 {monsterId}({entry.data.MonsterName})의 프리팹이 없습니다.");
             return null;
         }
 
-        monster.OriginPrefab = monsterPrefab;
-        CalcStageMultiplier(stageData, out double hpMult, out double dmgMult, out double goldMult);
-        monster.Spawn(monsterData, hpMult, dmgMult, goldMult, isBoss);
-        world.Add(monster.Combatant);
-        return monster;
-    }
-
-    public Monster SpawnBoss(StageData stage)
-    {
-        ClearEncounter();
-
-        MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(stage.BossMonsterId);
-        if (bossEntry == null || bossEntry.data == null)
+        var position = new Vector3(pivotX, GetGroundY(0f) + entry.groundOffset, 0f);
+        GameObject instance = PoolManager.Instance.Spawn(prefab, position, Quaternion.identity, isBoss ? spawnRoot : null);
+        if (!instance.TryGetComponent(out Monster monster))
         {
-            Debug.LogError($"BossMonsterData is not found, stageNumber:{stage.StageNumber}");
+            Debug.LogError($"[MonsterSpawner] {prefab.name} 프리팹에 Monster 컴포넌트가 없습니다.");
+            PoolManager.Instance.Despawn(prefab, instance);
             return null;
         }
-
-        GameObject bossPrefab = bossEntry.prefab;
-        if (bossPrefab == null)
-        {
-            Debug.LogError($"MonsterSpawner needs a boss prefab. bossID:{stage.BossMonsterId}");
-            return null;
-        }
-
-        if (!TryPrepareSpawn(stage, out float firstX)) return null;
-        Vector3 spawnPosition = new Vector3(firstX, GetGroundY(0f) + bossEntry.groundOffset, 0f);
 
         // 보스와 일반 몬스터는 같은 Monster다. 차이는 데이터(스킬, 이동 정책, 공격)와 처치 알림용 역할뿐이다.
-        Monster boss = SpawnMonster(bossEntry.data, stage, bossPrefab, spawnPosition, spawnRoot, true);
-        if (boss != null) activeMonsters.Add(boss);
-        return boss;
+        monster.OriginPrefab = prefab;
+        CalcStageMultiplier(stage, out double hpMult, out double dmgMult, out double goldMult);
+        monster.Spawn(entry.data, hpMult, dmgMult, goldMult, isBoss);
+        return monster.Combatant;
     }
 
-    // 원점을 대열 앞장 근처로 재설정하고(D16), 첫 몬스터의 피벗 x = 앞장 몸 중심 + spawnDistance(D18)를 돌려준다.
-    // 고정 단계 밖(스폰 루프의 WaitForFixedUpdate 뒤)에서 불린다.
-    private bool TryPrepareSpawn(StageData stage, out float firstX)
+    public void Despawn(Combatant combatant)
     {
-        firstX = 0f;
-        Combatant lead = world?.LeadAlly;
-        if (lead == null)
-        {
-            Debug.LogError("[MonsterSpawner] 대열 앞장(플레이어)이 전투 월드에 없어 스폰 위치를 정할 수 없습니다.");
-            return false;
-        }
+        if (combatant?.Host is Monster monster && monster != null)
+            PoolManager.Instance.Despawn(monster.OriginPrefab, monster.gameObject);
+    }
 
-        world.RecenterOn(lead);
-        firstX = lead.X + stage.SpawnDistance;
-        return true;
+    // 스테이지를 떠날 때 그 스테이지 몬스터의 풀을 비운다.
+    public void ReleaseStage(StageData stage)
+    {
+        foreach (int monsterId in new[] { stage.NormalMonsterId, stage.BossMonsterId })
+        {
+            MonsterEntry entry = GameDatabaseManager.Instance.GetMonster(monsterId);
+            if (entry?.prefab != null) PoolManager.Instance.ClearPool(entry.prefab);
+        }
     }
 
     // 항상 바닥(GroundY)에 붙어있는 것처럼 보이도록 고정 Y를 반환.

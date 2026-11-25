@@ -3,7 +3,7 @@
 // 몬스터의 호스트. 일반 몬스터와 보스가 모두 이 클래스다(docs/COMBAT_ARCHITECTURE.md 8-3).
 // 전투 규칙은 Combatant가 갖고, 둘의 차이는 데이터다:
 //   공격 간격 > 0이면 기본 공격, skillId가 있으면 스킬, movePolicy가 Approach면 자기 이동 속도(moveSpeed)로 다가온다.
-// 보스인지는 스폰할 때 정하는 역할이고, 처치 알림(BossKilled)에만 쓴다.
+// 보스인지는 스폰할 때 정하는 역할이다(흐름이 어느 전투원이 보스인지 안다).
 public class Monster : CombatantHost
 {
     [SerializeField] private FloatingHpBar hpBar;
@@ -69,7 +69,7 @@ public class Monster : CombatantHost
         if (hpBar != null) hpBar.gameObject.SetActive(false);
 
         // 골드/경험치 지급은 GlobalCombatEvents.OnMonsterDied 구독자(GameManager)가 처리한다.
+        // 보스 처치(스테이지 클리어)는 알리지 않는다: 흐름(EncounterDirector)이 다음 단계 ①에서 월드에 묻는다.
         GlobalCombatEvents.TriggerMonsterDied(this, goldReward, transform.position);
-        if (isBoss) GlobalGameEvents.TriggerBossKilled();
     }
 }

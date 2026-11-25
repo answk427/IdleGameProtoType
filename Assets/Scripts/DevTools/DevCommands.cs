@@ -15,12 +15,14 @@ public sealed class DevCommands
 
     private readonly GameSession session;
     private readonly GameManager game;
+    private readonly EncounterDirector flow;
     private readonly DevBackupStore backups;
 
-    public DevCommands(GameSession session, GameManager game, DevBackupStore backups)
+    public DevCommands(GameSession session, GameManager game, EncounterDirector flow, DevBackupStore backups)
     {
         this.session = session ?? throw new ArgumentNullException(nameof(session));
         this.game = game != null ? game : throw new ArgumentNullException(nameof(game));
+        this.flow = flow ?? throw new ArgumentNullException(nameof(flow));
         this.backups = backups ?? throw new ArgumentNullException(nameof(backups));
     }
 
@@ -29,23 +31,41 @@ public sealed class DevCommands
 
     public GameSession Session => session;
     public DevBackupStore Backups => backups;
-    public bool IsBusy => game.IsTransitioning;
+    public bool IsBusy => flow.Phase.Value == FlowPhase.Transition;
+    public FlowPhase Phase => flow.Phase.Value;
 
-    // ── 스테이지 ──────────────────────────────────────────
+    // ── 스테이지 (흐름의 명령을 그대로 부른다, 실행은 다음 고정 단계) ──
 
-    public int CurrentStage => session.CurrentStageNumber;
+    // 지금 플레이 중인 스테이지(흐름 기준). 진행도 교체 직후 전환 가운데까지는 세션의 스테이지 번호와 다를 수 있다.
+    public int CurrentStage => flow.CurrentStageNumber.Value;
 
-    public bool GoToStage(int stageNumber) =>
-        Report(game.RestartAt(stageNumber), $"스테이지 {stageNumber} 시작", $"스테이지 {stageNumber}로 갈 수 없습니다(전환 중이거나 없는 스테이지).");
+    public bool GoToStage(int stageNumber)
+    {
+        RestartResult result = flow.RestartAt(stageNumber);
+        return Report(result == RestartResult.Accepted, $"스테이지 {stageNumber} 시작",
+            result == RestartResult.NoSuchStage ? $"스테이지 {stageNumber}가 없습니다." : "스테이지 전환 중입니다. 끝난 뒤 다시 하세요.");
+    }
 
     public bool RestartStage() => GoToStage(CurrentStage);
 
-    // 보스 도전 버튼이 부르는 입구와 같다. 인카운터를 다 깼는지는 보지 않는다(개발용으로 바로 보스를 본다).
-    public bool StartBoss()
+    // 보스 도전 버튼과 같은 명령이다(D27): 인카운터를 다 깨서 도전 가능할 때만 받는다.
+    // 개발 도구 전용 입구("보스부터 시작")를 만들지 않는다. 빨리 보려면 배속을 올린다.
+    public bool ChallengeBoss()
     {
-        if (IsBusy) return Report(false, "", "스테이지 전환 중입니다.");
-        game.EnterBossBattle();
-        return Report(true, $"스테이지 {CurrentStage} 보스전 시작", "");
+        switch (flow.RequestBossChallenge())
+        {
+            case BossChallengeResult.Accepted:
+                return Report(true, $"스테이지 {CurrentStage} 보스 도전", "");
+            case BossChallengeResult.NotAvailable:
+                if (flow.Phase.Value == FlowPhase.BossIntro || flow.Phase.Value == FlowPhase.Boss)
+                    return Report(false, "", "이미 보스전입니다.");
+                int needed = flow.Stage != null ? flow.Stage.EncountersToComplete : 0;
+                if (flow.EncountersCleared >= needed)
+                    return Report(false, "", "보스 도전을 이미 받았습니다(다음 단계에 시작).");
+                return Report(false, "", $"아직 보스 도전 가능이 아닙니다(인카운터 {flow.EncountersCleared}/{needed}). 배속을 올리면 빨리 됩니다.");
+            default:
+                return Report(false, "", $"지금은 보스 도전을 받을 수 없습니다({flow.Phase.Value}).");
+        }
     }
 
     // ── 진행도(더하기: 보상 경로) ─────────────────────────

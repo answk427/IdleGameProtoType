@@ -18,7 +18,28 @@ public static class CombatDataValidator
         ValidateCharacters(LoadFirst<CharacterDatabase>(), skills, errors);
         ValidateStages(LoadFirst<StageDatabase>(), monsters, errors);
         ValidateSkillEffects(skills, errors);
+        ValidateFlowTimings(LoadFirst<BalanceConfig>(), errors);
         return errors;
+    }
+
+    // 흐름의 대기 시간(D24): 0 이상의 유한한 값. 0이면 그 대기가 없다.
+    private static void ValidateFlowTimings(BalanceConfig balance, List<string> errors)
+    {
+        if (balance == null)
+        {
+            errors.Add("[CombatData] BalanceConfig가 없습니다(흐름 시간과 성장 곡선).");
+            return;
+        }
+
+        RequireWait(balance.encounterClearDelay, "encounterClearDelay", errors);
+        RequireWait(balance.bossIntroDelay, "bossIntroDelay", errors);
+        RequireWait(balance.transitionDuration, "transitionDuration", errors);
+    }
+
+    private static void RequireWait(double seconds, string name, List<string> errors)
+    {
+        if (!(seconds >= 0.0) || double.IsInfinity(seconds))
+            errors.Add($"[CombatData] BalanceConfig: {name}는 0 이상이어야 합니다(0 = 대기 없음): {seconds}");
     }
 
     // 모든 전투원 프리팹: 판정 몸(반너비 > 0), 시간표, 애니메이션 뷰
@@ -138,6 +159,10 @@ public static class CombatDataValidator
             if (!(data.SpawnDistance > 0f) || float.IsInfinity(data.SpawnDistance))
                 errors.Add($"{where}: spawnDistance는 0보다 커야 합니다(플레이어 앞에 스폰): {data.SpawnDistance}");
             if (!(data.MonsterSpacing >= 0f)) errors.Add($"{where}: monsterSpacing은 0 이상이어야 합니다: {data.MonsterSpacing}");
+            if (!(data.BossTimeLimit >= 0.0) || double.IsInfinity(data.BossTimeLimit))
+                errors.Add($"{where}: bossTimeLimit은 0 이상이어야 합니다(0 = 제한 없음): {data.BossTimeLimit}");
+            if (!System.Enum.IsDefined(typeof(StageClearType), data.ClearType))
+                errors.Add($"{where}: clearType {(int)data.ClearType}은 처리하는 클리어 방식이 아닙니다(KillBoss만 있다).");
         }
     }
 

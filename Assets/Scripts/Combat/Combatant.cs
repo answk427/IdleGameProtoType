@@ -44,6 +44,8 @@ public sealed class Combatant : ICombatActor, IActionListener
 
     public CombatantPhase Phase { get; private set; }
     public bool IsAlive => Phase == CombatantPhase.Moving || Phase == CombatantPhase.Engaged;
+    // 죽었고 사망 행동(시간표)까지 마쳤다. 흐름이 아군 전멸을 판단한다.
+    public bool IsDeathComplete => Phase == CombatantPhase.Dead && deathCompletionReported;
     public Combatant Target { get; private set; }
 
     public float X { get; private set; }
@@ -107,6 +109,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         if (!(amount.ToDouble() >= 0.0)) amount = GameNumber.Zero; // 음수·NaN 데미지는 0으로
 
         Hp = GameNumber.Max(Hp - amount, GameNumber.Zero);
+        if (amount > GameNumber.Zero) World?.NoteProgress();
         host.HandleDamaged(this, amount);
 
         if (Hp <= GameNumber.Zero) Die();
@@ -121,10 +124,12 @@ public sealed class Combatant : ICombatActor, IActionListener
         host.HandleHealed(this, amount);
     }
 
+    // 스테이지를 다시 시작할 때(흐름이 부른다). 살아 있어도 교전 중이던 행동을 버리고 처음 상태(이동)로 돌아간다.
     public void Revive()
     {
         if (Phase == CombatantPhase.Inactive) return;
 
+        Combat.Disengage();
         deathRunner.Cancel();
         deathCompletionReported = false;
         Target = null;
@@ -140,6 +145,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         Target = null;
         Phase = CombatantPhase.Dead;
         deathCompletionReported = false;
+        World?.NoteProgress();
 
         // 사망 시간표는 기다릴 일이 있는 전투원(지금은 플레이어)만 갖는다. 사망 시각(사건 처리 중의 정확한 시각)부터 진행한다.
         if (World != null && timelines != null && timelines.TryGet(ActionKeys.Death, out ActionTimeline death) && death.IsValid)
@@ -242,9 +248,11 @@ public sealed class Combatant : ICombatActor, IActionListener
         float next = X + direction * distance;
         float contact = World.FindBlockingContact(this, direction);
 
-        X = direction > 0f
+        float moved = direction > 0f
             ? Mathf.Min(next, Mathf.Max(X, contact))
             : Mathf.Max(next, Mathf.Min(X, contact));
+        if (moved != X) World.NoteProgress();
+        X = moved;
     }
 
     // ── 대상 ──

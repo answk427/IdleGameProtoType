@@ -2,8 +2,9 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 
-// 스테이지 전환(최초 진입 포함) 시 화면 상단에 "Stage N"을 잠깐 띄우고 사라지는 안내문구.
-public class StageAnnouncement : UITransient
+// 스테이지 안내("Stage N")의 View(docs/UI_DESIGN.md 5-7). 언제, 무슨 글을 띄울지는 StageAnnouncementPresenter가 정한다.
+// 애니메이션은 화면 시간(unscaledDeltaTime)이라 배속·일시정지와 무관하게 같은 속도로 보인다(docs/UI_DESIGN.md 6-5).
+public class StageAnnouncement : MonoBehaviour, IStageAnnouncementView
 {
     [SerializeField] private TextMeshProUGUI label;
     [SerializeField] private CanvasGroup canvasGroup;
@@ -12,65 +13,43 @@ public class StageAnnouncement : UITransient
 
     private Coroutine routine;
 
-    public void SetStageNumber(int stageNumber)
+    public void Play(string text)
     {
-        if (label != null) label.text = $"Stage {stageNumber}";
-    }
-
-    // 패널이 꺼져 있어도 스테이지 변경 이벤트를 받아야 해서 UIManager 등록 시점에 구독한다.
-    public override void Initialize()
-    {
-        GlobalGameEvents.OnStageChanged += HandleStageChanged;
-    }
-
-    protected override void OnDestroy()
-    {
-        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
-    }
-
-    private void HandleStageChanged(int stageNumber)
-    {
-        SetStageNumber(stageNumber);
-        Show();
-    }
-
-    protected override void OnShown() => Play();
-
-    // 안내가 떠 있는 중에 다음 스테이지로 바뀌면 처음부터 다시 재생한다.
-    protected override void OnReshown() => Play();
-
-    private void Play()
-    {
+        if (label != null) label.text = text;
         if (canvasGroup != null) canvasGroup.alpha = 0f;
+
+        gameObject.SetActive(true);
         if (routine != null) StopCoroutine(routine);
         routine = StartCoroutine(ShowAndFade());
     }
 
-    protected override void OnHidden()
+    public void HideNow()
     {
-        if (routine != null)
-        {
-            StopCoroutine(routine);
-            routine = null;
-        }
+        if (routine != null) StopCoroutine(routine);
+        routine = null;
+        gameObject.SetActive(false);
     }
+
+    // 꺼지면 코루틴도 멈춘다.
+    private void OnDisable() => routine = null;
 
     private IEnumerator ShowAndFade()
     {
         yield return Fade(0f, 1f);
-        yield return new WaitForSeconds(visibleDuration);
+
+        for (float shown = 0f; shown < visibleDuration; shown += Time.unscaledDeltaTime) yield return null;
+
         yield return Fade(1f, 0f);
-        Hide();
+        routine = null;
+        gameObject.SetActive(false);
     }
 
     private IEnumerator Fade(float from, float to)
     {
         if (canvasGroup == null) yield break;
 
-        float t = 0f;
-        while (t < fadeDuration)
+        for (float t = 0f; t < fadeDuration; t += Time.unscaledDeltaTime)
         {
-            t += Time.deltaTime;
             canvasGroup.alpha = Mathf.Lerp(from, to, t / fadeDuration);
             yield return null;
         }

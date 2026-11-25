@@ -9,6 +9,7 @@
     "encountersToComplete": 2,
     "monsterSpacing": 1.5,
     "spawnDistance": 6.84,
+    "bossTimeLimit": 0.0,
     "bgTexturePath": "Textures/Backgrounds/BG_volcano_1024"
   },
   {
@@ -21,6 +22,7 @@
     "encountersToComplete": 1,
     "monsterSpacing": 1.5,
     "spawnDistance": 6.84,
+    "bossTimeLimit": 0.0,
     "bgTexturePath": "Textures/Backgrounds/BG_mountains_sunset_1024"
   },
   {
@@ -33,6 +35,7 @@
     "encountersToComplete": 1,
     "monsterSpacing": 1.5,
     "spawnDistance": 6.84,
+    "bossTimeLimit": 0.0,
     "bgTexturePath": "Textures/Backgrounds/BG_desert_night2_1024"
   }
 ]

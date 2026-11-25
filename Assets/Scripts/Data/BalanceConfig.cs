@@ -19,4 +19,16 @@ public class BalanceConfig : ScriptableObject
 
     [Tooltip("골드 보상 성장 배수")]
     public float goldGrowthBase = 1.05f;
+
+    // 흐름의 대기 시간(D24, docs/COMBAT_ARCHITECTURE.md 10-3). 모든 스테이지 공통이다. 0이면 그 대기가 없다.
+    // 흐름은 고정 단계 경계에서 판단해서 대기를 단계 수로 센다. double인 이유: float면 0.1 같은 값이 한 단계 늘어난다.
+    [Header("흐름 시간(초) — 시뮬레이션 시간이라 배속에서 같이 빨라진다")]
+    [Tooltip("인카운터의 적이 모두 죽은 뒤 시체를 남겨 두는 시간. 끝나면 정리하고 다음 인카운터")]
+    public double encounterClearDelay = 0.5;
+
+    [Tooltip("보스 도전을 받은 뒤 보스가 나오기까지")]
+    public double bossIntroDelay = 1.0;
+
+    [Tooltip("스테이지 전환 전체 길이. 가운데에서 스테이지가 바뀐다(페이드 아웃 → 바뀜 → 페이드 인)")]
+    public double transitionDuration = 1.0;
 }

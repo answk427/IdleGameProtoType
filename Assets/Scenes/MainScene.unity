@@ -358,7 +358,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea7e453caa17d384f844e58814cd6943, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawner
-  fallbackMonsterPrefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
   spawnRoot: {fileID: 1239810957}
 --- !u!4 &320452949
 Transform:
@@ -1070,60 +1069,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!1 &948967250
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 948967252}
-  - component: {fileID: 948967251}
-  m_Layer: 0
-  m_Name: StageManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &948967251
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 948967250}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 863b07adcaa2ee5468ce76ada141f1eb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StageManager
-  stage:
-    stageNumber: 0
-    normalMonsterId: 0
-    bossMonsterId: 0
-    monstersPerEncounter: 0
-    encountersToComplete: 0
-    monsterSpacing: 0
-    bgTexturePath: 
-    clearType: 0
-    spawnDistance: 0
---- !u!4 &948967252
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 948967250}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.34966, y: -1.13167, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1061945703
 GameObject:
   m_ObjectHideFlags: 0
@@ -1153,9 +1098,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fb24b4dddbc606049b006d5d836a485a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  monsterSpawner: {fileID: 320452948}
-  stageManager: {fileID: 948967251}
-  postEncounterDelay: 0.5
 --- !u!4 &1061945705
 Transform:
   m_ObjectHideFlags: 0
@@ -1610,6 +1552,7 @@ MonoBehaviour:
   playerSpawner: {fileID: 1881273561}
   gameManager: {fileID: 1061945704}
   combatSimulation: {fileID: 596820660}
+  background: {fileID: 1909895860}
   uiRoot: {fileID: 1625906307}
 --- !u!4 &1424901934
 Transform:
@@ -1660,6 +1603,8 @@ MonoBehaviour:
   registry: {fileID: 11400000, guid: 15d75a5fb4f304b4c95a4af7d02ecdcc, type: 2}
   fadeLayer: {fileID: 119688928}
   fadeController: {fileID: 1698183982}
+  bossChallengeButton: {fileID: 8862145974461050685}
+  stageAnnouncement: {fileID: 1176470795}
   uiManager: {fileID: 1698183983}
   skillSlotBar: {fileID: 503102083}
 --- !u!224 &1625906308
@@ -2832,6 +2777,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: fe8b7ff7d67cda742b30e87468ef403f, type: 3}
+--- !u!114 &8862145974461050685 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 103827207206487007, guid: fe8b7ff7d67cda742b30e87468ef403f, type: 3}
+  m_PrefabInstance: {fileID: 8862145974461050684}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4e0218812fdaf54bbd321b181641f8f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossChallengeButton
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2839,7 +2795,6 @@ SceneRoots:
   - {fileID: 1686371075}
   - {fileID: 1061945705}
   - {fileID: 320452949}
-  - {fileID: 948967252}
   - {fileID: 1239810957}
   - {fileID: 1909895864}
   - {fileID: 546248885}
