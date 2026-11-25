@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 // 전투원 전체와 그 사이의 규칙(거리, 대상, 처리 순서)을 갖는다(docs/COMBAT_ARCHITECTURE.md 8-3, 8-4). 순수 C#.
 // CombatSimulation(드라이버)이 고정 단계마다 국면 순서로 부른다: ② RunEvents → ③ StepPhases → ⑤ CaptureStep.
+// 위치는 월드 x다(3단계). 좌표가 커지지 않게 인카운터를 스폰할 때마다 원점을 재설정한다(ShiftOrigin).
 //
 // 처리 순서는 아군 → 적, 각 팀 안에서는 등록 순서다. 같은 시각의 전투 사건(CombatScheduler)도 이 순서다.
 // 처리 도중의 등록·해제(사망 알림을 받은 흐름 코드가 부르는 경우)는 그 국면이 끝난 뒤에 반영한다.
@@ -24,12 +25,25 @@ public sealed class CombatWorld
     public SimClock Clock { get; }
     public IReadOnlyList<Combatant> Combatants => combatants;
 
-    // 아군(전진 정책)이 이동 단계인가. 3단계 전까지 "세상이 스크롤되는가"의 뜻이다.
-    // ③에서 아군을 먼저 처리하므로, 같은 단계의 적 이동이 이 값을 읽는다.
-    public bool IsAllyAdvancing { get; private set; }
+    // 원점 재설정으로 뺀 거리의 합. 월드가 처음부터 실제로 이동한 거리 = 지금 좌표 + 이 값(배경의 연속성).
+    public double TotalShift { get; private set; }
 
-    // 스크롤과 접근 이동의 속도. 3단계 전까지는 전진하는 아군(플레이어)의 이동 속도다.
-    public float ScrollSpeed { get; private set; }
+    // 원점을 재설정한 뒤에 알린다(뷰가 살아 있는 연출을 같은 양만큼 옮긴다).
+    public event Action<float> OriginShifted;
+
+    // 대열의 앞장(전진 정책의 첫 아군, 지금은 플레이어). 카메라와 스폰 위치의 기준이다.
+    public Combatant LeadAlly
+    {
+        get
+        {
+            for (int i = 0; i < combatants.Count; i++)
+            {
+                Combatant c = combatants[i];
+                if (c.Team == Team.Ally && c.MovePolicy == MovePolicy.Advance && c.Phase != CombatantPhase.Inactive) return c;
+            }
+            return null;
+        }
+    }
 
     // ── 등록 ──
 
@@ -98,12 +112,8 @@ public sealed class CombatWorld
         busy = true;
         try
         {
-            Combatant leader = FindAdvancingAlly();
-            ScrollSpeed = leader != null ? leader.MoveSpeed : 0f;
-            IsAllyAdvancing = false;
-
-            StepTeam(Team.Ally, leader);
-            StepTeam(Team.Enemy, leader);
+            StepTeam(Team.Ally);
+            StepTeam(Team.Enemy);
         }
         finally
         {
@@ -118,6 +128,25 @@ public sealed class CombatWorld
         for (int i = 0; i < combatants.Count; i++) combatants[i].CaptureStep();
     }
 
+    // 원점 재설정(D16): 모든 위치에서 delta를 뺀다. 고정 단계 밖(스폰 루프)에서만 부른다.
+    // 거리, 대상, 단계는 그대로이고(모두 상대 위치), 그려지는 위치도 끊기지 않는다(보간 기준도 같이 옮김).
+    public void ShiftOrigin(float delta)
+    {
+        if (busy) throw new InvalidOperationException("고정 단계 처리 중에는 원점을 옮길 수 없습니다.");
+        if (delta == 0f || float.IsNaN(delta) || float.IsInfinity(delta)) return;
+
+        for (int i = 0; i < combatants.Count; i++) combatants[i].ShiftOrigin(delta);
+        TotalShift += delta;
+        OriginShifted?.Invoke(delta);
+    }
+
+    // anchor가 원점 근처(0 이상 1 미만)에 오도록 정수만큼 옮긴다.
+    public void RecenterOn(Combatant anchor)
+    {
+        if (anchor == null || anchor.World != this) return;
+        ShiftOrigin((float)Math.Floor(anchor.X));
+    }
+
     private void AddParticipants(Team team)
     {
         for (int i = 0; i < combatants.Count; i++)
@@ -127,26 +156,13 @@ public sealed class CombatWorld
         }
     }
 
-    private void StepTeam(Team team, Combatant leader)
+    private void StepTeam(Team team)
     {
         for (int i = 0; i < combatants.Count; i++)
         {
             Combatant c = combatants[i];
-            if (c.Team != team) continue;
-
-            c.StepPhase();
-            if (c == leader) IsAllyAdvancing = c.Phase == CombatantPhase.Moving;
+            if (c.Team == team) c.StepPhase();
         }
-    }
-
-    private Combatant FindAdvancingAlly()
-    {
-        for (int i = 0; i < combatants.Count; i++)
-        {
-            Combatant c = combatants[i];
-            if (c.Team == Team.Ally && c.MovePolicy == MovePolicy.Advance && c.Phase != CombatantPhase.Inactive) return c;
-        }
-        return null;
     }
 
     // ── 거리와 대상 (규칙 하나: 표면 거리) ──
@@ -170,6 +186,22 @@ public sealed class CombatWorld
                 best = c;
                 bestGap = gap;
             }
+        }
+        return best;
+    }
+
+    // mover가 direction(+1 / -1) 쪽으로 움직일 때 막는 접촉선: 그 방향(중심이 같거나 앞)의 살아 있는 상대 중 가장 가까운 것.
+    // 없으면 그 방향의 무한대.
+    public float FindBlockingContact(Combatant mover, float direction)
+    {
+        float best = direction > 0f ? float.PositiveInfinity : float.NegativeInfinity;
+        for (int i = 0; i < combatants.Count; i++)
+        {
+            Combatant c = combatants[i];
+            if (!IsOpponent(mover, c) || direction * (c.X - mover.X) < 0f) continue;
+
+            float contact = c.X - direction * (c.HalfWidth + mover.HalfWidth);
+            if (direction > 0f ? contact < best : contact > best) best = contact;
         }
         return best;
     }

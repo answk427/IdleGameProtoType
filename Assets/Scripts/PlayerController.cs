@@ -23,7 +23,6 @@ public class PlayerController : CombatantHost
 
     public PlayerStats Stats => stats;
     public CharacterData Character => character;
-    public float RunSpeed => character != null ? character.MoveSpeed : 0f;
     public float AttackInterval => stats != null ? stats.AttackInterval : 0f;
     public GameNumber CurrentHp => Combatant.Hp;
     public GameNumber MaxHp => Combatant.MaxHp;

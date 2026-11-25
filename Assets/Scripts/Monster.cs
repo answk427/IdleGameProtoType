@@ -2,7 +2,7 @@
 
 // 몬스터의 호스트. 일반 몬스터와 보스가 모두 이 클래스다(docs/COMBAT_ARCHITECTURE.md 8-3).
 // 전투 규칙은 Combatant가 갖고, 둘의 차이는 데이터다:
-//   공격 간격 > 0이면 기본 공격, skillId가 있으면 스킬, movePolicy가 Approach면 다가온다.
+//   공격 간격 > 0이면 기본 공격, skillId가 있으면 스킬, movePolicy가 Approach면 자기 이동 속도(moveSpeed)로 다가온다.
 // 보스인지는 스폰할 때 정하는 역할이고, 처치 알림(BossKilled)에만 쓴다.
 public class Monster : CombatantHost
 {
@@ -52,7 +52,7 @@ public class Monster : CombatantHost
             AttackDamage = GameNumber.Round(data.AttackDamage * damageMultiplier),
             AttackInterval = data.AttackInterval,
             AttackRange = data.AttackRange,
-            MoveSpeed = 0f, // 3단계 전까지 몬스터는 스크롤 속도로 움직인다(CombatWorld.ScrollSpeed)
+            MoveSpeed = data.MoveSpeed, // 접근 정책이 쓴다(제자리 정책은 움직이지 않는다)
             MovePolicy = data.MovePolicy,
         };
 

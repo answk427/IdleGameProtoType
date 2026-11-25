@@ -8,6 +8,11 @@ public class DamageText : MonoBehaviour
     
     private System.Action<GameObject> onComplete; // 반납용 콜백
 
+    // 숫자가 뜬 월드 위치. 카메라가 움직여도 월드를 따라가도록 매 프레임 화면 좌표로 바꾼다(D21).
+    private Vector3 worldAnchor;
+    private Canvas canvas;
+    private RectTransform canvasRect;
+
     private void Awake()
     {
         if (text == null)   
@@ -31,20 +36,10 @@ public class DamageText : MonoBehaviour
         text.text = prefix + NumberFormatUtility.Format(amount);
         text.color = new Color(color.r, color.g, color.b, 1f);
 
-        Vector2 screenPoint = Camera.main.WorldToScreenPoint(worldPos);
-
-        Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay
-            ? null
-            : canvas.worldCamera;
-
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            canvasRect,
-            screenPoint,
-            uiCamera,
-            out Vector2 localPoint
-        );
-
-        ((RectTransform)transform).anchoredPosition = localPoint;
+        worldAnchor = worldPos;
+        this.canvas = canvas;
+        this.canvasRect = canvasRect;
+        ((RectTransform)transform).anchoredPosition = AnchorOnCanvas();
 
         StartCoroutine(Animate());
     }
@@ -55,7 +50,6 @@ public class DamageText : MonoBehaviour
         float elapsed = 0f;
 
         RectTransform rect = (RectTransform)transform;
-        Vector2 startPos = rect.anchoredPosition;
         Color startColor = text.color;
 
         while (elapsed < duration)
@@ -63,12 +57,23 @@ public class DamageText : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
 
-            rect.anchoredPosition = startPos + Vector2.up * (50f * t);
+            rect.anchoredPosition = AnchorOnCanvas() + Vector2.up * (50f * t);
             text.color = new Color(startColor.r, startColor.g, startColor.b, 1f - t);
 
             yield return null;
         }
 
         onComplete?.Invoke(gameObject);
+    }
+
+    // 원점 재설정(CombatEffectManager.ShiftOrigin): 월드 기준점을 같은 양만큼 옮긴다.
+    public void ShiftOrigin(float delta) => worldAnchor.x -= delta;
+
+    private Vector2 AnchorOnCanvas()
+    {
+        Vector2 screenPoint = Camera.main.WorldToScreenPoint(worldAnchor);
+        Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, uiCamera, out Vector2 localPoint);
+        return localPoint;
     }
 }

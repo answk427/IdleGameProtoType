@@ -17,6 +17,7 @@ public static class CombatDataValidator
         ValidateMonsters(monsters, skills, errors);
         ValidateCharacters(LoadFirst<CharacterDatabase>(), skills, errors);
         ValidateStages(LoadFirst<StageDatabase>(), monsters, errors);
+        ValidateSkillEffects(skills, errors);
         return errors;
     }
 
@@ -58,6 +59,10 @@ public static class CombatDataValidator
             if (!(data.AttackRange >= 0f)) errors.Add($"{where}: attackRange는 0 이상이어야 합니다: {data.AttackRange}");
             if (data.MovePolicy != MovePolicy.Hold && data.MovePolicy != MovePolicy.Approach)
                 errors.Add($"{where}: movePolicy는 Hold 또는 Approach여야 합니다: {data.MovePolicy}");
+            if (!(data.MoveSpeed >= 0f) || float.IsInfinity(data.MoveSpeed))
+                errors.Add($"{where}: moveSpeed는 0 이상이어야 합니다: {data.MoveSpeed}");
+            else if (data.MovePolicy == MovePolicy.Approach && !(data.MoveSpeed > 0f))
+                errors.Add($"{where}: 접근(Approach) 몬스터의 moveSpeed는 0보다 커야 합니다(0이면 다가오지 않는다)");
 
             Monster host = entry.prefab != null ? entry.prefab.GetComponent<Monster>() : null;
             if (host == null)
@@ -130,6 +135,32 @@ public static class CombatDataValidator
             if (monsters == null || monsters.GetById(data.BossMonsterId) == null) errors.Add($"{where}: 보스 {data.BossMonsterId}가 MonsterDatabase에 없습니다.");
             if (data.MonstersPerEncounter <= 0) errors.Add($"{where}: monstersPerEncounter는 0보다 커야 합니다: {data.MonstersPerEncounter}");
             if (data.EncountersToComplete <= 0) errors.Add($"{where}: encountersToComplete는 0보다 커야 합니다: {data.EncountersToComplete}");
+            if (!(data.SpawnDistance > 0f) || float.IsInfinity(data.SpawnDistance))
+                errors.Add($"{where}: spawnDistance는 0보다 커야 합니다(플레이어 앞에 스폰): {data.SpawnDistance}");
+            if (!(data.MonsterSpacing >= 0f)) errors.Add($"{where}: monsterSpacing은 0 이상이어야 합니다: {data.MonsterSpacing}");
+        }
+    }
+
+    // 스킬 이펙트 프리팹의 파티클은 로컬 시뮬레이션 공간이어야 한다. 원점 재설정 때 CombatEffectManager가 트랜스폼만
+    // 옮기므로, 월드 공간 파티클은 날아가던 입자가 제자리에 남아 튄다(docs/COMBAT_ARCHITECTURE.md 9-3).
+    private static void ValidateSkillEffects(SkillDatabase skills, List<string> errors)
+    {
+        if (skills == null) return;
+        foreach (SkillEntry entry in skills.entries)
+        {
+            if (entry?.data == null) continue;
+            RequireLocalParticles(entry.castVfxPrefab, $"[CombatData] 스킬 {entry.data.Id}({entry.data.SkillName})의 시전 이펙트", errors);
+            RequireLocalParticles(entry.hitVfxPrefab, $"[CombatData] 스킬 {entry.data.Id}({entry.data.SkillName})의 타격 이펙트", errors);
+        }
+    }
+
+    private static void RequireLocalParticles(GameObject prefab, string context, List<string> errors)
+    {
+        if (prefab == null) return;
+        foreach (ParticleSystem ps in prefab.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            if (ps.main.simulationSpace == ParticleSystemSimulationSpace.World)
+                errors.Add($"{context}({prefab.name}/{ps.name}): 파티클이 월드 시뮬레이션 공간입니다. 로컬(Local)로 바꾸세요.");
         }
     }
 

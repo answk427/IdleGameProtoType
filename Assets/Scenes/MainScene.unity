@@ -359,9 +359,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawner
   fallbackMonsterPrefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
-  spawnAnchor: {fileID: 945510284}
   spawnRoot: {fileID: 1239810957}
-  firstMonsterPosition: {x: 1, y: 0, z: 0}
 --- !u!4 &320452949
 Transform:
   m_ObjectHideFlags: 0
@@ -876,7 +874,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleGameProtoType.Runtime::CombatSimulation
   monsterSpawner: {fileID: 320452948}
-  backgroundScroller: {fileID: 1909895860}
 --- !u!4 &596820661
 Transform:
   m_ObjectHideFlags: 0
@@ -1073,37 +1070,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!1 &945510283
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 945510284}
-  m_Layer: 0
-  m_Name: SpawnAnchor
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &945510284
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 945510283}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.91, y: -3.08, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &948967250
 GameObject:
   m_ObjectHideFlags: 0
@@ -1142,6 +1108,7 @@ MonoBehaviour:
     monsterSpacing: 0
     bgTexturePath: 
     clearType: 0
+    spawnDistance: 0
 --- !u!4 &948967252
 Transform:
   m_ObjectHideFlags: 0
@@ -1857,6 +1824,7 @@ GameObject:
   - component: {fileID: 1686371075}
   - component: {fileID: 1686371074}
   - component: {fileID: 1686371073}
+  - component: {fileID: 1686371076}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1938,6 +1906,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1686371076
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1686371072}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3f17e4401b1b38468591e8bfe2c184e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IdleGameProtoType.Runtime::CameraRig
+  targetCamera: {fileID: 1686371074}
+  simulation: {fileID: 596820660}
+  background: {fileID: 1909895860}
 --- !u!224 &1691521314 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 778706238419746332, guid: 6d171374e7fadd54fb51f3cf2165551a, type: 3}
@@ -2857,7 +2840,6 @@ SceneRoots:
   - {fileID: 1061945705}
   - {fileID: 320452949}
   - {fileID: 948967252}
-  - {fileID: 945510284}
   - {fileID: 1239810957}
   - {fileID: 1909895864}
   - {fileID: 546248885}

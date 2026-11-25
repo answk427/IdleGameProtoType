@@ -4,13 +4,13 @@ using UnityEngine;
 
 // 인카운터·보스 스폰과 정리. 스폰한 몬스터의 전투원은 전투 월드(CombatWorld)에 등록하고, 정리할 때 뺀다.
 // 대상 찾기와 범위 판정은 여기가 아니라 CombatWorld의 규칙 하나가 한다(docs/COMBAT_ARCHITECTURE.md 8-4).
+// 스폰 위치는 대열 앞장(플레이어) 기준의 게임 데이터다(스테이지 표 spawnDistance, monsterSpacing, 9-3).
+// 스폰하기 전에 원점을 앞장 근처로 재설정해서 좌표가 커지지 않게 한다(D16).
 
 public class MonsterSpawner : MonoBehaviour
 {
     [SerializeField] private GameObject fallbackMonsterPrefab;
-    [SerializeField] private Transform spawnAnchor;
     [SerializeField] private Transform spawnRoot;
-    [SerializeField] private Vector3 firstMonsterPosition = new Vector3(0f, 0f, 0f);
 
     private readonly List<Monster> activeMonsters = new List<Monster>();
     private CombatWorld world;
@@ -46,10 +46,8 @@ public class MonsterSpawner : MonoBehaviour
             return new List<Monster>();
         }
 
-        Vector3 basePosition = firstMonsterPosition;
-        if (spawnAnchor != null)
-            basePosition += spawnAnchor.position;
-        basePosition.y = GetGroundY(basePosition.y) + monsterEntry.groundOffset;
+        if (!TryPrepareSpawn(stage, out float firstX)) return new List<Monster>();
+        Vector3 basePosition = new Vector3(firstX, GetGroundY(0f) + monsterEntry.groundOffset, 0f);
 
         for (int i = 0; i < stage.MonstersPerEncounter; i++)
         {
@@ -125,13 +123,30 @@ public class MonsterSpawner : MonoBehaviour
             return null;
         }
 
-        Vector3 spawnPosition = firstMonsterPosition + (spawnAnchor != null ? spawnAnchor.position : Vector3.zero);
-        spawnPosition.y = GetGroundY(spawnPosition.y) + bossEntry.groundOffset;
+        if (!TryPrepareSpawn(stage, out float firstX)) return null;
+        Vector3 spawnPosition = new Vector3(firstX, GetGroundY(0f) + bossEntry.groundOffset, 0f);
 
         // 보스와 일반 몬스터는 같은 Monster다. 차이는 데이터(스킬, 이동 정책, 공격)와 처치 알림용 역할뿐이다.
         Monster boss = SpawnMonster(bossEntry.data, stage, bossPrefab, spawnPosition, spawnRoot, true);
         if (boss != null) activeMonsters.Add(boss);
         return boss;
+    }
+
+    // 원점을 대열 앞장 근처로 재설정하고(D16), 첫 몬스터의 피벗 x = 앞장 몸 중심 + spawnDistance(D18)를 돌려준다.
+    // 고정 단계 밖(스폰 루프의 WaitForFixedUpdate 뒤)에서 불린다.
+    private bool TryPrepareSpawn(StageData stage, out float firstX)
+    {
+        firstX = 0f;
+        Combatant lead = world?.LeadAlly;
+        if (lead == null)
+        {
+            Debug.LogError("[MonsterSpawner] 대열 앞장(플레이어)이 전투 월드에 없어 스폰 위치를 정할 수 없습니다.");
+            return false;
+        }
+
+        world.RecenterOn(lead);
+        firstX = lead.X + stage.SpawnDistance;
+        return true;
     }
 
     // 항상 바닥(GroundY)에 붙어있는 것처럼 보이도록 고정 Y를 반환.

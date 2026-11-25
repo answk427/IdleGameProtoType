@@ -4,8 +4,9 @@ using UnityEngine;
 
 // 전투원 하나(docs/COMBAT_ARCHITECTURE.md 8절). 플레이어, 일반 몬스터, 보스가 모두 이 클래스다. 순수 C#.
 //
-// - 위치(X)는 판정 몸의 중심이고, 시뮬레이션 위치의 주인이다. 로직은 transform을 읽지 않는다.
-//   호스트가 화면 프레임마다 직전 두 단계 사이를 보간해 그린다.
+// - 위치(X)는 판정 몸의 중심이고, 월드 x다(3단계, docs/COMBAT_ARCHITECTURE.md 9절). 로직은 transform을 읽지 않는다.
+//   호스트가 화면 프레임마다 직전 두 단계 사이를 보간해 그리고, 카메라가 아군을 따라간다.
+// - 이동은 sweep 하나: 그 방향의 가장 가까운 살아 있는 상대 몸(접촉선)까지만 간다. 전진(아군)과 접근(보스)이 같은 함수다.
 // - 거리는 표면 거리 하나(CombatWorld.Gap). 교전, 대상, 범위 스킬이 모두 이것을 쓴다.
 // - 상태는 단계 값 하나(이동 / 교전 / 사망). 상태 객체를 만들지 않는다.
 // - 행동의 결정과 진행은 CombatActions(1단계)가 하고, 이 클래스가 그것이 요구하는 것(ICombatActor)을 제공한다.
@@ -186,6 +187,14 @@ public sealed class Combatant : ICombatActor, IActionListener
         stepX = X;
     }
 
+    // 원점 재설정(CombatWorld.ShiftOrigin). 위치와 보간 기준을 같은 양만큼 옮겨서, 그려지는 위치가 끊기지 않는다.
+    internal void ShiftOrigin(float delta)
+    {
+        X -= delta;
+        previousStepX -= delta;
+        stepX -= delta;
+    }
+
     public float GetRenderX(float alpha) => previousStepX + (stepX - previousStepX) * alpha;
 
     private void EnterMoving()
@@ -208,31 +217,30 @@ public sealed class Combatant : ICombatActor, IActionListener
 
     private void Move()
     {
-        if (World == null) return;
+        if (World == null || !(stats.MoveSpeed > 0f)) return;
 
+        float distance = stats.MoveSpeed * (float)World.Clock.StepLength;
         switch (stats.MovePolicy)
         {
             case MovePolicy.Advance:
-                return; // 3단계 전까지 아군은 제자리에 서 있고, 이동 단계면 세상이 스크롤된다(CombatWorld.IsAllyAdvancing)
+                Sweep(1f, distance); // 앞(+x)으로
+                return;
             case MovePolicy.Hold:
-                if (World.IsAllyAdvancing) MoveTowardNearestOpponent(World.ScrollSpeed);
                 return;
             case MovePolicy.Approach:
-                MoveTowardNearestOpponent(World.ScrollSpeed);
+                Combatant other = World.FindNearestOpponent(this);
+                if (other != null) Sweep(other.X >= X ? 1f : -1f, distance);
                 return;
         }
     }
 
-    // CCD(docs/COMBAT_DESIGN.md 3-4): 상대 몸을 통과하지 않는다. 접촉선(두 몸이 닿는 위치) 앞이면 거기서 멈추고,
-    // 이미 겹쳐 있으면 더 파고들지 않는다. 한 단계 이동량과 상관없이 성립한다.
-    private void MoveTowardNearestOpponent(float speed)
+    // sweep(CCD의 일반화, docs/COMBAT_DESIGN.md 3-4): direction 쪽으로 distance만큼 가되, 그 방향의 가장 가까운
+    // 살아 있는 상대의 접촉선(두 몸이 닿는 위치)에서 멈춘다. 이미 겹쳐 있으면 더 파고들지 않는다(뒤로 밀려나지도 않는다).
+    // 한 단계 이동량과 상관없이 몸을 통과하지 않는다. 시체는 막지 않는다.
+    private void Sweep(float direction, float distance)
     {
-        Combatant other = World.FindNearestOpponent(this);
-        if (other == null || !(speed > 0f)) return;
-
-        float direction = other.X >= X ? 1f : -1f;
-        float contact = other.X - direction * (other.HalfWidth + HalfWidth);
-        float next = X + direction * speed * (float)World.Clock.StepLength;
+        float next = X + direction * distance;
+        float contact = World.FindBlockingContact(this, direction);
 
         X = direction > 0f
             ? Mathf.Min(next, Mathf.Max(X, contact))

@@ -17,6 +17,8 @@ public class MonsterData : IData
     [SerializeField] private int skillId;
     // 교전하지 않을 때 움직이는 방식(Hold: 제자리, Approach: 다가옴). 기본값 Hold(docs/COMBAT_ARCHITECTURE.md 8-4).
     [SerializeField] private MovePolicy movePolicy;
+    // 이동 속도(월드 유닛/초). 접근(Approach) 정책이 쓴다(docs/COMBAT_ARCHITECTURE.md 9-3, D17).
+    [SerializeField] private float moveSpeed;
 
     [JsonProperty("id")]
     public int Id { get => id; private set => id = value; }
@@ -38,5 +40,7 @@ public class MonsterData : IData
     public int SkillId { get => skillId; private set => skillId = value; }
     [JsonProperty("movePolicy")]
     public MovePolicy MovePolicy { get => movePolicy; private set => movePolicy = value; }
+    [JsonProperty("moveSpeed")]
+    public float MoveSpeed { get => moveSpeed; private set => moveSpeed = value; }
 }
 

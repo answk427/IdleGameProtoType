@@ -129,35 +129,37 @@ public class CombatWorldTests
     // ── 이동 ──
 
     [Test]
-    public void Hold_MovesOnlyWhileAllyAdvances_Approach_MovesAlways()
+    public void Advance_MovesForwardOnlyWhileMoving_Hold_NeverMoves_Approach_UsesOwnSpeed()
     {
+        // 3단계(9-3): 아군은 월드에서 실제로 전진하고, 제자리 몬스터는 움직이지 않으며, 보스는 자기 속도로 다가온다.
         CombatWorld world = World();
         Combatant ally = Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, interval: 1.0, range: 0.1f, policy: MovePolicy.Advance, speed: 2f));
-        Combatant hold = Spawn(world, Team.Enemy, 10f, 0.5f, Stats(policy: MovePolicy.Hold));
-        Combatant approach = Spawn(world, Team.Enemy, 20f, 0.5f, Stats(policy: MovePolicy.Approach));
+        Combatant hold = Spawn(world, Team.Enemy, 10f, 0.5f, Stats(policy: MovePolicy.Hold, speed: 5f));
+        Combatant approach = Spawn(world, Team.Enemy, 20f, 0.5f, Stats(policy: MovePolicy.Approach, speed: 1f));
 
         StepOnce(world);
-        Assert.AreEqual(10f - 2f * 0.02f, hold.X, 1e-5f, "아군이 전진 중이면 화면과 함께 다가온다");
-        Assert.AreEqual(20f - 2f * 0.02f, approach.X, 1e-5f);
+        Assert.AreEqual(2f * 0.02f, ally.X, 1e-6f, "이동 단계의 아군은 앞으로 간다");
+        Assert.AreEqual(10f, hold.X, "제자리 몬스터는 움직이지 않는다(속도가 있어도)");
+        Assert.AreEqual(20f - 1f * 0.02f, approach.X, 1e-5f, "접근 몬스터는 자기 속도로");
 
-        // 아군이 교전하면(스크롤 멈춤) Hold는 멈추고 Approach는 계속 온다
-        Spawn(world, Team.Enemy, 1.0f, 0.5f, Stats(hp: 1e9));
+        // 교전하면 아군은 멈추고, 접근 몬스터는 계속 온다
+        Spawn(world, Team.Enemy, 1.1f, 0.5f, Stats(hp: 1e9));
         StepOnce(world);
         Assert.AreEqual(CombatantPhase.Engaged, ally.Phase);
-        float holdX = hold.X, approachX = approach.X;
+        float allyX = ally.X, approachX = approach.X;
         StepOnce(world);
-        Assert.AreEqual(holdX, hold.X);
+        Assert.AreEqual(allyX, ally.X);
         Assert.Less(approach.X, approachX);
     }
 
     [TestCase(100f)]
     [TestCase(1e6f)]
-    public void Ccd_NeverPassesThroughTheOpponentBody_FromEitherSide(float speed)
+    public void Approach_NeverPassesThroughTheOpponentBody_FromEitherSide(float speed)
     {
         CombatWorld world = World();
-        Combatant ally = Spawn(world, Team.Ally, 0f, 0.4f, Stats(hp: 1e9, policy: MovePolicy.Advance, speed: speed));
-        Combatant right = Spawn(world, Team.Enemy, 50f, 1.5f, Stats(policy: MovePolicy.Approach));
-        Combatant left = Spawn(world, Team.Enemy, -50f, 0.1f, Stats(policy: MovePolicy.Approach));
+        Combatant ally = Spawn(world, Team.Ally, 0f, 0.4f, Stats(hp: 1e9, policy: MovePolicy.Advance, speed: 0f));
+        Combatant right = Spawn(world, Team.Enemy, 50f, 1.5f, Stats(policy: MovePolicy.Approach, speed: speed));
+        Combatant left = Spawn(world, Team.Enemy, -50f, 0.1f, Stats(policy: MovePolicy.Approach, speed: speed));
 
         Run(world, 30);
 
@@ -165,18 +167,93 @@ public class CombatWorldTests
         Assert.AreEqual(ally.X - 0.4f - 0.1f, left.X, 1e-4f);
     }
 
+    [TestCase(100f)]
+    [TestCase(1e6f)]
+    public void Advance_SweepStopsAtTheFirstLivingEnemyAhead_IgnoringCorpsesAndEnemiesBehind(float speed)
+    {
+        CombatWorld world = World();
+        Combatant ally = Spawn(world, Team.Ally, 0f, 0.4f, Stats(hp: 1e9, policy: MovePolicy.Advance, speed: speed));
+        Spawn(world, Team.Enemy, -3f, 0.5f, Stats(hp: 1e9));         // 뒤: 막지 않는다
+        Combatant corpse = Spawn(world, Team.Enemy, 2f, 0.5f, Stats(hp: 1));
+        corpse.TakeDamage(10);                                          // 시체: 막지 않는다
+        Combatant wall = Spawn(world, Team.Enemy, 7f, 0.6f, Stats(hp: 1e9)); // 앞의 첫 살아 있는 적
+
+        Run(world, 30);
+
+        Assert.AreEqual(wall.X - 0.6f - 0.4f, ally.X, 1e-4f, "앞의 살아 있는 적 몸에서 멈춘다");
+    }
+
     [Test]
     public void AlliesAreProcessedFirst_RegardlessOfRegistrationOrder()
     {
-        // 적을 먼저 등록해도, 같은 단계에서 아군의 전진 여부가 적 이동에 쓰인다.
+        // 적을 먼저 등록해도 아군이 먼저 움직이고, 적은 움직인 아군 몸을 기준으로 sweep한다.
+        // (적이 먼저라면 아군 0.01, 적 1.01이 된다)
         CombatWorld world = World();
-        Combatant hold = Spawn(world, Team.Enemy, 10f, 0.5f, Stats(policy: MovePolicy.Hold));
-        Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, policy: MovePolicy.Advance, speed: 1f));
+        Combatant enemy = Spawn(world, Team.Enemy, 1.03f, 0.5f, Stats(policy: MovePolicy.Approach, speed: 1f));
+        Combatant ally = Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, policy: MovePolicy.Advance, speed: 1f));
 
         StepOnce(world);
 
-        Assert.IsTrue(world.IsAllyAdvancing);
-        Assert.AreEqual(10f - 0.02f, hold.X, 1e-5f);
+        Assert.AreEqual(0.02f, ally.X, 1e-6f);
+        Assert.AreEqual(1.02f, enemy.X, 1e-6f);
+    }
+
+    // ── 원점 재설정(D16) ──
+
+    [Test]
+    public void ShiftOrigin_KeepsGapsTargetsPhases_AndRenderedPositionContinuous()
+    {
+        CombatWorld world = World();
+        Combatant ally = Spawn(world, Team.Ally, 1000.3f, 0.4f, Stats(hp: 1e9, interval: 0.5, range: 0.5f, policy: MovePolicy.Advance, speed: 3f));
+        Combatant enemy = Spawn(world, Team.Enemy, 1001.2f, 0.4f, Stats(hp: 1e9, policy: MovePolicy.Approach, speed: 1f));
+        Run(world, 5);
+        float gap = CombatWorld.Gap(ally, enemy);
+        float renderBefore = ally.GetRenderX(0.5f);
+        CombatantPhase phase = ally.Phase;
+        Combatant target = ally.Target;
+        float shifted = 0f;
+        world.OriginShifted += d => shifted += d;
+
+        world.RecenterOn(ally);
+
+        Assert.AreEqual(1000f, shifted, "정수 부분만큼");
+        Assert.AreEqual(1000.0, world.TotalShift);
+        Assert.That(ally.X, Is.InRange(0f, 1f));
+        Assert.AreEqual(gap, CombatWorld.Gap(ally, enemy), 1e-4f);
+        Assert.AreEqual(renderBefore - 1000f, ally.GetRenderX(0.5f), 1e-3f, "그려지는 위치가 끊기지 않는다");
+        Assert.AreEqual(phase, ally.Phase);
+        Assert.AreSame(target, ally.Target);
+    }
+
+    [Test]
+    public void RecenteringEveryEncounter_KeepsCoordinatesSmall_OverALongRun()
+    {
+        // 하루 방치(약 30만 유닛)에 해당하는 거리를 달려도 좌표가 작게 유지된다.
+        CombatWorld world = World();
+        Combatant ally = Spawn(world, Team.Ally, 0f, 0.4f, Stats(hp: 1e9, policy: MovePolicy.Advance, speed: 1000f));
+
+        float maxAbsX = 0f;
+        for (int encounter = 0; encounter < 20000; encounter++)
+        {
+            Run(world, 1); // 20유닛 전진
+            world.RecenterOn(ally);
+            maxAbsX = System.Math.Max(maxAbsX, System.Math.Abs(ally.X));
+        }
+
+        Assert.Less(maxAbsX, 1f);
+        Assert.AreEqual(20000 * 20.0, world.TotalShift + ally.X, 1.0, "이동한 거리 = 누적 재설정 + 지금 좌표");
+    }
+
+    [Test]
+    public void ShiftingDuringAStep_IsRejected()
+    {
+        CombatWorld world = World();
+        var host = new FakeHost();
+        Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, damage: 1000, interval: 0.1, range: 5f, policy: MovePolicy.Advance));
+        Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 1), host: host);
+        host.OnDiedCallback = _ => world.ShiftOrigin(1f); // 사건 처리 중에 재설정하려는 잘못된 코드
+
+        Assert.Throws<System.InvalidOperationException>(() => Run(world, 10));
     }
 
     // ── 사망 ──

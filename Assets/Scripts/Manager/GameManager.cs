@@ -6,8 +6,6 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
 
-    private bool isScrolling = true;
-
     private Coroutine currentSpawnLoop;
 
     private PlayerController player;
@@ -27,17 +25,6 @@ public class GameManager : MonoBehaviour
     // 1차 UI 이관(Presenter 주입) 전까지만 통로로 남겨 둔다.
     public GameSession Session => session;
     public GoldWallet Wallet => session?.Wallet;
-
-    public bool IsScrolling
-    {
-        get => isScrolling;
-        set
-        {
-            if (isScrolling == value) return;
-            isScrolling = value;
-            GlobalGameEvents.TriggerScrollChanged(isScrolling);
-        }
-    }
 
     private void Awake()
     {

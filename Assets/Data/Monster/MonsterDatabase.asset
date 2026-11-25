@@ -24,6 +24,7 @@ MonoBehaviour:
       attackRange: 0
       skillId: 0
       movePolicy: 0
+      moveSpeed: 0
     prefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
     groundOffset: 0.5
   - data:
@@ -37,6 +38,7 @@ MonoBehaviour:
       attackRange: 0
       skillId: 0
       movePolicy: 0
+      moveSpeed: 0
     prefab: {fileID: 4813688462502952101, guid: 05968968a0bcf4245a9b6c7874fa1c4f, type: 3}
     groundOffset: 0.5
   - data:
@@ -50,6 +52,7 @@ MonoBehaviour:
       attackRange: 0.1
       skillId: 1
       movePolicy: 1
+      moveSpeed: 1
     prefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
     groundOffset: 1.2
   - data:
@@ -63,5 +66,6 @@ MonoBehaviour:
       attackRange: 0.1
       skillId: 6
       movePolicy: 1
+      moveSpeed: 1
     prefab: {fileID: 4813688462502952101, guid: cb04ea20ab6f88b42ab65829f1994016, type: 3}
     groundOffset: 1.2

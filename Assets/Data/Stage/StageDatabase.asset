@@ -22,6 +22,7 @@ MonoBehaviour:
       monsterSpacing: 1.5
       bgTexturePath: Textures/Backgrounds/BG_volcano_1024
       clearType: 0
+      spawnDistance: 6.84
     backgroundTexture: {fileID: 2800000, guid: 36097b5693c0714478ffc6273a352644, type: 3}
   - data:
       stageNumber: 2
@@ -32,6 +33,7 @@ MonoBehaviour:
       monsterSpacing: 1.5
       bgTexturePath: Textures/Backgrounds/BG_mountains_sunset_1024
       clearType: 0
+      spawnDistance: 6.84
     backgroundTexture: {fileID: 2800000, guid: b147266f8e2d8e849ad06136e78d4e77, type: 3}
   - data:
       stageNumber: 3
@@ -42,4 +44,5 @@ MonoBehaviour:
       monsterSpacing: 1.5
       bgTexturePath: Textures/Backgrounds/BG_desert_night2_1024
       clearType: 0
+      spawnDistance: 6.84
     backgroundTexture: {fileID: 2800000, guid: 6a8a8fb6953cc4f45a25c7b27f799696, type: 3}

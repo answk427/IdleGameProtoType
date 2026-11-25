@@ -1,21 +1,20 @@
 using UnityEngine;
 
-// 전투의 유일한 고정 단계(docs/COMBAT_DESIGN.md 3-1, docs/COMBAT_ARCHITECTURE.md 7-11, 8-3). 씬에 하나만 둔다.
+// 전투의 유일한 고정 단계(docs/COMBAT_DESIGN.md 3-1, docs/COMBAT_ARCHITECTURE.md 7-11, 8-3, 9-3). 씬에 하나만 둔다.
 // 전투 규칙과 상태는 CombatWorld(순수 C#)가 갖고, 이 클래스는 그것을 Unity의 시간에 맞춰 돌리는 드라이버다.
 //
 // 한 단계는 정해진 국면 순서로 진행한다.
 //   ② 전투 사건: 교전 중인 모든 전투원의 행동·쿨다운 사건을 단계 안의 정확한 시각 순서로(CombatScheduler)
-//   ③ 단계 전이와 이동: 아군 → 적, 각 팀은 등록 순(이동↔교전 전환, 몬스터 이동, 사망 동작). 위치는 단계마다 적분한다
-//   ④ 배경
+//   ③ 단계 전이와 이동: 아군 → 적, 각 팀은 등록 순(이동↔교전 전환, 전진·접근 이동(sweep), 사망 동작)
 //   ⑤ 보간용 기록, 시계를 다음 단계로
-// (① "보간 위치 되돌리기"는 2단계에서 없어졌다: 로직이 transform을 읽지 않고 Combatant.X가 위치의 주인이다.)
+// (① 보간 위치 되돌리기는 2단계에서, ④ 배경은 3단계에서 없어졌다. 배경은 카메라를 따라 화면 프레임에서 그린다.)
 // 전투 코드는 Time.deltaTime을 쓰지 않고 이 시계(SimClock)의 시각과 단계 길이를 쓴다.
 //
-// 화면 프레임(Update)에서는 전투원 위치와 배경을 직전 두 단계 사이로 보간해 그리기만 한다.
+// 화면 프레임(Update)에서는 전투원 위치를 직전 두 단계 사이로 보간해 그리기만 한다. 카메라와 배경은 그 뒤(CameraRig.LateUpdate).
+// 원점 재설정(스폰 때)이 일어나면 살아 있는 연출(동전, 이펙트, 데미지 숫자)을 같은 양만큼 옮기도록 CombatEffectManager에 전한다.
 public class CombatSimulation : MonoBehaviour
 {
     [SerializeField] private MonsterSpawner monsterSpawner;
-    [SerializeField] private BackgroundScroller backgroundScroller;
 
     public SimClock Clock { get; private set; }
     public CombatWorld World { get; private set; }
@@ -26,15 +25,20 @@ public class CombatSimulation : MonoBehaviour
     {
         Clock = new SimClock(Time.fixedDeltaTime);
         World = new CombatWorld(Clock);
+        World.OriginShifted += HandleOriginShifted;
         World.Add(player.Combatant);
         monsterSpawner.Attach(World);
+    }
+
+    private void OnDestroy()
+    {
+        if (World != null) World.OriginShifted -= HandleOriginShifted;
     }
 
     public bool ValidateReferences()
     {
         bool ok = true;
         if (monsterSpawner == null) { Debug.LogError("[CombatSimulation] monsterSpawner가 연결되지 않았습니다."); ok = false; }
-        if (backgroundScroller == null) { Debug.LogError("[CombatSimulation] backgroundScroller가 연결되지 않았습니다."); ok = false; }
         return ok;
     }
 
@@ -47,12 +51,6 @@ public class CombatSimulation : MonoBehaviour
 
         // ③ 단계 전이와 이동
         World.StepPhases();
-
-        // 스크롤 여부를 배경 쪽(GameManager.IsScrolling 구독자)에 알린다. 3단계에서 카메라 기반으로 바뀐다.
-        if (GameManager.Instance != null) GameManager.Instance.IsScrolling = World.IsAllyAdvancing;
-
-        // ④ 배경
-        backgroundScroller.Tick(Clock);
 
         // ⑤ 이번 단계 결과를 보간용으로 기록하고 시계를 넘긴다.
         World.CaptureStep();
@@ -71,6 +69,10 @@ public class CombatSimulation : MonoBehaviour
         {
             if (combatants[i].Host is CombatantHost host) host.ApplyRenderPose(alpha);
         }
-        backgroundScroller.ApplyRenderOffset(alpha);
+    }
+
+    private static void HandleOriginShifted(float delta)
+    {
+        if (CombatEffectManager.Instance != null) CombatEffectManager.Instance.ShiftOrigin(delta);
     }
 }

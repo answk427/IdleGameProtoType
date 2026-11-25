@@ -1,5 +1,9 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
+// 전투 연출(데미지 숫자, 타격 이펙트, 스킬 이펙트, 보상 동전). 모두 월드 위치에 생기고, 카메라가 지나간다(3단계).
+// 원점 재설정(CombatSimulation이 전함) 때는 지금 살아 있는 것을 같은 양만큼 옮긴다(docs/COMBAT_ARCHITECTURE.md 9-3).
+// 이펙트 프리팹은 로컬 시뮬레이션 공간이어야 한다(트랜스폼만 옮기면 파티클도 따라오게). 월드 공간이면 데이터 검사가 잡는다.
 public class CombatEffectManager : MonoBehaviour
 {
     public static CombatEffectManager Instance;
@@ -22,6 +26,11 @@ public class CombatEffectManager : MonoBehaviour
     [SerializeField] private int maxCoinDropCount = 6;
     [SerializeField] private float chestDropChance = 0.15f;
     [SerializeField] private int rewardSortingOrder = 30;
+
+    // 지금 살아 있는 월드 연출(원점 재설정 때 옮긴다)
+    private readonly List<DamageText> liveTexts = new List<DamageText>();
+    private readonly List<RewardDropEffect> liveDrops = new List<RewardDropEffect>();
+    private readonly List<Transform> liveEffects = new List<Transform>();
 
     private Sprite defaultCoinSprite;
     private Sprite defaultChestSprite;
@@ -82,6 +91,7 @@ public class CombatEffectManager : MonoBehaviour
         }
 
         RectTransform canvasRect = dynamicCanvas.transform as RectTransform;
+        liveTexts.Add(damageText);
         damageText.Play(amount, worldPos, dynamicCanvas, canvasRect, ReturnDamageText, color, prefix);
     }
 
@@ -106,6 +116,7 @@ public class CombatEffectManager : MonoBehaviour
             return;
         }
 
+        liveEffects.Add(obj.transform);
         hitParticle.Play(worldPos, returnedObj => ReturnHitParticle(prefab, returnedObj));
     }
 
@@ -171,6 +182,7 @@ public class CombatEffectManager : MonoBehaviour
             return;
         }
 
+        liveDrops.Add(effect);
         effect.Play(sprite, color, startPosition, landingOffset, duration, size, rewardSortingOrder, rotate, ReturnRewardDrop);
     }
 
@@ -298,6 +310,7 @@ public class CombatEffectManager : MonoBehaviour
         if (vfxPrefab == null) return;
 
         GameObject obj = PoolManager.Instance.Spawn(vfxPrefab, worldPos, Quaternion.identity);
+        liveEffects.Add(obj.transform);
         StartCoroutine(ReturnVfxAfterDelay(vfxPrefab, obj, GetVfxLifetime(obj)));
     }
 
@@ -314,21 +327,42 @@ public class CombatEffectManager : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         if (instance != null)
+        {
+            liveEffects.Remove(instance.transform);
             PoolManager.Instance.Despawn(prefab, instance);
+        }
     }
 
     public void ReturnDamageText(GameObject obj)
     {
+        if (obj.TryGetComponent(out DamageText text)) liveTexts.Remove(text);
         PoolManager.Instance.Despawn(damageTextPrefab, obj);
     }
 
     public void ReturnHitParticle(GameObject prefab, GameObject obj)
     {
+        liveEffects.Remove(obj.transform);
         PoolManager.Instance.Despawn(prefab, obj);
     }
 
     public void ReturnRewardDrop(GameObject obj)
     {
+        if (obj.TryGetComponent(out RewardDropEffect drop)) liveDrops.Remove(drop);
         PoolManager.Instance.Despawn(EnsureRewardDropPrefab(), obj);
+    }
+
+    // 원점 재설정: 지금 살아 있는 월드 연출을 같은 양만큼 옮긴다(전투원·카메라·배경은 시뮬레이션에서 다시 계산하므로 할 일이 없다).
+    public void ShiftOrigin(float delta)
+    {
+        for (int i = 0; i < liveTexts.Count; i++) liveTexts[i].ShiftOrigin(delta);
+        for (int i = 0; i < liveDrops.Count; i++) liveDrops[i].ShiftOrigin(delta);
+        for (int i = 0; i < liveEffects.Count; i++)
+        {
+            Transform t = liveEffects[i];
+            if (t == null) continue;
+            Vector3 position = t.position;
+            position.x -= delta;
+            t.position = position;
+        }
     }
 }

@@ -1,28 +1,25 @@
 using UnityEngine;
 
-// 배경 텍스처 스크롤(러닝 중 UV 오프셋 이동) + 스테이지 전환 시 배경 텍스처 교체를 함께 담당.
+// 배경(docs/COMBAT_ARCHITECTURE.md 9-3). 카메라를 따라 화면을 덮고, 텍스처는 월드가 이동한 거리만큼 흐른다(패럴랙스).
+// 시뮬레이션과 무관한 그림이라 고정 단계가 아니라 화면 프레임(CameraRig.LateUpdate)에서 그린다.
+// 그래서 플레이어가 달리면 그 속도로 흐르고, 멈추면 멈춘다(예전의 "스크롤 중" 상태가 필요 없다).
+// 스테이지가 바뀌면 그 스테이지의 배경 텍스처로 바꾼다.
 public class BackgroundScroller : MonoBehaviour
 {
-    // 플레이어 RunSpeed(월드 단위/초)를 UV 오프셋(0~1) 변화량으로 환산하는 배율.
-    // 텍스처/쿼드 크기에 따라 달라지므로 배경마다 튜닝 가능하게 남겨둔다.
-    [SerializeField]
-    private float scrollScale = 0.25f;
+    [Tooltip("월드 이동 거리(유닛)를 텍스처 오프셋(0~1)으로 바꾸는 배율(패럴랙스). 텍스처·쿼드 크기에 따라 배경마다 조정한다")]
+    [SerializeField] private float scrollScale = 0.25f;
 
-    private Material mat;      // 매터리얼을 담을 변수
+    private Material mat;
 
-    // 보간용 직전/현재 고정 단계의 UV 오프셋 x (docs/COMBAT_DESIGN.md 3-3)
-    private float previousOffsetX;
-    private float currentOffsetX;
-
-    public bool IsActiveScroll { get; private set; } = true;
-
-    void Awake()
+    private void Awake()
     {
-        // GameManager.Start()가 최초 스테이지 진입 시 이벤트를 쏴도
-        // Awake에서 이미 구독을 완료한 상태가 보장
         mat = GetComponent<Renderer>().material;
         GlobalGameEvents.OnStageChanged += HandleStageChanged;
-        GlobalGameEvents.OnScrollChanged += UpdateScrollState;
+    }
+
+    private void OnDestroy()
+    {
+        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
     }
 
     private void HandleStageChanged(int stageNumber)
@@ -35,42 +32,20 @@ public class BackgroundScroller : MonoBehaviour
     {
         if (newBg != null)
         {
+            mat.mainTextureOffset = mat.mainTextureOffset; // 오프셋은 이동 거리에서 다시 계산되므로 그대로 둔다
             mat.mainTexture = newBg;
         }
     }
 
-    // CombatSimulation이 고정 단계마다 부른다. 몬스터와 같은 단계에서 같은 속도로 움직여야 서로 미끄러져 보이지 않는다.
-    public void Tick(SimClock clock)
+    // CameraRig가 화면 프레임마다 부른다. worldDistance = 월드가 처음부터 이동한 거리(원점 재설정과 무관하게 이어진다).
+    public void Follow(float cameraX, double worldDistance)
     {
-        previousOffsetX = currentOffsetX;
-        if (!IsActiveScroll) return;
+        Vector3 position = transform.position;
+        position.x = cameraX;
+        transform.position = position;
 
-        float runSpeed = GameManager.Instance != null ? GameManager.Instance.GetPlayer()?.RunSpeed ?? 0f : 0f;
-        currentOffsetX += runSpeed * scrollScale * (float)clock.StepLength;
-
-        // 1을 넘기면 둘에서 똑같이 빼서, 보간이 0~1 사이를 거꾸로 훑지 않게 한다.
-        if (currentOffsetX >= 1f)
-        {
-            currentOffsetX -= 1f;
-            previousOffsetX -= 1f;
-        }
-    }
-
-    // CombatSimulation이 화면 프레임마다 부른다.
-    public void ApplyRenderOffset(float alpha)
-    {
-        float x = Mathf.Repeat(Mathf.LerpUnclamped(previousOffsetX, currentOffsetX, alpha), 1f);
-        mat.mainTextureOffset = new Vector2(x, mat.mainTextureOffset.y);
-    }
-
-    private void OnDestroy()
-    {
-        GlobalGameEvents.OnScrollChanged -= UpdateScrollState;
-        GlobalGameEvents.OnStageChanged -= HandleStageChanged;
-    }
-
-    private void UpdateScrollState(bool isScrolling)
-    {
-        IsActiveScroll = isScrolling;
+        double offset = worldDistance * scrollScale % 1.0;
+        if (offset < 0.0) offset += 1.0;
+        mat.mainTextureOffset = new Vector2((float)offset, mat.mainTextureOffset.y);
     }
 }
