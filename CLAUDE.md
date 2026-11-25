@@ -157,10 +157,10 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 | 일 | 어디서 |
 |---|---|
 | 코드를 고친 뒤 컴파일 확인, C# 실행, 콘솔 보기, 씬·에셋 편집 | 사용자가 켜 둔 에디터(1). 꺼져 있으면 사본 에디터(2)에서 컴파일하고, 씬·에셋 편집은 원본 배치 모드(3) |
-| 테스트, 플레이 시나리오, 긴 측정, Android 빌드 | 검증용 사본 프로젝트의 Claude 전용 에디터(2) |
+| 테스트, 플레이 시나리오, 긴 측정, Android 빌드 | 검증용 사본 프로젝트의 Claude 전용 에디터(2). 시작 전 `Tools/VerifyCopy.ps1 -Action Sync` |
 | 화면을 봐야 하는 확인 | Android 기기(4). 에디터 화면이 꼭 필요하면 사용자 에디터에서 플레이(1의 세이브 보호 규칙) |
 
-이유: 켜 둔 에디터는 빠르지만(명령 0.2~0.6초, 컴파일 수 초) 사용자의 것이다. 플레이 모드·테스트·빌드는 사용자 작업을 끊고, 테스트의 무한 반복은 사용자 에디터를 멈춘다. 예전에는 그런 일마다 사용자가 에디터를 닫고 원본에서 배치 모드를 돌렸다(실행마다 시작 1~2분, 화면 없음). 사본은 프로젝트 폴더가 달라 잠금이 겹치지 않고, 상주 에디터라 시작 비용이 한 번뿐이다.
+이유: 켜 둔 에디터는 빠르지만(명령 0.2~0.6초, 컴파일 수 초) 사용자의 것이다. 플레이 모드·테스트·빌드는 사용자 작업을 끊고, 테스트의 무한 반복은 사용자 에디터를 멈춘다. 예전에는 그런 일마다 사용자가 에디터를 닫고 원본에서 배치 모드를 돌렸다(실행마다 시작 1~2분, 화면 없음). 사본은 프로젝트 폴더가 달라 잠금이 겹치지 않고, 상주 에디터라 시작 비용이 한 번뿐이다. 다른 방법과 비교해 정했다(2026-11-25): 링크 사본(ParrelSync처럼 `Assets`를 공유)은 사본의 쓰기(임시 검증 스크립트, 플레이 중 바뀌는 에셋)가 원본에 들어가고, git worktree는 커밋 전 코드를 담지 못한다(커밋은 지시가 있을 때만).
 
 1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: `com.unity.pipeline` 1.0.1 설치됨, 회사 PC에서 켜 둔 에디터 연결 확인**(`unity status`, `script eval`, `console`, `capture editor_window`, `recompile` 동작. Claude 데스크톱 앱의 MSIX 샌드박스에서도 됨). 사본 에디터가 함께 떠 있을 수 있으므로 **모든 명령에 `--project-path <원본>`을 붙인다.**
    - **사용자 세이브 보호(필수):** 켜 둔 에디터는 사용자의 진짜 세이브를 쓴다. 플레이 모드에 들어가기 전에 항상 `SaveProfile.SetActive(SaveProfile.VerificationProfile)`(`claude` 프로필)을 켜고, 진입 후 콘솔에 `[Save] 검증용 프로필 'claude' 사용 중` 경고가 있는지 확인한 뒤 검증한다. 경고가 없으면 즉시 플레이를 끝낸다. 검증이 끝나면 플레이를 나와서 `SaveProfile.SetActive(null)`로 되돌린다.
@@ -171,14 +171,18 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
    - **빌드는 사본(2)에서 한다.** 켜 둔 에디터에서도 `unity command build run`으로 되지만 빌드하는 몇 분 동안 사용자 에디터가 묶인다.
 2. **검증용 사본 프로젝트 + Claude 전용 상주 에디터** — 테스트, 플레이 시나리오, 긴 측정, 빌드. 개발자 도구를 이 방식으로 검증했다(2026-11-25).
    - **위치:** 프로젝트 옆 폴더(회사 PC는 `..\IdleGameProtoType_verify`). git 저장소가 아니라 원본의 복사본이다.
-   - **동기화는 원본 → 사본 한 방향:** `robocopy <원본>\<폴더> <사본>\<폴더> /MIR`를 `Assets`, `Packages`, `ProjectSettings`에 대해(종료 코드 8 미만이 성공). 사본에서 고친 것은 다음 동기화 때 사라진다. **씬·에셋·코드 수정은 원본에서만 한다.** 임시 검증 스크립트(시나리오, 러너)는 사본에만 두고, 원본에는 넣지 않는다.
-   - **만들 때:** 원본 `Library`를 복사하면 가져오기를 건너뛴다. `Bee`(Android 빌드 캐시, 약 6.7GB), `Pipeline`, `_verify`, **`ilpp.pid`, `*-lock`은 빼고** 복사한다. 2026-11-25에 `ilpp.pid`까지 복사했더니 사본 에디터가 시작하면서 사용자 에디터의 IL 후처리 프로세스를 "남은 프로세스"로 보고 종료시켰다(사용자 에디터는 다음 컴파일 때 다시 띄우므로 문제는 없었다).
+   - **동기화는 `Tools/VerifyCopy.ps1` 하나로만 한다**(원본 → 사본 한 방향). `powershell -NoProfile -ExecutionPolicy Bypass -File Tools/VerifyCopy.ps1 -Action <Sync|Check|Clean>`. 사본 경로는 원본 옆 `<원본 폴더 이름>_verify`로 계산한다.
+     - `Sync`: `Assets`, `Packages`, `ProjectSettings`를 미러 복사 → 사본 에디터가 떠 있으면 새로 읽고 컴파일 → 원본과 파일 내용(SHA-256) 비교. **종료 코드 0일 때만 검증을 시작한다**(1 다름, 2 실행 실패, 3 사본 컴파일 실패). 약 40초(에디터 새로 읽기 포함).
+     - `Check`: 비교만(약 2초). **검증 결과를 보고하기 전에** 돌려 검증하는 동안 원본이 바뀌지 않았는지 보고, 보고에 출력의 지문(`사본 = 원본 (파일 N개, 지문 …)`)을 적는다. 다르면 무엇이 다른지 보고 판단한다(사본에서 플레이하면 TMP 동적 폰트 에셋이 바뀔 수 있다).
+     - 사본에서 고친 것은 다음 동기화 때 사라진다. **씬·에셋·코드 수정은 원본에서만 한다.**
+     - **임시 검증 스크립트(시나리오, 러너)는 사본의 `Assets/_ClaudeVerify/`에 둔다**(에디터 스크립트는 그 안의 `Editor/`). 이 폴더와 `.meta`는 복사·삭제·비교에서 빠져 동기화해도 남는다. 원본에는 넣지 않고, 다 쓰면 지운다.
+   - **만들 때:** 원본 `Library`를 복사하면 가져오기를 건너뛴다. `Bee`(Android 빌드 캐시, 약 6.7GB), `Pipeline`, `_verify`, **`ilpp.pid`, `*-lock`은 빼고** 복사한다. 2026-11-25에 `ilpp.pid`까지 복사했더니 사본 에디터가 시작하면서 사용자 에디터의 IL 후처리 프로세스를 "남은 프로세스"로 보고 종료시켰다(사용자 에디터는 다음 컴파일 때 다시 띄우므로 문제는 없었다). 만든 뒤 `Sync`가 0을 내는지 확인한다.
    - **에디터:** `Unity.exe -batchmode -projectPath <사본> -logFile <사본>\Logs\resident_editor.log`(`-quit` 없음 → 상주)를 백그라운드로 띄우고 `unity status --until-ready --project-path <사본>`. 이후 **모든 명령에 `--project-path <사본>`**.
      - 컴파일 `unity recompile`, 테스트 `unity command test run --mode editor`, 플레이 `unity command editor.playmode start|stop`, C# `unity command script eval`.
      - 빌드 `unity command build run --target Android --output-path Builds/<이름>.apk --options '["Development"]' --confirm true` 후 `unity command build status`. 사본에는 `Bee` 캐시가 없어 첫 빌드는 처음부터 한다.
-     - 동기화하거나 사본 파일을 고친 뒤에는 `unity recompile`로 새로 읽게 한다(창 없는 에디터는 파일 변경을 스스로 보지 않는다).
+     - 창 없는 에디터는 파일 변경을 스스로 보지 않는다. `Sync`가 새로 읽기와 컴파일까지 하므로, `_ClaudeVerify`의 파일을 고친 뒤에도 `Sync`를 다시 돌린다.
    - **세이브:** `persistentDataPath`가 원본과 같다(회사·제품 이름이 같다). 사본에서도 플레이 전에 `claude` 프로필을 켜고 경고를 확인한다(1의 세이브 보호 규칙 그대로).
-   - **수명:** 사본 에디터는 Claude의 것이라 멈추면 사용자 승인 없이 끌 수 있다. 다음 검증이 빠르도록 켜 둬도 되고, 디스크가 필요하면 사본 폴더째 지워도 된다(다시 만들면 된다).
+   - **수명과 크기:** 사본 에디터(메모리 약 0.9GB)는 Claude의 것이라 사용자 승인 없이 끌 수 있다. 검증이 이어지는 동안은 켜 두고, 그날 검증이 끝나거나 한동안 검증할 일이 없으면 끄고(`unity close <사본>`) `Clean`을 돌린다. `Clean`은 빌드 캐시(`Library/Bee`, Android 빌드 뒤 약 6GB)와 가장 최근 APK가 아닌 빌드 결과(기호 폴더 약 0.6GB 포함)를 지운다. 사본은 빌드 직후 약 9GB, `Clean` 뒤 약 2GB. 대가는 다음 빌드가 처음부터(약 8분)인 것과 다음 시작 때 스크립트 전체 재컴파일이다. 사본 폴더째 지워도 된다(다시 만들면 된다).
 3. **원본 배치 모드(사용자 에디터가 꺼져 있을 때만)** — `Unity.exe`를 창 없이 띄워 일을 시키고 종료한다. 씬·에셋 편집처럼 원본에서 해야 하는 일에 쓴다. 0단계(GameSession/GameInitializer)를 이 방식으로 구현·검증했다.
    - **실행 전:** 사용자가 이 프로젝트를 에디터로 열고 있으면 실행할 수 없다(프로젝트 잠금, `Temp/UnityLockfile`). Unity 프로세스가 없는지 먼저 확인.
    - **컴파일 + 임의 작업:** `Unity.exe -batchmode -quit -projectPath <프로젝트> -executeMethod <클래스.메서드> -logFile <로그>`. 로그에서 `error CS`, `Exception`, `Exiting batchmode successfully now!`를 확인. 한 번에 1~2분 걸린다.
