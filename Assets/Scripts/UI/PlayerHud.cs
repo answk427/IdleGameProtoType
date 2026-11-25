@@ -35,16 +35,23 @@ public class PlayerHud : UIHud
         player.Stats.OnExpChanged += UpdateExpBar;
         player.Stats.OnLevelUp += UpdateLevelText;
         player.Stats.OnUpgraded += RefreshHpBar;
+        player.Stats.OnReloaded += RefreshProgress;
 
         if (GameManager.Instance != null)
         {
             GameManager.Instance.Wallet.OnGoldChanged += UpdateGoldText;
         }
 
+        RefreshProgress();
+        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : GameNumber.Zero);
+    }
+
+    // 처음 보일 때와 진행도가 통째로 바뀌었을 때(PlayerStats.OnReloaded). 골드는 지갑이 따로 알린다.
+    private void RefreshProgress()
+    {
         UpdateHpBar(player.CurrentHp, player.MaxHp);
         UpdateExpBar(player.Stats.CurrentExp, player.Stats.RequiredExp);
         UpdateLevelText(player.Stats.Level);
-        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : GameNumber.Zero);
     }
 
     protected override void OnHidden()
@@ -55,6 +62,7 @@ public class PlayerHud : UIHud
             player.Stats.OnExpChanged -= UpdateExpBar;
             player.Stats.OnLevelUp -= UpdateLevelText;
             player.Stats.OnUpgraded -= RefreshHpBar;
+            player.Stats.OnReloaded -= RefreshProgress;
         }
 
         if (GameManager.Instance != null)

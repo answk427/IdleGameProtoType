@@ -30,6 +30,16 @@ public class GameInitializer : MonoBehaviour
 
     public GameSession Session { get; private set; }
 
+    // 조립이 끝난 뒤에만 의미가 있다(IsInitialized). 조립 지점이 모르는 쪽(개발 도구, docs/DEV_TOOLS.md T2)이 읽는다.
+    public bool IsInitialized { get; private set; }
+    public PlayerController Player { get; private set; }
+    public GameManager GameManager => gameManager;
+    public CombatSimulation CombatSimulation => combatSimulation;
+    public UIRoot UIRoot => uiRoot;
+
+    // 조립이 끝났을 때 한 번 알린다. 세이브를 읽지 못해 중단되면 알리지 않는다.
+    public event System.Action<GameInitializer> Initialized;
+
     private void Start()
     {
         // 참조가 빠지면(인스펙터 연결 누락) 에러 없이 null로 진행되다가 엉뚱한 곳에서 터진다.
@@ -64,6 +74,10 @@ public class GameInitializer : MonoBehaviour
         gameManager.Initialize(Session, player);
         combatSimulation.Initialize(player);
         uiRoot.Initialize(Session, GameDatabaseManager.Instance.GetAllSkills(), player);
+
+        Player = player;
+        IsInitialized = true;
+        Initialized?.Invoke(this);
     }
 
     private bool ValidateReferences()

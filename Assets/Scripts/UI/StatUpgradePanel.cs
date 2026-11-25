@@ -60,6 +60,7 @@ public class StatUpgradePanel : UITabPanel
         player.Stats.OnUpgraded += RefreshAll;
         player.Stats.OnExpChanged += OnExpChanged;
         player.Stats.OnLevelUp += OnLevelUp;
+        player.Stats.OnReloaded += RefreshAll;
 
         if (GameManager.Instance != null)
         {
@@ -76,6 +77,7 @@ public class StatUpgradePanel : UITabPanel
             player.Stats.OnUpgraded -= RefreshAll;
             player.Stats.OnExpChanged -= OnExpChanged;
             player.Stats.OnLevelUp -= OnLevelUp;
+            player.Stats.OnReloaded -= RefreshAll;
         }
 
         if (GameManager.Instance != null)

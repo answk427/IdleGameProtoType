@@ -28,6 +28,9 @@ public class UIRoot : MonoBehaviour
     private InputBlocker inputBlocker;
     private InputAction backAction;
 
+    // Initialize 뒤에만 있다. 창이 아닌 화면(개발 도구 패널)도 같은 입력 차단을 쓴다.
+    public InputBlocker InputBlocker => inputBlocker;
+
     public void Initialize(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerController player)
     {
         if (windows != null || !ValidateReferences()) return;

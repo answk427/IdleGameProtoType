@@ -46,9 +46,11 @@ public sealed class InputBlocker
     }
 
     // 차단은 즉시, 스피너는 SpinnerDelay를 넘을 때만. 자체 연출이 있는 차단(화면 페이드)은 스피너를 끈다.
-    public IDisposable Acquire(string reason, bool showSpinner = true)
+    // warnIfLong: 오래 풀리지 않으면 경고한다(영구 잠금 디버깅용). 사용자가 닫을 때까지 쥐는 차단
+    // (개발 도구 패널, 이후 튜토리얼)은 길어도 정상이라 끈다.
+    public IDisposable Acquire(string reason, bool showSpinner = true, bool warnIfLong = true)
     {
-        var lease = new Lease(this, reason, showSpinner);
+        var lease = new Lease(this, reason, showSpinner) { Warned = !warnIfLong };
         leases.Add(lease);
 
         if (leases.Count == 1)

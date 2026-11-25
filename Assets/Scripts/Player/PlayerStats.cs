@@ -37,6 +37,11 @@ public class PlayerStats
     public event Action OnSkillLearned;           // 스킬 학습 시
     public event Action OnSkillEquipChanged;      // 스킬 슬롯 배치 변경 시
 
+    // 진행도가 통째로 바뀌었을 때(LoadSave). 저장을 일으키지 않는 사건이라 위의 사건과 따로 둔다.
+    // 받는 쪽은 진행도에서 읽은 값을 전부 다시 읽는다(능력치, 장착 스킬, HUD의 레벨·경험치).
+    // 과도기 장치: 4단계에서 레벨·경험치가 반응형 상태가 되면 UI 쪽 구독은 반응형 구독으로 대체된다(docs/DEV_TOOLS.md T6).
+    public event Action OnReloaded;
+
     // ── 참조 ────────────────────────────────────────────────
     private PlayerStatDatabase statData;
     private PlayerUpgradeConfig upgradeConfig;
@@ -57,7 +62,8 @@ public class PlayerStats
     public int Level => saveData?.level ?? 1;
     public int CurrentExp => saveData?.currentExp ?? 0;
     public int RequiredExp => statData?.GetRequiredExp(Level) ?? 999;
-    public bool IsMaxLevel => Level >= (statData?.MaxLevel ?? 1);
+    public int MaxLevel => statData?.MaxLevel ?? 1;
+    public bool IsMaxLevel => Level >= MaxLevel;
 
     // 최종 스탯 = 기본 + 업그레이드 보너스. HP·공격력은 전투 수치라 GameNumber다(D14, 계산은 double이라 int처럼 넘치지 않는다).
     public GameNumber MaxHp => GameNumber.FromDouble((double)BaseStat.BaseMaxHp + (double)(saveData?.hpUpgradeLevel ?? 0) * upgradeConfig.settings.hpPerUpgrade);
@@ -94,13 +100,15 @@ public class PlayerStats
 
     // GameSession.Apply()가 호출한다. PlayerStats 객체 자체는 그대로 두고 데이터만 갈아끼우므로,
     // 이 객체를 참조하는 쪽(캐릭터, UI)은 다시 연결할 필요가 없다.
+    // 실행 중에도 불릴 수 있다(진행도 교체, 서버 롤백). 그래서 끝에서 OnReloaded로 알린다.
     public void LoadSave(PlayerStatsSaveData data)
     {
         saveData = data ?? new PlayerStatsSaveData();
 
-        // 상태만 갱신한다. 저장을 일으키는 사건(OnSkillLearned 등)은 내지 않는다.
+        // 저장을 일으키는 사건(OnSkillLearned 등)은 내지 않는다.
         SetLearnedSkills(saveData.learnedSkillIds ?? new List<int>());
         SetEquippedSlots(saveData.equippedSkillSlotIds ?? new PlayerStatsSaveData().equippedSkillSlotIds);
+        OnReloaded?.Invoke();
     }
 
     // ── 경험치 / 레벨업 ─────────────────────────────────────

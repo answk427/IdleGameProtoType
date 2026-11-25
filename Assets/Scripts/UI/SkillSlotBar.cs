@@ -52,6 +52,7 @@ public class SkillSlotBar : UITabPanel
         }
 
         player.Stats.OnSkillEquipChanged += RefreshAll;
+        player.Stats.OnReloaded += RefreshAll;
 
         RefreshAll();
     }
@@ -61,6 +62,7 @@ public class SkillSlotBar : UITabPanel
         if (player != null)
         {
             player.Stats.OnSkillEquipChanged -= RefreshAll;
+            player.Stats.OnReloaded -= RefreshAll;
         }
     }
 

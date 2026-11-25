@@ -87,7 +87,7 @@ ISaveStorage                        IGameServer       ServerOwnedState (서버 �
 
 **지금 (UI_DESIGN의 0단계·1차에 포함, 비용 작음)**
 
-1. **`GameSession.Apply(스냅샷)`은 객체를 새로 만들지 않고 값만 덮어쓴다.** Presenter들이 GameSession을 참조하고 있어서, 객체를 새로 만들면 구독이 옛 객체에 남는다. 세이브 로드도 같은 경로를 써서 로드와 롤백을 같은 코드로 만든다. GameSession 설계 자체에 관한 것이라 나중에 바꾸면 비싸다.
+1. **`GameSession.Apply(스냅샷)`은 객체를 새로 만들지 않고 값만 덮어쓴다.** Presenter들이 GameSession을 참조하고 있어서, 객체를 새로 만들면 구독이 옛 객체에 남는다. 세이브 로드도 같은 경로를 써서 로드와 롤백을 같은 코드로 만든다. GameSession 설계 자체에 관한 것이라 나중에 바꾸면 비싸다. 실행 중에 진행도를 바꾸는 입구는 `GameManager.LoadSnapshot`(검사 → 복사본 적용 → 그 스테이지 처음부터 → 저장)으로 먼저 만들었다. 개발자 도구가 첫 사용자다([DEV_TOOLS.md](DEV_TOOLS.md) T5).
 2. **명령 결과 타입**(`UpgradeResult` 등, 실패 이유 포함) — UI_DESIGN 10-1에서 결정됨.
 3. **시간 규칙:** 실제 시각이 필요하면 `IClock`을 통해서만 얻는다. 지금은 해당 코드가 없으므로 규칙만 둔다.
 4. 1장의 소유권 규칙.

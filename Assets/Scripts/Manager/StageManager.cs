@@ -4,7 +4,6 @@ public class StageManager : MonoBehaviour
 {
     [SerializeField] private StageData stage;
 
-    private int currentStageIndex;
     private int encounterProgress;
     private bool bossAvailable;
     private bool isStageCleared;
@@ -40,7 +39,6 @@ public class StageManager : MonoBehaviour
         }
 
         stage = nextStageEntry.data;
-        currentStageIndex = stageNumber;
 
         Initialize();
         GlobalGameEvents.TriggerStageChanged(stageNumber);
@@ -77,23 +75,5 @@ public class StageManager : MonoBehaviour
         return true;
     }
 
-    public bool TryAdvanceStage()
-    {
-        if (!IsCompleted())
-        {
-            return false;
-        }
-
-        if (!Initialize(currentStageIndex + 1))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    public bool IsCompleted()
-    {
-        return isStageCleared;
-    }
+    // 다음 스테이지로 넘어가는 것은 GameManager.RestartAt(흐름 입구 하나)이 정한다.
 }

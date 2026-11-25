@@ -7,7 +7,7 @@ Unity 2D 방치형(idle) 액션 게임 프로토타입. Unity 6000.4.9f1.
 
 ## 핵심 게임 루프
 
-`GameInitializer.Start()`(세이브 로드 → `GameSession` 생성 → 플레이어 스폰) → `GameManager.Initialize(session, player)` → `StageManager.Initialize(stage)` → 몬스터 인카운터 반복 스폰(`MonsterSpawner`) → 인카운터 다 죽이면 보스 도전 가능 → 보스 클리어 시 다음 스테이지로 전환. 플레이어는 자동 전투(타겟 자동 탐색 + 공격)만 하며 조작 입력은 없음 — 스탯 업그레이드와 스킬 장착만 플레이어가 직접 함.
+`GameInitializer.Start()`(세이브 로드 → `GameSession` 생성 → 플레이어 스폰) → `GameManager.Initialize(session, player)` → `StageManager.Initialize(stage)` → 몬스터 인카운터 반복 스폰(`MonsterSpawner`) → 인카운터 다 죽이면 보스 도전 가능 → 보스 클리어 시 다음 스테이지로 전환. 스테이지를 처음부터 시작하는 길은 `GameManager.RestartAt(스테이지)` 하나다(사망 = 같은 스테이지, 클리어 = 다음, 마지막이면 그 스테이지. 개발자 도구의 이동과 진행도 교체도 이 길). 플레이어는 자동 전투(타겟 자동 탐색 + 공격)만 하며 조작 입력은 없음 — 스탯 업그레이드와 스킬 장착만 플레이어가 직접 함.
 
 ## 데이터 아키텍처 (Excel → JSON → ScriptableObject)
 
@@ -99,7 +99,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 설계는 `docs/UI_DESIGN.md`가 기준. 지금은 1차 이관 중이라 두 시스템이 공존한다 — **화면 하나의 주인은 하나, 두 시스템을 아는 곳은 `UIRoot` 하나.**
 
-새 구조 (`Assets/Scripts/UI/Core/`) — **새 팝업은 전부 여기로 만든다.**
+새 구조 (`Assets/Scripts/UI/Core/`) — **새 팝업은 전부 여기로 만든다.** (예외: 개발자 도구 패널은 IMGUI, 아래 "개발자 도구")
 - `UIRoot` — 조립 지점. 창별 Presenter 생성 함수를 `Bind`로 등록하고, 기존 `UIManager`와 연결(열기 요청, 탭 전환 시 닫기, 뒤로가기 순서)한다.
 - `WindowManager` — 로드/스택/정렬(`UISortBand`)/뒤로가기/열린 창 Tick. 열기는 `windows.Open<SkillManageWindow>(new SkillManageArgs())`, 닫힘과 결과는 `await handle.Closed`.
 - 창 추가 순서: ① `UIWindow<TArgs>` View(구조는 `Options`로 코드에) + `TArgs : IWindowArgs<그 창>` ② View 인터페이스 + 순수 C# Presenter(구독은 `CompositeDisposable`) ③ 프리팹(Canvas 넣지 않음)을 `Assets/Data/UI/WindowRegistry.asset`에 등록 ④ `UIRoot`에 `Bind`.
@@ -122,6 +122,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, 전투 단계)는 전투원(`Combatant`, 호스트 `PlayerController`)이 갖는다.
 - **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `ISaveStorage.Load()`(예외면 여기서 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `GameManager.Initialize(session, player)` → `CombatSimulation.Initialize(player)` → `UIRoot.Initialize(session, 스킬 목록, player)`. 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
 - **저장 데이터 변환은 `GameSession.Apply(PlayerSaveData)` / `GameSession.ToSaveData()` 두 곳뿐.** `Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다(세션/Stats/Wallet을 참조하는 쪽이 옛 객체를 붙잡지 않게). 세이브 로드와 이후 서버 롤백(`docs/SERVER_DESIGN.md`)이 같은 경로를 쓴다.
+- **실행 중 진행도 교체는 `GameManager.LoadSnapshot(스냅샷)`** — 저장과 같은 검사 → JSON 복사본을 `Apply` → 그 스테이지를 `RestartAt`(저장 포함). `Apply`는 넘겨받은 객체를 그대로 붙잡으므로 직접 부를 때는 복사본을 넘긴다. 교체를 알리는 사건은 `PlayerStats.OnReloaded`(저장을 일으키지 않음)이고, 진행도에서 값을 읽어 둔 쪽(캐릭터 능력치·장착 스킬, HUD, 캐릭터 탭, 스킬 슬롯 바)은 여기서 다시 읽는다. 진행도에서 읽은 값을 캐시하는 새 코드도 이것을 구독할 것(안 하면 교체 뒤 옛 값이 남는다. 4단계에서 반응형으로 바뀌면 대체된다).
 - **저장 백엔드는 `ISaveStorage`로 추상화**(`Assets/Scripts/Player/ISaveStorage.cs`, 최상위 `PlayerSaveData` 기준). `LocalFileSaveStorage`가 현재 구현체(JSON을 `Application.persistentDataPath/player_save.json`에 입출력). `SaveStorageProvider.Current`가 스위치 지점 — 나중에 서버 저장으로 바꿀 때 `ServerSaveStorage : ISaveStorage`를 새로 만들고 `SaveStorageProvider.Current`에 대입하는 한 줄만 바꾸면 됨. `Load()`는 동기(`GameInitializer.Start()`에서 즉시 써야 해서), `Save()`는 `IEnumerator`(코루틴) — 호출부가 기다리지 않는 fire-and-forget이라 서버 지연을 흡수할 수 있게 미리 비동기 모양으로 잡아둔 것.
 - **손상된 세이브는 새 데이터로 대신하지 않는다.** `Load()`는 파일이 없을 때만 신규 데이터를 주고, 파일이 있는데 온전히 읽을 수 없으면 예외를 던진다. `GameInitializer`가 잡아서 세션 없이 중단하므로 종료 저장을 포함한 어떤 저장도 원본을 건드리지 않는다. 새 저장소 구현체도 이 규칙을 지킬 것.
 - **검사는 `SaveDataValidator`(`Assets/Scripts/Player/SaveDataValidator.cs`) 한 곳.** `JsonUtility`는 없는 필드를 기본값으로 채워 변환 후에는 손상을 알 수 없어서, 변환 전에 `JObject`로 필수 키/타입/하한/슬롯 길이/중복 키를 본다. `Save()`도 같은 검사를 통과한 값만 쓴다(`NaN` 등이면 에러 로그 후 기존 파일 유지). 상한은 보지 않는다(데이터가 줄었을 때 정상 세이브를 막지 않게).
@@ -135,6 +136,13 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - 세이브 파일 경로: `C:\Users\<user>\AppData\LocalLow\DefaultCompany\IdleGameProtoType\player_save.json`
 - **에디터 검증용 세이브 프로필**(`SaveProfile`, `Assets/Scripts/Player/SaveProfile.cs`): 에디터에서만 켤 수 있고, 켜면 세이브 폴더가 `persistentDataPath/profiles/<이름>/`로 바뀐다(형식과 저장 코드는 같음). 값은 `SessionState`라 에디터를 끄면 기본으로 돌아오고, 플레이 중에는 바꿀 수 없다. 메뉴는 `IdleGame/Save Profile/...`, `IdleGame/Reset Save Data`는 지금 켜진 프로필의 세이브를 지운다. 빌드에는 프로필 코드가 없어서 항상 기본 경로를 쓴다.
 
+## 개발자 도구 (`docs/DEV_TOOLS.md`)
+
+- **에디터와 개발 빌드에만 있다.** 어셈블리 `IdleGameProtoType.DevTools`(`Assets/Scripts/DevTools/`)의 define constraint가 `UNITY_EDITOR || DEVELOPMENT_BUILD`라 릴리스 빌드에서는 컴파일되지 않는다. 게임 코드는 도구를 모른다(도구가 `GameInitializer.Initialized`에 붙는다). **게임 어셈블리에서 DevTools를 참조하지 말 것**(릴리스 빌드가 깨진다).
+- 화면 오른쪽 위(골드 아래)의 `DEV` 버튼 또는 에디터의 `` ` `` 키로 연다. 패널은 IMGUI다(에셋을 가질 수 없어서 "새 팝업은 UIWindow" 규칙의 예외). 열려 있는 동안 게임 UI 입력은 `InputBlocker`로 막는다.
+- 명령: 스테이지 이동·처음부터·보스전, 골드 x10·경험치 +1레벨분, 레벨 지정, 백업·복원·새로 시작, 배속 x1~x10, 판정 몸 표시. 코드에서는 `DevTools.Commands`(Claude가 플레이 중 `script eval`로 쓸 수 있다).
+- **개발 도구 전용 게임 API를 만들지 않는다.** 더하는 명령은 보상 경로(`Wallet.AddGold`, `PlayerStats.AddExp`), 통째로 바꾸는 명령은 `GameManager.LoadSnapshot` 하나를 지난다. 덮어쓰기 전에는 `<세이브 폴더>/dev_backups/`에 자동 백업하고, 백업이 실패하면 덮어쓰지 않는다.
+
 ## 작업 시 주의사항
 
 - **테스트는 작성해도 된다**(2026-11-23 합의 변경. 전에는 새 테스트를 만들지 않기로 했다). 반복해서 쓸 검증은 테스트로 `Assets/Tests/EditMode/`에 둔다. 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 확인한다(예: `docs/COMBAT_ARCHITECTURE.md` 5절). 일회성 측정 스크립트는 저장소에 넣지 않고 쓰고 지운다. 실패 중인 기존 테스트 2개(`AddExp`)는 고칠지 지울지 결정 대기(`docs/TODO.md`).
@@ -144,16 +152,34 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 외부 도구: Unity 에디터 조작
 
-에디터 조작(컴파일 확인, 씬 편집, 플레이 모드 확인, 테스트)은 아래 우선순위로 한다. 기계별 경로(에디터 설치 위치 등)는 이 파일이 아니라 Claude memory에 있다.
+에디터 조작은 **일의 종류로 나눈다**(2026-11-25 정함). **사용자에게 에디터를 닫아 달라고 하지 않는다.** 기계별 경로(에디터 설치 위치, 사본 위치)는 이 파일이 아니라 Claude memory에 있다.
 
-1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: `com.unity.pipeline` 1.0.1 설치됨, 회사 PC에서 켜 둔 에디터 연결 확인**(`unity status`, `script eval`, `console`, `capture editor_window` 동작. Claude 데스크톱 앱의 MSIX 샌드박스에서도 됨). 에디터가 켜져 있으면 배치 모드는 쓸 수 없으므로(프로젝트 잠금) 이 방식을 쓴다.
+| 일 | 어디서 |
+|---|---|
+| 코드를 고친 뒤 컴파일 확인, C# 실행, 콘솔 보기, 씬·에셋 편집 | 사용자가 켜 둔 에디터(1). 꺼져 있으면 사본 에디터(2)에서 컴파일하고, 씬·에셋 편집은 원본 배치 모드(3) |
+| 테스트, 플레이 시나리오, 긴 측정, Android 빌드 | 검증용 사본 프로젝트의 Claude 전용 에디터(2) |
+| 화면을 봐야 하는 확인 | Android 기기(4). 에디터 화면이 꼭 필요하면 사용자 에디터에서 플레이(1의 세이브 보호 규칙) |
+
+이유: 켜 둔 에디터는 빠르지만(명령 0.2~0.6초, 컴파일 수 초) 사용자의 것이다. 플레이 모드·테스트·빌드는 사용자 작업을 끊고, 테스트의 무한 반복은 사용자 에디터를 멈춘다. 예전에는 그런 일마다 사용자가 에디터를 닫고 원본에서 배치 모드를 돌렸다(실행마다 시작 1~2분, 화면 없음). 사본은 프로젝트 폴더가 달라 잠금이 겹치지 않고, 상주 에디터라 시작 비용이 한 번뿐이다.
+
+1. **실행 중인 에디터에 연결: Unity CLI + Pipeline 패키지** — 사용자가 에디터를 켜 두었고 프로젝트에 `com.unity.pipeline`이 있으면 `unity status`로 연결을 확인하고 `unity command ...`(플레이 모드, C# 실행, 콘솔, 스크린샷)로 실시간 조작한다. **셸을 쓸 수 있으면 MCP보다 CLI를 우선한다**(CLI가 더 많은 기능을 쓴다). 사용법은 `unity-cli` 스킬. **현재 상태: `com.unity.pipeline` 1.0.1 설치됨, 회사 PC에서 켜 둔 에디터 연결 확인**(`unity status`, `script eval`, `console`, `capture editor_window`, `recompile` 동작. Claude 데스크톱 앱의 MSIX 샌드박스에서도 됨). 사본 에디터가 함께 떠 있을 수 있으므로 **모든 명령에 `--project-path <원본>`을 붙인다.**
    - **사용자 세이브 보호(필수):** 켜 둔 에디터는 사용자의 진짜 세이브를 쓴다. 플레이 모드에 들어가기 전에 항상 `SaveProfile.SetActive(SaveProfile.VerificationProfile)`(`claude` 프로필)을 켜고, 진입 후 콘솔에 `[Save] 검증용 프로필 'claude' 사용 중` 경고가 있는지 확인한 뒤 검증한다. 경고가 없으면 즉시 플레이를 끝낸다. 검증이 끝나면 플레이를 나와서 `SaveProfile.SetActive(null)`로 되돌린다.
    - **열린 씬이 MainScene이 아닐 수 있다**(빈 새 씬이 열려 있던 적 있음). 사용자가 연 씬을 바꾸지 말고 `EditorSceneManager.playModeStartScene`에 MainScene을 넣고 플레이한 뒤 `null`로 되돌린다.
    - **자동 반복 측정:** 플레이를 여러 번 돌릴 때는 임시 `[InitializeOnLoad]` 러너가 `SessionState`의 실행 목록을 하나씩 꺼내 플레이하고, 런타임 쪽 임시 스크립트(`#if UNITY_EDITOR`, `RuntimeInitializeOnLoadMethod`)가 `Time.captureDeltaTime`으로 프레임을 고정해 결과를 쓰고 플레이를 끝낸다. 결과와 큐 파일은 `Library/_verify/`처럼 `Temp/` 밖에 둔다(에디터를 닫으면 `Temp/`가 통째로 지워진다). 배치 모드에서는 러너를 `-executeMethod`로 시작하고 큐가 끝나면 `EditorApplication.Exit`로 종료한다(2·3단계 검증에 씀). 전투 고정 타임스텝 검증에 쓴 것이 이 방식이다(스크립트는 지웠다). 플레이 중에는 스크립트를 고치지 않는다(재컴파일이 측정 사이에 끼어든다).
-   - **테스트는 에디터의 메인 스레드에서 돈다.** 새 테스트나 테스트하는 코드에 무한 반복이 있으면 켜 둔 에디터 전체가 멈추고, 프로세스를 끝내는 것 말고는 풀 수 없다(2026-11-24에 `ActionRunner` 버그로 한 번 겪었다). 반복이나 시간을 다루는 코드를 크게 바꿨으면, 사용자에게 에디터를 닫아도 되는지 묻고 배치 모드(`-runTests`, 프로세스에 시간 제한)로 먼저 돌린다. 에디터를 강제 종료할 때는 먼저 사용자 승인을 받는다.
+   - **테스트는 에디터의 메인 스레드에서 돈다.** 새 테스트나 테스트하는 코드에 무한 반복이 있으면 그 에디터 전체가 멈추고, 프로세스를 끝내는 것 말고는 풀 수 없다(2026-11-24에 `ActionRunner` 버그로 한 번 겪었다). 그래서 테스트는 사용자 에디터가 아니라 사본 에디터(2)에서 돌린다. 사용자 에디터를 강제 종료할 때는 먼저 사용자 승인을 받는다.
    - **플레이/빌드 후 정리:** TMP 동적 폰트(`Assets/Fonts/MalgunGothic SDF.asset`)가 플레이 중 채운 글자로 바뀌고, Android 빌드 후 `ProjectSettings/UnityConnectSettings.asset`의 `m_Enabled`가 1이 된다. 플레이하면 `persistentDataPath/Unity/`(분석 캐시)도 생긴다. 셋 다 되돌리거나 지운다.
-   - **빌드:** 켜 둔 에디터에서는 `unity command build run --target Android --output-path Temp/AndroidBuild/idleproto.apk --confirm true` 후 `build status`로 기다린다. 출력은 프로젝트 안에 둔다(Claude 쪽 AppData 경로는 MSIX 가상화로 예전 파일이 보일 수 있다).
-2. **에디터가 꺼져 있으면: 배치 모드** — `Unity.exe`를 창 없이 띄워 일을 시키고 종료한다. 0단계(GameSession/GameInitializer)를 이 방식으로 구현·검증했다.
+   - **빌드는 사본(2)에서 한다.** 켜 둔 에디터에서도 `unity command build run`으로 되지만 빌드하는 몇 분 동안 사용자 에디터가 묶인다.
+2. **검증용 사본 프로젝트 + Claude 전용 상주 에디터** — 테스트, 플레이 시나리오, 긴 측정, 빌드. 개발자 도구를 이 방식으로 검증했다(2026-11-25).
+   - **위치:** 프로젝트 옆 폴더(회사 PC는 `..\IdleGameProtoType_verify`). git 저장소가 아니라 원본의 복사본이다.
+   - **동기화는 원본 → 사본 한 방향:** `robocopy <원본>\<폴더> <사본>\<폴더> /MIR`를 `Assets`, `Packages`, `ProjectSettings`에 대해(종료 코드 8 미만이 성공). 사본에서 고친 것은 다음 동기화 때 사라진다. **씬·에셋·코드 수정은 원본에서만 한다.** 임시 검증 스크립트(시나리오, 러너)는 사본에만 두고, 원본에는 넣지 않는다.
+   - **만들 때:** 원본 `Library`를 복사하면 가져오기를 건너뛴다. `Bee`(Android 빌드 캐시, 약 6.7GB), `Pipeline`, `_verify`, **`ilpp.pid`, `*-lock`은 빼고** 복사한다. 2026-11-25에 `ilpp.pid`까지 복사했더니 사본 에디터가 시작하면서 사용자 에디터의 IL 후처리 프로세스를 "남은 프로세스"로 보고 종료시켰다(사용자 에디터는 다음 컴파일 때 다시 띄우므로 문제는 없었다).
+   - **에디터:** `Unity.exe -batchmode -projectPath <사본> -logFile <사본>\Logs\resident_editor.log`(`-quit` 없음 → 상주)를 백그라운드로 띄우고 `unity status --until-ready --project-path <사본>`. 이후 **모든 명령에 `--project-path <사본>`**.
+     - 컴파일 `unity recompile`, 테스트 `unity command test run --mode editor`, 플레이 `unity command editor.playmode start|stop`, C# `unity command script eval`.
+     - 빌드 `unity command build run --target Android --output-path Builds/<이름>.apk --options '["Development"]' --confirm true` 후 `unity command build status`. 사본에는 `Bee` 캐시가 없어 첫 빌드는 처음부터 한다.
+     - 동기화하거나 사본 파일을 고친 뒤에는 `unity recompile`로 새로 읽게 한다(창 없는 에디터는 파일 변경을 스스로 보지 않는다).
+   - **세이브:** `persistentDataPath`가 원본과 같다(회사·제품 이름이 같다). 사본에서도 플레이 전에 `claude` 프로필을 켜고 경고를 확인한다(1의 세이브 보호 규칙 그대로).
+   - **수명:** 사본 에디터는 Claude의 것이라 멈추면 사용자 승인 없이 끌 수 있다. 다음 검증이 빠르도록 켜 둬도 되고, 디스크가 필요하면 사본 폴더째 지워도 된다(다시 만들면 된다).
+3. **원본 배치 모드(사용자 에디터가 꺼져 있을 때만)** — `Unity.exe`를 창 없이 띄워 일을 시키고 종료한다. 씬·에셋 편집처럼 원본에서 해야 하는 일에 쓴다. 0단계(GameSession/GameInitializer)를 이 방식으로 구현·검증했다.
    - **실행 전:** 사용자가 이 프로젝트를 에디터로 열고 있으면 실행할 수 없다(프로젝트 잠금, `Temp/UnityLockfile`). Unity 프로세스가 없는지 먼저 확인.
    - **컴파일 + 임의 작업:** `Unity.exe -batchmode -quit -projectPath <프로젝트> -executeMethod <클래스.메서드> -logFile <로그>`. 로그에서 `error CS`, `Exception`, `Exiting batchmode successfully now!`를 확인. 한 번에 1~2분 걸린다.
    - **테스트:** `-runTests -testPlatform EditMode -testResults <xml>` (`-quit`를 붙이지 않는다).
@@ -164,9 +190,9 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
      - 테스트 실행은 `persistentDataPath`(`LocalLow/DefaultCompany/IdleGameProtoType/`)에 `TestResults.xml`과 `Unity/` 폴더를 남긴다 → 지운다.
      - 로그의 `UnityEditor.Search.SearchDatabase` `ArgumentOutOfRangeException`은 배치 모드 에디터 내부 예외로 프로젝트 코드와 무관하다.
    - 한계: 화면을 볼 수 없다. UI가 제대로 보이는지는 사용자 확인이 필요하다.
-3. **Android 실기기 (adb)** — 최종 확인은 Android 빌드를 실기기에 설치해서 한다.
+4. **Android 실기기 (adb)** — 최종 확인은 Android 빌드를 실기기에 설치해서 한다. 개발 빌드(`Development`)에는 개발자 도구가 들어 있다(아래 "개발자 도구").
    - **adb는 PC 전체에서 한 버전만 쓴다.** adb 서버는 PC에 하나(포트 5037)이고, 버전이 다른 adb가 명령을 보내면 서버를 끄고 자기 버전으로 다시 띄운다. 그래서 다른 프로젝트(liveeye_kr 웹 개발)와 같은 PC에서 쓰면 서로의 서버를 꺼 버린다. 기준은 **Unity에 딸린 adb**이고, 다른 도구가 쓰는 SDK의 `platform-tools`도 같은 것으로 맞춰 둔다(회사 PC: `~/android-dev/sdk/platform-tools`를 Unity 것으로 교체, 원본은 `platform-tools-37.0.1-backup`). **Unity를 업그레이드하면 adb 버전이 바뀌므로 그쪽 `platform-tools`도 다시 맞춘다.**
    - 설정은 PC별 `.claude/settings.local.json`(원본: claude-sync `setup/`)의 `env`에 있다: `ADB`(Unity의 adb 경로), `ANDROID_SERIAL`(이 프로젝트 테스트 기기). `ANDROID_SERIAL`이 있으면 adb가 `-s` 없이도 그 기기에만 명령을 보낸다. 같은 PC에 다른 프로젝트가 쓰는 기기가 함께 연결돼 있을 수 있으므로 다른 기기에는 설치·실행·입력을 하지 않는다.
    - `adb kill-server`/`start-server`는 권한 규칙으로 막혀 있다(두 프로젝트 모두). 서버를 다시 띄우는 판단은 사용자가 한다.
-   - 빌드: 배치 모드 `-buildTarget Android`로 APK만 만들고(Build & Run을 쓰지 않음), 설치는 `"$ADB" install -r <apk>`. 확인은 `screencap`, `logcat -s Unity:*`, `shell input`. **배치 모드 에디터는 종료할 때 출력 폴더 `Temp/AndroidBuild/`를 지운다**(2026-11-24 확인). 그래서 출력은 git이 무시하는 `Builds/`(예: `Builds/idleproto.apk`)에 둔다. `Library/` 안으로는 Unity가 빌드를 거부한다. 빌드 캐시의 `Library/Bee/Android/Prj/IL2CPP/Gradle/launcher/build/outputs/apk/release/launcher-release.apk`에서 설치해도 된다. 배치 빌드에는 임시 `-executeMethod` 스크립트(`BuildPipeline.BuildPlayer`)를 쓰고 끝나면 지운다.
-4. **Unity MCP(`mcp__UnityMCP__*`)** — 과거 세션에서 쓰던 방식. 세션에 연결돼 있을 때만 쓸 수 있다. `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.
+   - 빌드: 사본 에디터(2)의 `build run`, 또는 원본 배치 모드 `-buildTarget Android`로 APK만 만들고(Build & Run을 쓰지 않음), 설치는 `"$ADB" install -r <apk>`. 확인은 `screencap`, `logcat -s Unity:*`, `shell input`. **배치 모드 에디터는 종료할 때 출력 폴더 `Temp/AndroidBuild/`를 지운다**(2026-11-24 확인). 그래서 출력은 git이 무시하는 `Builds/`(예: `Builds/idleproto.apk`)에 둔다. `Library/` 안으로는 Unity가 빌드를 거부한다. 빌드 캐시의 `Library/Bee/Android/Prj/IL2CPP/Gradle/launcher/build/outputs/apk/release/launcher-release.apk`에서 설치해도 된다. 배치 빌드에는 임시 `-executeMethod` 스크립트(`BuildPipeline.BuildPlayer`)를 쓰고 끝나면 지운다.
+5. **Unity MCP(`mcp__UnityMCP__*`)** — 과거 세션에서 쓰던 방식. 세션에 연결돼 있을 때만 쓸 수 있다. `execute_code`는 종종 mono.exe 경로 길이 문제로 환경적 오류가 나는데, 코드 내용과 무관한 툴 자체 이슈인 경우가 있음 — 의심되면 `return 1+1;` 같은 최소 코드로 먼저 격리 확인.

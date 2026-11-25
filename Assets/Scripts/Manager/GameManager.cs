@@ -7,6 +7,7 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance;
 
     private Coroutine currentSpawnLoop;
+    private bool isTransitioning;
 
     private PlayerController player;
     private GameSession session;
@@ -99,10 +100,14 @@ public class GameManager : MonoBehaviour
         session?.SetCurrentStageNumber(stageNumber);
     }
 
+    // 스테이지 클리어: 다음 스테이지로. 마지막 스테이지면 그 스테이지를 다시 한다.
     private void StartStageTransition()
     {
-        if (currentSpawnLoop != null) StopCoroutine(currentSpawnLoop);
-        StartCoroutine(TransitionToStage(true));
+        int current = stageManager.CurrentStage.StageNumber;
+        bool hasNext = GameDatabaseManager.Instance.GetStage(current + 1)?.data != null;
+        if (!hasNext) Debug.Log("모든 스테이지 클리어! 마지막 스테이지를 다시 시작합니다.");
+
+        RestartAt(hasNext ? current + 1 : current);
     }
 
     private void OnApplicationQuit()
@@ -141,11 +146,8 @@ public class GameManager : MonoBehaviour
         return SaveStorageProvider.Current.Save(session.ToSaveData());
     }
 
-    private void HandlePlayerDied()
-    {
-        if (currentSpawnLoop != null) StopCoroutine(currentSpawnLoop);
-        StartCoroutine(TransitionToStage(false));
-    }
+    // 사망: 지금 스테이지를 처음부터.
+    private void HandlePlayerDied() => RestartAt(stageManager.CurrentStage.StageNumber);
 
     private IEnumerator ContinuousSpawnLoop()
     {
@@ -232,55 +234,101 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private IEnumerator TransitionToStage(bool canNext)
+    // ── 흐름 입구 (docs/DEV_TOOLS.md T4) ──────────────────────
+    // 사망, 클리어, 진행도 교체, 개발 도구의 스테이지 이동이 모두 이 하나로 "스테이지를 처음부터" 시작한다.
+    // 4단계에서 흐름을 EncounterDirector로 옮길 때 이 입구를 옮긴다.
+
+    public bool IsTransitioning => isTransitioning;
+
+    // 페이드 → 인카운터 정리 → 스테이지 초기화 → 부활 → 저장 → 스폰 루프. 전환 중이거나 없는 스테이지면 false.
+    public bool RestartAt(int stageNumber)
     {
-        yield return StartCoroutine(FadeController.Instance.FadeTransition(0.5f, () =>
+        if (isTransitioning)
         {
-            TransitionToStageInternal(canNext);
-        }));
+            Debug.LogWarning($"[GameManager] 스테이지 전환 중이라 스테이지 {stageNumber} 시작 요청을 무시합니다.");
+            return false;
+        }
+
+        if (GameDatabaseManager.Instance.GetStage(stageNumber)?.data == null)
+        {
+            Debug.LogError($"[GameManager] 스테이지 {stageNumber}가 StageDatabase에 없습니다.");
+            return false;
+        }
+
+        if (currentSpawnLoop != null) StopCoroutine(currentSpawnLoop);
+        currentSpawnLoop = null;
+        StartCoroutine(TransitionRoutine(stageNumber));
+        return true;
+    }
+
+    private IEnumerator TransitionRoutine(int stageNumber)
+    {
+        isTransitioning = true;
+        yield return StartCoroutine(FadeController.Instance.FadeTransition(0.5f, () => EnterStage(stageNumber)));
+        isTransitioning = false;
 
         currentSpawnLoop = StartCoroutine(ContinuousSpawnLoop());
     }
 
-    private void TransitionToStageInternal(bool canNext)
+    private void EnterStage(int stageNumber)
     {
         monsterSpawner.ClearEncounter();
 
-        if (canNext)
+        StageData previous = stageManager.CurrentStage;
+        if (previous != null && previous.StageNumber == stageNumber)
         {
-            int monsterId = stageManager.CurrentStage.NormalMonsterId;
-            int bossId = stageManager.CurrentStage.BossMonsterId;
-
-            MonsterEntry monsterEntry = GameDatabaseManager.Instance.GetMonster(monsterId);
-            if (monsterEntry?.prefab != null)
-            {
-                PoolManager.Instance.ClearPool(monsterEntry.prefab);
-            }
-
-            MonsterEntry bossEntry = GameDatabaseManager.Instance.GetMonster(bossId);
-            if (bossEntry?.prefab != null)
-            {
-                PoolManager.Instance.ClearPool(bossEntry.prefab);
-            }
-
-            if (stageManager.TryAdvanceStage())
-            {
-                // TryAdvanceStage 내부에서 currentStageIndex가 +1 됨.
-            }
-            else
-            {
-                Debug.Log("모든 스테이지 클리어! 재시작!");
-                stageManager.Initialize();
-            }
+            // 같은 스테이지를 처음부터. 스테이지가 바뀐 것이 아니라서 알리지 않는다(스테이지 안내가 뜨지 않음).
+            stageManager.Initialize();
+        }
+        else
+        {
+            if (previous != null) ClearStagePools(previous);
+            stageManager.Initialize(stageNumber);   // 스테이지 변경 알림 → 세션의 스테이지 번호, 배경, 안내
         }
 
         player.Revive();
+        SaveGame();
+    }
 
-        if (!canNext)
+    // 스테이지를 떠날 때 그 스테이지 몬스터의 풀을 비운다.
+    private static void ClearStagePools(StageData stage)
+    {
+        foreach (int monsterId in new[] { stage.NormalMonsterId, stage.BossMonsterId })
         {
-            stageManager.Initialize();
+            MonsterEntry entry = GameDatabaseManager.Instance.GetMonster(monsterId);
+            if (entry?.prefab != null) PoolManager.Instance.ClearPool(entry.prefab);
+        }
+    }
+
+    // ── 진행도 교체 (docs/DEV_TOOLS.md T5) ────────────────────
+    // 진행도를 통째로 바꾸고 그 진행도의 스테이지를 처음부터 시작한다(저장 포함).
+    // 저장할 때와 같은 검사를 통과한 값만 받는다. 개발 도구의 새로 시작·백업 복원·레벨 지정이 쓰고,
+    // 서버가 진행도를 되돌릴 때(docs/SERVER_DESIGN.md 2장)도 이 길을 쓴다.
+    public bool LoadSnapshot(PlayerSaveData snapshot, out string error)
+    {
+        if (session == null) { error = "게임이 시작되지 않았습니다(세션 없음)."; return false; }
+        if (isTransitioning) { error = "스테이지 전환 중입니다. 끝난 뒤 다시 하세요."; return false; }
+        if (snapshot == null) { error = "스냅샷이 없습니다."; return false; }
+
+        // 저장 형식(JSON)으로 한 번 거친다: 검사는 JSON을 보고, 세션은 넘겨받은 객체와 데이터를 공유하지 않는다.
+        string json = JsonUtility.ToJson(snapshot);
+        if (!SaveDataValidator.TryValidate(json, out error)) return false;
+
+        PlayerSaveData copy = JsonUtility.FromJson<PlayerSaveData>(json);
+        if (GameDatabaseManager.Instance.GetStage(copy.currentStageNumber)?.data == null)
+        {
+            error = $"스테이지 {copy.currentStageNumber}가 StageDatabase에 없습니다.";
+            return false;
         }
 
-        SaveGame();
+        int maxLevel = session.Stats.MaxLevel;
+        if (copy.stats.level > maxLevel)
+        {
+            error = $"레벨 {copy.stats.level}이 최대 레벨 {maxLevel}보다 큽니다.";
+            return false;
+        }
+
+        session.Apply(copy);
+        return RestartAt(session.CurrentStageNumber);
     }
 }

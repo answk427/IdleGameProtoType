@@ -54,6 +54,7 @@ public class PlayerController : CombatantHost
         stats.OnSkillEquipChanged += RefreshEquippedSkills;
         stats.OnUpgraded += RefreshStats;
         stats.OnLevelUp += HandleLevelUp;
+        stats.OnReloaded += HandleReloaded;
 #if UNITY_EDITOR
         DataTuning.Changed += RefreshStats;
 #endif
@@ -68,6 +69,7 @@ public class PlayerController : CombatantHost
             stats.OnSkillEquipChanged -= RefreshEquippedSkills;
             stats.OnUpgraded -= RefreshStats;
             stats.OnLevelUp -= HandleLevelUp;
+            stats.OnReloaded -= HandleReloaded;
         }
 #if UNITY_EDITOR
         DataTuning.Changed -= RefreshStats;
@@ -91,6 +93,14 @@ public class PlayerController : CombatantHost
     }
 
     private void HandleLevelUp(int level) => RefreshStats();
+
+    // 진행도가 통째로 바뀌면(GameManager.LoadSnapshot) 진행도에서 온 것을 모두 다시 넣는다.
+    // 스킬 슬롯 바도 이 사건에서 캐릭터의 장착 스킬을 읽으므로, 캐릭터가 먼저 구독돼 있어야 한다(Initialize가 UI보다 먼저).
+    private void HandleReloaded()
+    {
+        RefreshStats();
+        RefreshEquippedSkills();
+    }
 
     // ── 연출 ──
 

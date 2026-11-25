@@ -274,7 +274,7 @@ using (inputBlocker.Acquire("StageTransition"))   // 스코프를 벗어나면 �
 |---|---|
 | **0단계 (게임 쪽 선행)** | GameInitializer와 GameSession(10-2), `GameNumber`(10-3). 게임 동작이 바뀌지 않는 리팩터, UI 작업과 별도 커밋 |
 | **1차 (뼈대)** | 반응형 타입과 모델 전환, UIRoot와 `UISortBand`, WindowManager(옵션 기반 창, 스택, 정렬, 뒤로가기, Tick), 창 수명 주기와 타입 있는 인자, WindowRegistry, InputBlocker, View/Presenter와 구독 자동 해제, 기존 패널 이관 |
-| **2차 (서비스)** | DialogService, ToastService, 공용 버튼(`UIButton`: 사운드, 연타 방지, 차단 인지), RedDot, 해금(탭 잠금 이관), 디버그 도구(치트 메뉴: 골드/레벨 설정, 창 스택·입력 차단 이유 오버레이) |
+| **2차 (서비스)** | DialogService, ToastService, 공용 버튼(`UIButton`: 사운드, 연타 방지, 차단 인지), RedDot, 해금(탭 잠금 이관), 디버그 도구(창 스택·입력 차단 이유 오버레이. 치트 메뉴는 개발자 도구로 앞당겨 만들었다, [DEV_TOOLS.md](DEV_TOOLS.md)) |
 | **3차 (품질)** | 전환 애니메이션, SafeArea, 하단 UI 영역을 `PlayAreaBounds`에 전달, 재사용 스크롤, 서브 Canvas, Addressables 로더, 현지화, 어셈블리 분리 |
 | **4차 (서버 판정 기능: 가챠)** | 서버가 판정하는 첫 기능으로 가챠를 붙이고, 그 기능과 함께 서버 대비 부품을 만든다: `FakeGameServer`(지연·실패율·타임아웃 조절), `ServerCommandService`(요청 ID, 재시도, 타임아웃), `ServerOwnedState`와 전용 저장 DTO, 비동기 명령 + InputBlocker + 지연 스피너, 실패/재시도 안내, 오프라인 시 버튼 비활성화. 상세는 [SERVER_DESIGN.md](SERVER_DESIGN.md) 3·5장 |
 
@@ -322,7 +322,7 @@ GameInitializer.Start()  — 씬에 하나, [DefaultExecutionOrder(-1000)]로 �
 ```
 
 - 저장 데이터 조립은 `session.ToSaveData()` 한 곳, 반대 방향은 `session.Apply(스냅샷)` 한 곳.
-- **`Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다.** Presenter들이 GameSession과 그 안의 반응형 값을 구독하고 있어서, 객체를 새로 만들면 구독이 옛 객체에 남는다. 값만 덮어쓰면 반응형 구조라 화면이 자동으로 따라온다. 세이브 로드와 서버 거절 시 되돌리기([SERVER_DESIGN.md](SERVER_DESIGN.md) 2장)가 같은 코드가 된다. GameSession 설계 자체에 관한 것이라 0단계에서 이렇게 만든다.
+- **`Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다.** Presenter들이 GameSession과 그 안의 반응형 값을 구독하고 있어서, 객체를 새로 만들면 구독이 옛 객체에 남는다. 값만 덮어쓰면 반응형 구조라 화면이 자동으로 따라온다(레벨·경험치처럼 아직 반응형이 아닌 값은 `PlayerStats.OnReloaded`를 받아 다시 읽는다. 실행 중 교체를 처음 써 보고 찾은 빈틈이다, [DEV_TOOLS.md](DEV_TOOLS.md) T6). 세이브 로드와 서버 거절 시 되돌리기([SERVER_DESIGN.md](SERVER_DESIGN.md) 2장)가 같은 코드가 된다. GameSession 설계 자체에 관한 것이라 0단계에서 이렇게 만든다.
 - 업그레이드 같은 게임 규칙 명령은 캐릭터에서 GameSession 쪽으로 옮긴다.
 - 규칙: **다른 객체에 의존하는 초기화는 각자의 `Awake`/`Start`가 아니라 GameInitializer가 부르는 `Initialize()`에서 한다.**
 - **Awake가 아니라 Start인 이유(구현 중 수정):** 처음에는 Awake로 적었으나, 그러면 다른 객체의 Awake(UI의 `OnGameStarted` 구독, 싱글턴 등록, `PlayAreaBounds`의 바닥 위치 계산)보다 먼저 돌 수 있다. 예: 게임 시작 알림이 HUD의 구독보다 먼저 나가 HUD가 안 뜨고, 플레이어가 바닥 위치 계산 전에 스폰된다. Unity 규약대로 "Awake = 자기 자신, Start = 다른 객체와 연결"로 나누고 실행 순서 -1000으로 다른 Start보다 먼저 돌게 했다.
@@ -388,3 +388,4 @@ GameInitializer.Start()  — 씬에 하나, [DefaultExecutionOrder(-1000)]로 �
 | 정렬 구분 간격 200, 깊이 한도 없음 | 간격 1000, 구분 안 깊이 100까지, 초과 시 에러 | 깊이가 쌓이면 다음 구분을 조용히 침범할 수 있었음. 16비트 범위라 간격을 아낄 이유가 없음 |
 | 정적 이벤트 버스에 사건과 상태 혼재 | 버스에는 사건만, 상태는 주인의 `ReactiveProperty` | 정적 버스의 상태는 전역 가변 변수가 됨 |
 | 재진입 무한 루프를 깊이 제한으로 감지 | 총 전달 수로 감지 | 구현 중 재현: 구독자 둘이면 깊이 17에서 알림이 30만 번을 넘어 깊이 100에 닿지 못함 |
+| 새 팝업은 전부 `UIWindow` | 개발자 도구 패널만 IMGUI(예외) | 릴리스 빌드에서 통째로 빠져야 해서 에셋을 가질 수 없음. 창 프리팹을 `WindowRegistry`에 등록하면 릴리스 빌드에 스크립트가 빠진 프리팹이 들어간다([DEV_TOOLS.md](DEV_TOOLS.md) T3) |
