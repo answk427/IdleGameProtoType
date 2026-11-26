@@ -95,27 +95,22 @@ MonoBehaviour:
   - tabType: 1
     label: "\uCE90\uB9AD\uD130"
     icon: {fileID: 21300000, guid: da1ac645301a6c64087dc3ae2daa9574, type: 3}
-    isUnlockedByDefault: 1
   - tabType: 2
     label: "\uC2A4\uD0AC"
     icon: {fileID: 0}
-    isUnlockedByDefault: 1
   - tabType: 3
     label: "\uC7A5\uBE44"
     icon: {fileID: 0}
-    isUnlockedByDefault: 1
   - tabType: 4
     label: "\uB3D9\uB8CC"
     icon: {fileID: 0}
-    isUnlockedByDefault: 0
   - tabType: 5
     label: "\uBAA8\uD5D8"
     icon: {fileID: 0}
-    isUnlockedByDefault: 0
   - tabType: 6
     label: "\uC0C1\uC810"
     icon: {fileID: 0}
-    isUnlockedByDefault: 1
+  selectedColor: {r: 1, g: 0.86, b: 0.45, a: 1}
 --- !u!114 &761896500688389821
 MonoBehaviour:
   m_ObjectHideFlags: 0

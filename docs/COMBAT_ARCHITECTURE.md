@@ -811,7 +811,7 @@ Combatant (순수 C#, 전투원 하나)          ICombatantHost (호스트가 �
 **남은 것**
 - 이동·스크롤·속도는 3단계다. 몬스터는 아직 "스크롤 속도 = 플레이어 이동 속도"로 움직이고, 캐릭터 표의 `moveSpeed`는 그 값의 출처만 옮긴 것이다.
 - 연출 호출(데미지 숫자, 이펙트, 소리)은 호스트 한 곳에 모였지만 아직 직접 호출이다(5단계).
-- 업그레이드 표시 API(`IUpgradeStat`)는 float다(UI 이관 때).
+- 업그레이드 표시 API(`IUpgradeStat`)는 float다(UI 이관 때). → 2026-11-26 탭 이관에서 해결: float API를 지우고 `PlayerStats.PreviewUpgrade`(같은 계산)로 그린다([UI_DESIGN.md](UI_DESIGN.md) 10-5).
 - 로직용 난수는 쓰는 기능이 생길 때 만든다(D13).
 
 ---
@@ -1396,4 +1396,4 @@ S24 눈 확인: HUD 값, 데미지 숫자가 HUD·탭바 아래로 그려짐, �
 **남은 것**
 - 보스전 제한 시간 값(D25)은 사용자 결정. 지금 모든 스테이지 0이라 기기에서 보스 시간은 보이지 않는다.
 - 보스 시간 패널의 모양(배경, 글꼴 굵기)은 프리팹에서 다듬을 수 있다. 지금은 골드 표시와 같은 글자뿐인 모양이다.
-- 탭 2개의 Presenter 이관과 `UIManager` 삭제는 다음 작업 6. 업그레이드 표시 API(`IUpgradeStat`)의 `GameNumber`화도 그때.
+- 탭 2개의 Presenter 이관과 `UIManager` 삭제는 다음 작업 6. 업그레이드 표시 API(`IUpgradeStat`)의 `GameNumber`화도 그때. → 2026-11-26 완료([UI_DESIGN.md](UI_DESIGN.md) 10-5).

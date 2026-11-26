@@ -46,7 +46,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **거리 규칙 하나: 표면 거리**(`CombatWorld.Gap` = 중심 거리 − 두 반너비, 겹치면 음수). 교전, 단일 대상, 범위 스킬 반경이 모두 이것이다. **대상은 반대 팀의 살아 있는 가장 가까운 전투원**(앞뒤 무관, 같은 거리면 등록 순)이고, 지금 대상이 유효하면 바꾸지 않는다.
 - **판정 몸은 프리팹의 `HitboxProfile`**: 중심 = 피벗 + `bodyOffset.x`, `halfWidth` > 0 필수(스프라이트 바운드 자동 계산은 없앴다). 판정과 이펙트 위치가 같은 몸을 쓴다.
 - **상태는 단계 값 하나**(`CombatantPhase`: Inactive / Moving / Engaged / Dead). 상태 객체와 `StateMachine`은 없다. 이동 ↔ 교전 전환은 양쪽이 같은 판정(`TryAcquireTarget`)을 써서 떨지 않는다. 사망 시간표가 있으면(플레이어) 그것이 끝날 때 호스트에 알리고(`HandleDeathCompleted` → 재시작 요청), 없으면 바로 알린다.
-- **HP·데미지는 `GameNumber`**(D5, D14). 데미지는 `GameNumber.Round(공격력 × 배율)`, 몬스터 성장 배율은 `Math.Pow`(double). `PlayerStats.CombatStats`의 최대 HP·공격력도 `GameNumber`다(업그레이드 표시 API `IUpgradeStat`는 아직 float, 탭 이관 때 정리).
+- **HP·데미지는 `GameNumber`**(D5, D14). 데미지는 `GameNumber.Round(공격력 × 배율)`, 몬스터 성장 배율은 `Math.Pow`(double). `PlayerStats.CombatStats`의 최대 HP·공격력도 `GameNumber`다(업그레이드 표시도 float를 거치지 않는다: `PreviewUpgrade` → Presenter 포맷).
 - **전투 진행 중 할당 0**(R6): 상태 객체 없음, 범위·스킬 결과는 재사용 버퍼, 몬스터의 `Combatant`는 풀 객체마다 하나를 다시 쓴다(`Spawn`이 이전 상태를 지움). `CombatAllocationTests`가 확인한다.
 - **데이터와 프리팹의 짝은 에디터·빌드가 검사한다**(`CombatDataValidator`, `ActionTimelineTools.ValidateCombatData`에서 호출): 몬스터의 공격 간격 > 0이면 프리팹 시간표에 `Attack`, `skillId`의 스킬과 그 행동 키, 캐릭터 프리팹의 `Attack`·`Death`와 배울 수 있는 모든 스킬의 행동 키, 스테이지가 가리키는 몬스터, 모든 전투원 프리팹의 판정 몸·시간표·뷰.
 
@@ -104,28 +104,32 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 - 예: 공격이 끝났는지를 애니메이션이 알려 주던 시절, Animator `AnyState` 전이 방식과 별도 `hasHitLanded` 플래그 방식을 시도했다가 "주먹구구식"이라는 이유로 반려하고 `isAnimationFinished` 단일 플래그로 정착했었다. 2026-11-24에는 그 축 자체를 바꿔 행동의 길이를 게임 데이터가 정하고 애니메이션이 따라오게 했다(`docs/COMBAT_ARCHITECTURE.md` 4절, 7-13).
 - **지금 밸런스 수치는 기준이 아니다.** 구조가 단단하고, 밸런스를 데이터만 고쳐서 바꿀 수 있는지가 기준이다. 검증은 지금 값에서 통과하는지가 아니라 불변식과 극단값으로 한다.
-- 새 기능을 freestanding `MonoBehaviour`로 만들기보다, 기존 패턴에 맞춰 들어가는 설계를 선호함 (`StageAnnouncement`가 그 사례). 새 팝업의 패턴은 `UIBase` 상속이 아니라 `UIWindow` + Presenter(아래 "UI 구조").
+- 새 기능을 freestanding `MonoBehaviour`로 만들기보다, 기존 패턴에 맞춰 들어가는 설계를 선호함 (`StageAnnouncement`가 그 사례). 새 창(팝업, 탭 내용)의 패턴은 `UIWindow` + Presenter(아래 "UI 구조").
 
 ## UI 구조
 
-설계는 `docs/UI_DESIGN.md`가 기준. 지금은 1차 이관 중이라 두 시스템이 공존한다 — **화면 하나의 주인은 하나, 두 시스템을 아는 곳은 `UIRoot` 하나.**
+설계는 `docs/UI_DESIGN.md`가 기준. **UI 1차 이관은 끝났다(2026-11-26)**: 창(탭 내용, 팝업, 치명 오류)은 전부 `WindowManager`가 열고 닫고, 씬에 배치된 것은 HUD 위젯(View + Presenter)뿐이다. 옛 `UIManager`/`UIBase`/`UITabPanel`은 지웠다.
 
-새 구조 (`Assets/Scripts/UI/Core/`) — **새 팝업은 전부 여기로 만든다.** (예외: 개발자 도구 패널은 IMGUI, 아래 "개발자 도구")
-- `UIRoot` — 조립 지점. 창별 Presenter 생성 함수를 `Bind`로 등록하고, 기존 `UIManager`와 연결(열기 요청, 탭 전환 시 닫기, 뒤로가기 순서)한다. **준비는 두 단계**(UI_DESIGN 3장): `Prepare()`(창 시스템, 세션이 필요 없는 창 = 세이브 오류 창의 Bind)는 `GameInitializer`가 항상 부르고, `BindGame(세션, 스킬, 플레이어, 흐름)`(HUD Presenter, 스킬 창, 페이드, 탭 연결)은 시작에 성공했을 때만, 실패하면 대신 `ShowSaveError`. 세션이 필요 없는 새 창은 `Prepare` 쪽에 Bind한다.
-- `WindowManager` — 로드/스택/정렬(`UISortBand`)/뒤로가기/열린 창 Tick. 열기는 `windows.Open<SkillManageWindow>(new SkillManageArgs())`, 닫힘과 결과는 `await handle.Closed`. **스택은 [로드된 창: 구분 순, 같은 구분은 열린 순] + [로드 중인 창]**이라 스택 맨 위 = 화면 맨 위다(UI_DESIGN 6-4). 탭 전환(Exclusive)은 `CloseBelow(UISortBand.System)`으로 System 밑만 닫고, 로드 중인 창에는 로드가 끝날 때 적용한다. 테스트는 `WindowManagerTests`(가짜 로더로 로드 완료를 늦춘다).
+구조 (`Assets/Scripts/UI/Core/`) — **새 창은 전부 여기로 만든다.** (예외: 개발자 도구 패널은 IMGUI, 아래 "개발자 도구")
+- `UIRoot` — 조립 지점. 창별 Presenter 생성 함수를 `Bind`로 등록하고 HUD 위젯의 Presenter를 만든다. **준비는 두 단계**(UI_DESIGN 3장): `Prepare()`(창 시스템, 세션이 필요 없는 창 = 세이브 오류 창의 Bind)는 `GameInitializer`가 항상 부르고, `BindGame(세션, 스킬, 플레이어, 흐름)`(HUD·탭바 Presenter, 탭 창과 스킬 창의 Bind, 페이드)은 시작에 성공했을 때만, 실패하면 대신 `ShowSaveError`. 세션이 필요 없는 새 창은 `Prepare` 쪽에 Bind한다. 뒤로가기는 `WindowManager.Back()` 하나다(스택이 비면 아무 일도 없다, 종료 확인창은 2차).
+- `WindowManager` — 로드/스택/정렬(`UISortBand`)/뒤로가기/열린 창 Tick. 열기는 `windows.Open<SkillManageWindow>(new SkillManageArgs())`, 닫힘과 결과는 `await handle.Closed`. **스택은 [로드된 창: 구분 순, 같은 구분은 열린 순] + [로드 중인 창]**이라 스택 맨 위 = 화면 맨 위다(UI_DESIGN 6-4). `CloseBelow(UISortBand.System)`은 System 밑만 닫고, 로드 중인 창에는 로드가 끝날 때 적용한다. 테스트는 `WindowManagerTests`(가짜 로더 `FakeWindowLoader`로 로드 완료를 늦추거나 실패시킨다).
+- **스택 방식(`WindowOptions.Stack`)**: `Overlay`(쌓임, 팝업)와 `Exclusive`(탭, 프리셋 `WindowOptions.Tab`). Exclusive 창은 **로드가 끝나 옵션을 아는 순간, 자기보다 먼저 열기를 요청한 창에만** `CloseBelow(System)`을 쓴다(창마다 요청 순번). 그래서 나중에 요청한 팝업은 새 탭 위에 남고, 새 탭의 로드가 실패하면 이전 탭이 그대로다(UI_DESIGN 10-5).
 - 창 추가 순서: ① `UIWindow<TArgs>` View(구조는 `Options`로 코드에) + `TArgs : IWindowArgs<그 창>` ② View 인터페이스 + 순수 C# Presenter(구독은 `CompositeDisposable`) ③ 프리팹(Canvas 넣지 않음)을 `Assets/Data/UI/WindowRegistry.asset`에 등록 ④ `UIRoot`에 `Bind`.
 - 창은 `Update`를 쓰지 않는다(숨겨도 돈다). 매 프레임 값은 Presenter의 `Tick()`.
 - `InputBlocker` — 참조 카운트 입력 차단. **코루틴 지역변수로 `using`하지 말 것**(끊기면 안 풀림, `FadeController` 참고).
 - `SkillManageWindow`(View) + `SkillManagePresenter` + `SkillListItem`/`SkillSlotWidget` — 스킬 학습/슬롯 장착. 첫 이관 사례. (프리팹 파일명은 `SkillManagePopup.prefab` 그대로)
 - `SaveErrorWindow` + `SaveErrorPresenter` + `SaveErrorArgs`(`Assets/Scripts/UI/SaveError/`, 프리팹 `Assets/UI/Prefabs/Panels/SaveErrorWindow.prefab`) — 시작을 멈췄다는 안내(UI_DESIGN 10-4). 첫 System 구분 창: 모달, 바깥 터치·뒤로가기·탭 전환으로 닫히지 않고, 버튼은 "게임 종료" 하나. 글은 Presenter가 만들고, 화면에 파일 경로를 내지 않는다(검사기 메시지는 그대로, 다른 예외는 형식 이름만).
-- **씬의 HUD 위젯도 View + Presenter**(창이 아니라 `WindowManager`를 거치지 않는다): `PlayerHud`(HP·경험치·레벨·골드·보스전 남은 시간, Presenter `Assets/Scripts/UI/Hud/PlayerHudPresenter`), `BossChallengeButton`(보이기 = `BossChallengeAvailable`, 누르면 `RequestBossChallenge`), `StageAnnouncement`(스테이지 번호가 바뀌면 "Stage N", Presenter는 `Assets/Scripts/UI/Flow/`). `UIRoot.BindHudWidgets`(`BindGame` 안)가 만들고 수명을 갖는다. 위젯이 스스로 숨거나 게임 쪽을 직접 부르지 않는다. 단 Presenter가 켜기 전에는 `Awake`에서 숨는다(시작에 실패하면 Presenter가 없다). 매 프레임 값(보스 남은 시간)은 `UIRoot`가 HUD Presenter의 `Tick`을 부르고, 글자는 보이는 값이 바뀔 때만 만든다.
+- **씬의 HUD 위젯도 View + Presenter**(창이 아니라 `WindowManager`를 거치지 않는다): `PlayerHud`(HP·경험치·레벨·골드·보스전 남은 시간, Presenter `Assets/Scripts/UI/Hud/PlayerHudPresenter`), `BossChallengeButton`(보이기 = `BossChallengeAvailable`, 누르면 `RequestBossChallenge`), `StageAnnouncement`(스테이지 번호가 바뀌면 "Stage N", Presenter는 `Assets/Scripts/UI/Flow/`). `UIRoot.BindHudWidgets`(`BindGame` 안)가 만들고 수명을 갖는다. 위젯이 스스로 숨거나 게임 쪽을 직접 부르지 않는다. 단 값을 보이는 위젯은 Presenter가 켜기 전에는 `Awake`에서 숨는다(시작에 실패하면 Presenter가 없다). 탭바는 숨지 않고 모든 탭이 잠긴 모양으로 남는다(세이브 오류 창의 딤 밑). 매 프레임 값(보스 남은 시간)은 `UIRoot`가 HUD Presenter의 `Tick`을 부르고, 글자는 보이는 값이 바뀔 때만 만든다.
 - `FadeController` — 흐름의 전환 시각(`EncounterDirector.Transition`)을 그리기만 한다(시작 0 → 가운데 1 → 끝 0). 전환 중에는 입력을 막는다.
-- **그리는 순서:** 기존 `UIManager` 쪽 Canvas에도 `UIRoot`가 시작할 때 정렬 구분을 넣는다: `StaticCanvas`(HUD, 보스 버튼, 스테이지 안내, 탭) = Hud, `DynamicCanvas`(데미지 숫자) = Fx. 데미지 숫자가 HUD·탭바 아래로 그려진다.
+- **그리는 순서:** 씬의 HUD Canvas에도 `UIRoot`가 시작할 때 정렬 구분을 넣는다: `StaticCanvas`(HUD, 보스 버튼, 스테이지 안내, 탭바) = Hud, `DynamicCanvas`(데미지 숫자) = Fx. 데미지 숫자가 HUD·탭바 아래로, 탭 내용(Window)은 HUD 위로 그려진다. 이 Canvas들의 루트 오브젝트는 `HudRoot`(옛 `UIManager` 오브젝트, `FadeController`도 여기 붙어 있다).
 
-기존 구조 (탭 — 이관 예정, 다음 작업 6)
-- `UIBase`(`Assets/Scripts/UI/UIBase.cs`) — 기존 패널의 베이스, `UIManager`가 생명주기 관리. 남은 것은 탭(`UITabPanel`)뿐이다(`UIHud`, `UITransient`, `UILayer`는 4-B에서 지웠다).
-- `UITabPanel : UIBase` — 탭(`TabType`)이 있는 패널 전용 서브클래스(`StatUpgradePanel`, `SkillSlotBar`). 진행도 구독은 반응형이고(보일 때 구독, 숨길 때 해제), Presenter 이관은 다음 작업 6.
-- `StatUpgradePanel` + `UpgradeListItem` — 데이터 기반 업그레이드 목록(`PlayerStats.upgradeStats : Dictionary<UpgradeStatType, IUpgradeStat>`로 Strategy 패턴). 새 업그레이드 스탯 추가 시 `IUpgradeStat` 구현체 하나 추가 + 등록만 하면 됨 (`HpUpgradeStat`, `AttackUpgradeStat`, `AttackSpeedUpgradeStat` 참고).
+탭 (`Assets/Scripts/UI/Tabs/`, UI_DESIGN 10-5)
+- **탭 = Exclusive 창.** `TabBar`(씬의 HUD 위젯, View: 버튼과 잠금·선택 표시만) + `TabBarPresenter`. 다른 탭을 누르면 연다(이전 탭은 Exclusive가 닫는다), 같은 탭을 다시 누르면 화면(System 밑)을 비운다, 뒤로가기는 맨 위 창부터. 지금 탭은 연 탭 창의 핸들로 따라온다(뒤로가기·실패도). 바꾸는 도중에 "탭 없음"이 끼지 않는다.
+- **잠금 = 창이 연결되지 않은 탭.** `UIRoot.BindHudWidgets`가 탭 → 여는 함수 표를 탭바 Presenter에만 넘긴다. 탭 창을 여는 길이 그것뿐이라 잠금을 우회할 수 없다. 게임 규칙 해금(스테이지 클리어 등)은 2차 "해금". 잠금 데이터(`isUnlockedByDefault`)는 없앴다.
+- `CharacterTabWindow` + `CharacterTabPresenter`(옛 `StatUpgradePanel`, 프리팹 `CharacterTabWindow.prefab`): 레벨·경험치·레벨업, 업그레이드 목록(`UpgradeListItem`). "현재 → 다음"은 `PlayerStats.PreviewUpgrade(종류)`(실제 능력치와 같은 계산)로, 표시 문자열(HP·공격력 `NumberFormatUtility`, 공격 간격은 초당 횟수)은 Presenter가 만든다.
+- `SkillTabWindow` + `SkillTabPresenter`(옛 `SkillSlotBar`, 프리팹 `SkillTabWindow.prefab`): 장착 슬롯(`EquippedSlots`로 그림, 쿨다운은 `Tick`), 슬롯 탭 = `RequestSkillSlot`, 관리 버튼 = 스킬 관리 창.
+- **탭 창 프리팹의 루트는 HUD의 탭 내용 영역(화면 아래 10.5~35% = `BottomUIRoot` 0~0.35 × `TabContent` 0.3~1)에 맞춰 놓는다.** 같은 하단 UI 비율이 `BottomUIRoot`, 탭 창 프리팹, `PlayAreaBounds.bottomUiScreenRatio` 세 곳에 있다(`docs/TODO.md` "UI"). 하단 비율을 바꾸면 셋 다 고칠 것.
+- **업그레이드 스탯을 더하려면** `IUpgradeStat` 구현(단계 = 세이브의 어느 칸, 비용 공식)과 `PlayerStats` 등록만으로는 안 된다: 세이브 필드(형식 변경, 아래 "저장 시스템" ⚠️), `PlayerStats.ComputeCombatStats`(효과), 필요하면 `PlayerCombatStats` 필드, `CharacterTabPresenter.FormatStat`(표시), 캐릭터 탭 프리팹의 `upgrades` 목록까지 같이 고친다.
 
 ## 이벤트 버스
 

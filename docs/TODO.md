@@ -45,6 +45,7 @@
 - **전투 4-A: 흐름 (2026-11-25):** 인카운터·보스·스테이지 흐름이 `EncounterDirector`(순수 C#, 고정 단계 ①) 한 곳에 있다. `StageManager`, `GlobalGameEvents`, `GameManager`의 흐름 코루틴을 지웠다. 보스 버튼과 스테이지 안내는 View + Presenter로 흐름의 상태를 구독하고(버튼이 상태와 어긋나던 버그 해결), 스테이지 전환이 시뮬레이션 시간이라 프레임률과 무관하게 결정적이다(전에는 페이드가 화면 시간이라 전환 뒤가 갈렸다). 흐름 시간은 데이터(`BalanceConfig`), 보스전 제한 시간 열(`bossTimeLimit`, 지금 모두 0), 진전 감시 경고를 더했다. 측정 중 시뮬레이션 단계 길이가 0.0199999921이던 것을 찾아 0.02로 고쳤다. 결과는 [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10-9.
 - **전투 4-B: 진행도 표시 (2026-11-26):** 진행도 모델(레벨, 경험치, 업그레이드, 골드)과 정적 버스가 반응형이다(상태·파생 상태·사건, `DerivedProperty<T>`). 과도기 장치 `OnReloaded`가 없어도 진행도 교체 뒤 화면과 캐릭터가 맞고, 레벨업이 바로 저장된다. HUD는 View + Presenter(보스전 남은 시간 포함, 엑셀 값만으로 켜진다), 데미지 숫자는 HUD·탭바 아래로 그려진다. `UIManager`에는 탭만 남았다. 테스트가 처음으로 모두 통과한다(196개, 실패하던 `AddExp` 2개를 지금 규칙으로 고쳐 씀). 결과는 [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10-11.
 - **세이브 오류 창 (2026-11-26):** 세이브를 읽지 못하거나 저장된 스테이지가 데이터에 없으면 System 구분의 창(닫히지 않음, "게임 종료"만)이 "세이브 파일은 바꾸지 않았다"를 알리고, 딤이 탭바를 막는다(전에는 콘솔 에러뿐이었고 탭이 눌려 예외가 났다). 이를 위해 `UIRoot` 준비를 `Prepare`/`BindGame`으로 나누고, WindowManager 스택을 정렬 구분 순으로, 탭 전환은 System 밑만 닫게 바꿨다. 테스트 215개 통과(새 19개). 결과는 [UI_DESIGN.md](UI_DESIGN.md) 10-4.
+- **탭 2개 이관 — UI 1차 끝 (2026-11-26):** 탭이 Exclusive 창이다(`WindowOptions.Stack`, 열릴 때 먼저 요청된 창 중 System 밑을 닫는다). 캐릭터 탭·스킬 탭은 `UIWindow` + View 인터페이스 + Presenter, 탭바는 HUD 위젯(View + Presenter)이고, `UIManager`/`UIBase`/`UITabPanel`과 UIRoot의 "이관 기간 연결"을 지웠다. 잠금은 "창이 연결된 탭만 열림"(우회 불가), 선택된 탭 강조를 넣었다. 업그레이드 "다음" 값은 진행도의 미리보기(`PreviewUpgrade`, 실제 능력치와 같은 계산)라 float 표시 API와 공식 중복이 없어졌다. 테스트 253개 통과(새 38개). 결과는 [UI_DESIGN.md](UI_DESIGN.md) 10-5.
 - **옛 브랜치 `UIManager_improvement`는 병합하지 않기로 결정:** `.gitignore` 규칙, `BalanceConfig`, 코드리뷰/백로그의 유효 항목만 옮겼다. UIRegistry와 Canvas 정리는 UI_DESIGN이 대체, SingletonBehaviour는 보류(아래 "코드 품질"). 집 PC에만 남은 그 브랜치의 커밋 4개와 stash는 **이어가는 데 필요 없다.**
 
 ### 4. 다음 작업 (2026-11-24 순서 확정)
@@ -59,7 +60,7 @@
 | ~~3.5~~ | ~~개발자 도구~~ | | **완료 2026-11-25** (위 "완료된 것") |
 | ~~4~~ | ~~전투 4단계: 흐름(EncounterDirector) + HUD·보스 버튼·StageAnnouncement 이관~~ | | **완료 2026-11-26** (위 "완료된 것", [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10-9, 10-11) |
 | ~~5~~ | ~~세이브 오류 창~~ | | **완료 2026-11-26** (위 "완료된 것", [UI_DESIGN.md](UI_DESIGN.md) 10-4) |
-| 6 | 탭 2개 이관(여기서 UI 1차 끝) | - | `WindowOptions`에 Exclusive 추가(열 때 `CloseBelow(UISortBand.System)`, UI_DESIGN 6-4), `UIRoot`의 탭 연결 제거, 기존과 동작 동일, `UIManager` 삭제 |
+| ~~6~~ | ~~탭 2개 이관(여기서 UI 1차 끝)~~ | | **완료 2026-11-26** (위 "완료된 것", [UI_DESIGN.md](UI_DESIGN.md) 10-5) |
 | 7 | UI 2차(서비스) | UI_DESIGN 9장 | |
 | 8 | 전투 5단계 + UI 3차 어셈블리 분리 | 상세 설계. 오프라인 보상을 만들기로 하면 앞당긴다 | |
 | 9 | UI 4차(가챠, 서버) | UI_DESIGN 9장 | |
@@ -88,16 +89,20 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
   예전에는 버튼이 스스로 `Hide()`하고 `GameManager.EnterBossBattle()`을 직접 불렀고, 도전 가능 상태에서 죽거나 개발자 도구로 옮기면 버튼이 남아 누르면 보스전이 시작됐다.
   전투 4-A에서 버튼은 View + Presenter가 됐다: 보이기는 흐름의 상태(`EncounterDirector.BossChallengeAvailable`) 하나가 정하고, 누르면 명령(`RequestBossChallenge`)이 받을 수 있는지 검사해 결과를 돌려준다. 회귀 테스트 `EncounterDirectorTests.BossChallengeAvailable_ThenWipe_TurnsOffAndRejectsRequest`([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10-9).
 
-- **탭 잠금 규칙이 `TabBarController`에만 있음**
-  잠금 상태(`isUnlocked`)를 탭 바가 들고 있어서, 코드에서 `UIManager.ShowUI<탭패널>()`을 직접 부르면 잠금을 우회한다.
-  탭이 늘어나면 잠금 규칙을 어느 쪽이 소유할지 정해야 함.
+- **(해결 일부, 2026-11-26) 탭 잠금 규칙이 탭바에만 있었음.**
+  예전에는 잠금 상태를 탭바가 들고 있어서 코드에서 `UIManager.ShowUI<탭패널>()`을 직접 부르면 잠금을 우회했다.
+  탭 이관에서 "UIRoot가 여는 함수를 넘긴 탭만 열림"으로 바꿨다. 여는 함수는 탭바 Presenter만 받으므로 우회하는 길이 없다([UI_DESIGN.md](UI_DESIGN.md) 10-5).
+  남은 것: 게임 규칙에 따른 해금(예: 스테이지 3 클리어 시 장비 탭)은 2차 "해금"에서 게임 쪽 반응형 상태로 만들어 탭바 Presenter가 구독한다. 그때 잠긴 탭을 눌렀을 때의 안내(토스트)도 붙인다.
 
-- **탭 위에 전체 화면을 올리는 구조 미지원**
-  탭은 기존 `UIManager`(Exclusive), 팝업은 `WindowManager`(쌓임)만 지원. 탭 → 전체 화면 → 뒤로가기로 탭 복귀하는 흐름은 불가.
-  상세 화면을 팝업으로 만들면 현재 규칙으로 가능하고, 정말 필요해지면 `WindowOptions`에 전체 화면 축을 추가하면 됨.
+- **(해결 일부, 2026-11-26) 탭 위에 전체 화면을 올리는 구조 미지원.**
+  탭이 WindowManager의 창이 되어 탭 → 상세 창 → 뒤로가기로 탭 복귀가 스택으로 된다(상세 창을 탭 위에 열면 뒤로가기로 그것만 닫힌다).
+  남은 것: "전체 화면이면 아래 창 숨김" 옵션(오버드로 줄이기, UI_DESIGN 4-4)은 쓰는 창이 생길 때 `WindowOptions`에 더한다.
 
-- **선택된 탭 강조 표시 없음**
-  `TabBarController`가 현재 탭을 모른다. `UIManager`의 탭 변경 이벤트는 UI 구조 정리 때 추가하지만, 강조 표시 UI 자체는 별도 작업.
+- **(해결, 2026-11-26) 선택된 탭 강조 표시 없음.** 탭바 Presenter가 지금 탭을 알고 View가 버튼 배경색으로 보인다(모양은 최소).
+
+- **하단 UI 비율이 세 곳에 있음** (2026-11-26 탭 이관에서 생김)
+  `BottomUIRoot`(화면 0~0.35), 탭 창 프리팹 루트(탭 내용 영역 0.105~0.35), `PlayAreaBounds.bottomUiScreenRatio`(0.35). 하단 비율을 바꾸면 셋 다 고쳐야 하고, 하나만 고치면 에러 없이 어긋난다.
+  UI_DESIGN 9장 3차 "하단 UI 영역을 `PlayAreaBounds`에 전달"(SafeArea와 함께)에서 한 곳으로 모은다.
 
 - **스택이 비었을 때 뒤로가기는 아무 동작도 안 함**
   종료 확인창은 아직 없음.
@@ -204,7 +209,8 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 ## 문서
 
 - **README가 1차 슬라이스 이전 구조를 설명함**
-  UI 절은 모든 화면이 `UIBase` + 씬 배치 자동 등록이라고 설명하는데, 팝업은 이제 `UIWindow` + Registry + Presenter다. 저장 절에도 손상 검사와 차단이 없다. 포트폴리오 첫 화면이므로 1차 이관이 끝나기 전이라도 고칠 것.
+  UI 절은 모든 화면이 `UIBase` + 씬 배치 자동 등록이라고 설명하는데, 창은 이제 전부 `UIWindow` + Registry + Presenter다. 저장 절에도 손상 검사와 차단이 없다. 포트폴리오 첫 화면이므로 고칠 것.
+  **1차 이관이 끝나(2026-11-26) `UIManager.cs`, `UIBase.cs`가 지워졌다. README의 UI 절과 폴더 설명이 없는 파일을 가리킨다.**
 
 ## 빌드
 
@@ -231,7 +237,7 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 
 - **싱글턴 규칙 불일치**
   중복 검사와 `DontDestroyOnLoad`가 매니저마다 다르고, 파괴될 때 `Instance`를 비우는 곳이 없다. 씬이 하나인 지금은 드러나지 않으므로 부트 씬을 나눌 때(UI_DESIGN 9장) 정한다.
-  공통 베이스를 도입한다면 주의: `FadeController`는 `UIManager` 오브젝트에 붙어 있어 씬 간 유지로 만들면 UI 전체가 같이 유지된다.
+  공통 베이스를 도입한다면 주의: `FadeController`는 HUD Canvas의 루트 오브젝트(`HudRoot`, 옛 `UIManager` 오브젝트)에 붙어 있어 씬 간 유지로 만들면 HUD 전체가 같이 유지된다.
 
 - **이벤트 버스 규칙 불일치**
   `GlobalCombatEvents`만 `static class`가 아니다. 구독 시점도 `GameManager`는 Awake/OnDestroy, `CombatEffectManager`는 OnEnable/OnDisable로 다르다.

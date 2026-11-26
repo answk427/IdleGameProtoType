@@ -213,11 +213,10 @@ public sealed class PlayerStats
         return upgradeStats[type].GetLevel() >= upgradeConfig.maxUpgradeLevel;
     }
 
-    // 업그레이드 표시 API는 아직 float다(탭 이관 때 GameNumber로, D14).
-    public float GetCurrentStatValue(UpgradeStatType type) => upgradeStats[type].GetCurrentValue();
-
-    // 한 번 더 업그레이드했을 때의 값. UI에서 "현재 → 다음" 표시용.
-    public float GetNextStatValue(UpgradeStatType type) => upgradeStats[type].GetNextValue();
+    // 이 업그레이드를 한 단계 더 했을 때의 전투 능력치(캐릭터 탭의 "현재 → 다음" 표시용).
+    // 실제 능력치(CombatStats)와 같은 계산을 쓰므로 공식이 바뀌어도 미리보기가 따로 틀리지 않는다.
+    // 최대 단계여도 한 단계 위를 계산한다(살 수 있는지는 IsUpgradeMaxed가 정한다).
+    public PlayerCombatStats PreviewUpgrade(UpgradeStatType type) => ComputeCombatStats(type);
 
     public void Upgrade(UpgradeStatType type)
     {
@@ -231,7 +230,7 @@ public sealed class PlayerStats
         stat.IncrementLevel();
         upgradeLevels[type].Value = stat.GetLevel();
 
-        Debug.Log($"[PlayerStats] {type} 업그레이드 → Lv.{stat.GetLevel()}, 현재값:{stat.GetCurrentValue()}");
+        Debug.Log($"[PlayerStats] {type} 업그레이드 → Lv.{stat.GetLevel()} | {combatStats.Value}");
         upgraded.OnNext(type);
     }
 
@@ -326,13 +325,20 @@ public sealed class PlayerStats
     private int RequiredExpOf(int atLevel) => statData != null ? statData.GetRequiredExp(atLevel) : 0;
 
     // HP·공격력은 전투 수치라 GameNumber다(D14, 계산은 double이라 int처럼 넘치지 않는다).
-    private PlayerCombatStats ComputeCombatStats()
+    private PlayerCombatStats ComputeCombatStats() => ComputeCombatStats(null);
+
+    // plusOne: 그 업그레이드만 한 단계 더 한 것으로 계산한다(미리보기). 실제 능력치와 미리보기가 이 한 함수를 쓴다.
+    // 단계는 long으로 센다(int 최대 단계에서 +1이 넘치지 않게). 공격 간격은 예전과 같은 float 계산(정수 × float)이라
+    // 전투 시각이 비트 단위로 그대로다.
+    private PlayerCombatStats ComputeCombatStats(UpgradeStatType? plusOne)
     {
+        long LevelOf(UpgradeStatType type) => (long)upgradeStats[type].GetLevel() + (plusOne == type ? 1 : 0);
+
         PlayerStatData baseStat = statData.GetByLevel(saveData.level);
         return new PlayerCombatStats(
-            GameNumber.FromDouble((double)baseStat.BaseMaxHp + (double)saveData.hpUpgradeLevel * upgradeConfig.settings.hpPerUpgrade),
-            GameNumber.FromDouble((double)baseStat.BaseAttackDamage + (double)saveData.attackUpgradeLevel * upgradeConfig.settings.attackPerUpgrade),
-            Mathf.Max(0.1f, baseStat.BaseAttackInterval - saveData.attackSpeedUpgradeLevel * upgradeConfig.settings.attackSpeedPerUpgrade));
+            GameNumber.FromDouble((double)baseStat.BaseMaxHp + (double)LevelOf(UpgradeStatType.Hp) * upgradeConfig.settings.hpPerUpgrade),
+            GameNumber.FromDouble((double)baseStat.BaseAttackDamage + (double)LevelOf(UpgradeStatType.Attack) * upgradeConfig.settings.attackPerUpgrade),
+            Mathf.Max(0.1f, baseStat.BaseAttackInterval - LevelOf(UpgradeStatType.AttackSpeed) * upgradeConfig.settings.attackSpeedPerUpgrade));
     }
 
     // 스킬 목록/슬롯은 이 객체로 고치지 말 것(상태에 알려지지 않는다). 위 명령을 쓴다.

@@ -10,6 +10,9 @@ using UnityEngine;
 //   System 창 위로 Popup이 열려도 Popup은 그 밑에 들어가고, 뒤로가기는 System 창이 받는다.
 //   창의 구분은 프리팹을 로드해야 알므로(옵션은 View의 가상 프로퍼티) 로드 중인 창은 맨 위에 두고(뒤로가기를 먹기만 한다),
 //   로드가 끝나는 순간 자기 구분 자리로 옮긴다.
+// - Exclusive 창(탭)은 열릴 때 System 구분 밑의 창을 닫는다(CloseBelow). 스택 방식도 구분처럼 로드해야 알므로
+//   로드가 끝난 순간에 적용하고, 자기보다 먼저 열기를 요청한 창에만 적용한다. 그래서 결과가 요청할 때 알았던 것과 같다
+//   (나중에 요청한 팝업은 새 탭 위에 남는다). 새 창의 로드가 실패하면 이전 창은 그대로다.
 // - 요청 큐는 없다. 같은 창이 열려 있으면 AlreadyOpen, 로드 중 입력은 InputBlocker가 막는다.
 // - 어떤 창이 있고 무엇이 필요한지는 모른다. 조립은 UIRoot가 Bind로 한다.
 public sealed class WindowManager : IDisposable
@@ -30,6 +33,9 @@ public sealed class WindowManager : IDisposable
 
     private Entry topModal;
     private bool isDisposed;
+
+    // 열기 요청 순번. Exclusive가 "먼저 요청된 창"을 가리는 데 쓴다(스택 안의 위치는 구분 순이라 요청 순서가 아니다).
+    private long nextSequence;
 
     public IReadOnlyReactiveProperty<bool> HasModal => hasModal;
 
@@ -64,7 +70,7 @@ public sealed class WindowManager : IDisposable
     public WindowHandle Open<TWindow>(IWindowArgs<TWindow> args) where TWindow : UIWindow
     {
         var handle = new WindowHandle();
-        var entry = new Entry(this, typeof(TWindow), (status, _) => handle.Complete(status));
+        var entry = new Entry(this, typeof(TWindow), nextSequence++, (status, _) => handle.Complete(status));
         handle.RequestClose = entry.Dismiss;
 
         Begin(entry, args);
@@ -74,7 +80,7 @@ public sealed class WindowManager : IDisposable
     public WindowHandle<TResult> Open<TWindow, TResult>(IWindowArgs<TWindow, TResult> args) where TWindow : UIWindow
     {
         var handle = new WindowHandle<TResult>();
-        var entry = new Entry(this, typeof(TWindow), (status, value) =>
+        var entry = new Entry(this, typeof(TWindow), nextSequence++, (status, value) =>
             handle.Complete(new WindowResult<TResult>(status, value is TResult result ? result : default)));
         handle.RequestClose = entry.Dismiss;
 
@@ -98,12 +104,17 @@ public sealed class WindowManager : IDisposable
     // System 구분(치명 오류, 강제 안내)은 화면 이동과 상관없이 남아야 한다.
     // 로드 중인 창은 구분을 아직 모르므로 그 자리에서 닫지 않고 기준만 기억해 두었다가, 로드가 끝날 때 같은 규칙을 적용한다.
     // 그래서 결과가 구분을 처음부터 알았던 것과 같다(로드 중인 System 창은 남고, 로드 중인 Popup은 새 탭 위에 뜨지 않는다).
-    public void CloseBelow(UISortBand band)
+    public void CloseBelow(UISortBand band) => CloseBelow(band, long.MaxValue);
+
+    // requestedBefore보다 먼저 열기를 요청한 창만 본다(Exclusive 창이 자기와 나중에 요청된 창을 건드리지 않게).
+    private void CloseBelow(UISortBand band, long requestedBefore)
     {
         Entry[] current = windows.ToArray();
         for (int i = current.Length - 1; i >= 0; i--)
         {
             Entry entry = current[i];
+            if (entry.Sequence >= requestedBefore || entry.State == WindowState.Closed) continue;
+
             if (!entry.IsLoaded) entry.RememberCloseBelow(band);
             else if (entry.Options.Band < band) Close(entry, WindowStatus.Dismissed);
         }
@@ -186,6 +197,17 @@ public sealed class WindowManager : IDisposable
                 host.Hide(); // 새로 만든 창은 보이는 채로 생긴다. 다시 쓰는 창은 이미 숨어 있다.
                 Close(entry, WindowStatus.Dismissed);
                 return;
+            }
+
+            // Exclusive: 먼저 요청된 창을 닫는다. 닫힌 창의 결과를 기다리던 쪽이 이 창을 닫았을 수도 있다.
+            if (options.Stack == WindowStackMode.Exclusive)
+            {
+                CloseBelow(UISortBand.System, entry.Sequence);
+                if (entry.State == WindowState.Closed)
+                {
+                    host.Hide();
+                    return;
+                }
             }
 
             entry.Host = host;
@@ -326,6 +348,7 @@ public sealed class WindowManager : IDisposable
         private readonly WindowManager owner;
 
         public readonly Type WindowType;
+        public readonly long Sequence; // 열기 요청 순번
         public readonly Action<WindowStatus, object> Complete;
         public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
 
@@ -338,10 +361,11 @@ public sealed class WindowManager : IDisposable
         // 로드 중에 받은 가장 높은 닫기 기준(CloseBelow). 없으면 null.
         private UISortBand? closeBelowOnLoad;
 
-        public Entry(WindowManager owner, Type windowType, Action<WindowStatus, object> complete)
+        public Entry(WindowManager owner, Type windowType, long sequence, Action<WindowStatus, object> complete)
         {
             this.owner = owner;
             WindowType = windowType;
+            Sequence = sequence;
             Complete = complete;
         }
 

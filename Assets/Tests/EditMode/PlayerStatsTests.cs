@@ -259,6 +259,56 @@ public class PlayerStatsTests
         Assert.IsEmpty(upgraded, "무시된 명령은 저장 계기를 내지 않는다");
     }
 
+    // ── 업그레이드 미리보기(캐릭터 탭의 "현재 → 다음") ──
+    // 미리보기와 실제 능력치는 같은 계산이다. 공식을 따로 쓰면(예전 IUpgradeStat.GetNextValue) 화면만 조용히 틀린다.
+
+    [Test]
+    public void PreviewUpgrade_EqualsStatsAfterUpgrade_ForEveryType_PastAttackIntervalFloor()
+    {
+        // 간격 1.0에서 0.05씩 줄면 18단계에서 하한(0.1)에 닿는다. 하한을 넘어서도 미리보기가 맞아야 한다.
+        foreach (UpgradeStatType type in System.Enum.GetValues(typeof(UpgradeStatType)))
+        {
+            for (int i = 0; i < 25; i++)
+            {
+                PlayerCombatStats preview = stats.PreviewUpgrade(type);
+                stats.Upgrade(type);
+                Assert.AreEqual(preview, stats.CombatStats.Value, $"{type} {i}단계 → {i + 1}단계");
+            }
+        }
+
+        Assert.AreEqual(0.1f, stats.CombatStats.Value.AttackInterval, "하한에 닿았다");
+    }
+
+    [Test]
+    public void PreviewUpgrade_ChangesNothing()
+    {
+        PlayerCombatStats before = stats.CombatStats.Value;
+        List<UpgradeStatType> upgraded = Record(stats.Upgraded);
+        List<PlayerCombatStats> combatChanges = Record(stats.CombatStats);
+
+        PlayerCombatStats preview = stats.PreviewUpgrade(UpgradeStatType.Hp);
+
+        Assert.AreEqual(before.MaxHp + upgradeConfig.settings.hpPerUpgrade, preview.MaxHp);
+        Assert.AreEqual(before.AttackDamage, preview.AttackDamage, "다른 능력치는 그대로");
+        Assert.AreEqual(before, stats.CombatStats.Value);
+        Assert.AreEqual(0, stats.UpgradeLevel(UpgradeStatType.Hp).Value);
+        Assert.AreEqual(0, stats.GetSaveData().hpUpgradeLevel);
+        Assert.IsEmpty(upgraded);
+        Assert.IsEmpty(combatChanges);
+    }
+
+    [Test]
+    public void PreviewUpgrade_AtMaxIntLevel_DoesNotOverflow()
+    {
+        stats.LoadSave(new PlayerStatsSaveData { level = 1, hpUpgradeLevel = int.MaxValue });
+
+        PlayerCombatStats now = stats.CombatStats.Value;
+        PlayerCombatStats preview = stats.PreviewUpgrade(UpgradeStatType.Hp);
+
+        Assert.Greater(preview.MaxHp, now.MaxHp, "한 단계 더하면 커진다(int로 세면 음수 단계가 된다)");
+        Assert.AreEqual(GameNumber.FromDouble(50d + ((double)int.MaxValue + 1d) * upgradeConfig.settings.hpPerUpgrade), preview.MaxHp);
+    }
+
     // ── 스킬 장착 ──
 
     [Test]

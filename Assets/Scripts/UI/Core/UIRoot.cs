@@ -1,19 +1,19 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-// 새 화면 UI의 진입점이자 조립 지점 (docs/UI_DESIGN.md 3장). 준비는 두 단계다:
+// 화면 UI의 진입점이자 조립 지점 (docs/UI_DESIGN.md 3장). 준비는 두 단계다:
 // - Prepare: 창 시스템(정렬 구분, 입력 차단, WindowManager, 뒤로가기)과 세션이 필요 없는 창(세이브 오류 창).
 //   GameInitializer가 참조 검사 직후 항상 부른다. 그래서 창 시스템은 시작의 성공과 실패가 같은 코드로 준비된다.
-// - BindGame: 게임이 시작될 때만. 세션·플레이어·흐름이 필요한 것(HUD Presenter, 스킬 창, 페이드, 탭 연결).
-// 시작에 실패하면(세이브를 읽지 못함 등) BindGame 대신 ShowSaveError를 부른다. HUD 위젯은 Presenter가 없으면 숨어 있다.
+// - BindGame: 게임이 시작될 때만. 세션·플레이어·흐름이 필요한 것(HUD Presenter, 탭과 스킬 창, 페이드).
+// 시작에 실패하면(세이브를 읽지 못함 등) BindGame 대신 ShowSaveError를 부른다. HUD 위젯은 Presenter가 없으면 숨어 있거나
+// (값을 보이는 위젯) 아무 일도 하지 않는다(탭바).
 //
-// 이관 기간에는 기존 UIManager(HUD, 탭)와 공존한다. 규칙:
-// - 화면 하나의 주인은 하나다. 지금 WindowManager의 창은 SkillManageWindow(Popup)와 SaveErrorWindow(System)다.
-// - 두 시스템을 아는 곳은 여기뿐이다("이관 기간 연결"). 이관이 끝나면 그 부분만 지우면 된다.
-// - 그리는 순서는 정렬 구분(UISortBand)이다. 기존 UIManager 쪽 Canvas도 여기서 구분을 넣는다:
-//   HUD·탭(StaticCanvas) = Hud, 데미지 숫자(DynamicCanvas) = Fx. 창(Window), 페이드(System)는 그 위다.
+// 창(탭 내용, 팝업, 치명 오류)은 전부 WindowManager가 열고 닫는다. 씬에 배치된 것은 HUD 위젯뿐이다.
+// 그리는 순서는 정렬 구분(UISortBand)이다. 씬의 HUD Canvas에도 여기서 구분을 넣는다:
+// HUD·탭바(StaticCanvas) = Hud, 데미지 숫자(DynamicCanvas) = Fx. 창(Window, Popup), 페이드(System)는 그 위다.
 [RequireComponent(typeof(Canvas))]
 public class UIRoot : MonoBehaviour
 {
@@ -27,16 +27,13 @@ public class UIRoot : MonoBehaviour
     [SerializeField] private PlayerHud playerHud;
     [SerializeField] private BossChallengeButton bossChallengeButton;
     [SerializeField] private StageAnnouncement stageAnnouncement;
+    [SerializeField] private TabBar tabBar;
 
-    [Header("정렬 구분 (기존 UIManager 쪽 Canvas)")]
-    [Tooltip("HUD, 보스 버튼, 스테이지 안내, 탭이 있는 Canvas → Hud 구분")]
+    [Header("정렬 구분 (씬의 HUD Canvas)")]
+    [Tooltip("HUD, 보스 버튼, 스테이지 안내, 탭바가 있는 Canvas → Hud 구분")]
     [SerializeField] private Canvas hudCanvas;
     [Tooltip("데미지 숫자가 있는 Canvas → Fx 구분(HUD 아래, GraphicRaycaster 없음)")]
     [SerializeField] private Canvas fxCanvas;
-
-    [Header("이관 기간 연결 (기존 UIManager 쪽)")]
-    [SerializeField] private UIManager uiManager;
-    [SerializeField] private SkillSlotBar skillSlotBar;
 
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
@@ -88,7 +85,6 @@ public class UIRoot : MonoBehaviour
         fadeController.Initialize(inputBlocker, flow);
         BindGameWindows(session, skills, player);
         BindHudWidgets(session, player, flow);
-        ConnectLegacyUI();
     }
 
     // 시작을 멈췄다는 안내(System 구분, 닫는 길 없음). 게임 종료 버튼만 있다.
@@ -124,9 +120,17 @@ public class UIRoot : MonoBehaviour
         // 쿨다운은 시뮬레이션 시계 기준의 준비 시각이라, 지금 시각을 아는 캐릭터에게 비율을 묻는다.
         float CooldownRatio(int slot) => player.GetSkillCooldownRatio(slot);
 
+        windows.Bind<CharacterTabWindow, CharacterTabArgs>((view, args, window) =>
+            new CharacterTabPresenter(view, session.Stats, session.Wallet.Gold, session.TryUpgrade));
+
+        windows.Bind<SkillTabWindow, SkillTabArgs>((view, args, window) =>
+            new SkillTabPresenter(view, session.Stats, skills, CooldownRatio, player.RequestSkillSlot, OpenSkillManage));
+
         windows.Bind<SkillManageWindow, SkillManageArgs>((view, args, window) =>
             new SkillManagePresenter(view, session.Stats, skills, CooldownRatio, window));
     }
+
+    private void OpenSkillManage() => windows.Open<SkillManageWindow>(new SkillManageArgs());
 
     // 씬에 배치된 HUD 위젯. 창이 아니라 WindowManager를 거치지 않고, Presenter의 수명은 UIRoot와 같다.
     private void BindHudWidgets(GameSession session, PlayerController player, EncounterDirector flow)
@@ -136,6 +140,14 @@ public class UIRoot : MonoBehaviour
             () => flow.BossDeadline, () => flow.Clock.Now).AddTo(disposables);
         new BossChallengePresenter(bossChallengeButton, flow).AddTo(disposables);
         new StageAnnouncementPresenter(stageAnnouncement, flow.CurrentStageNumber).AddTo(disposables);
+
+        // 탭 = Exclusive 창. 여기 있는 탭만 열리고 나머지는 잠긴다. 탭 창을 여는 함수는 탭바 Presenter만 받는다.
+        var tabs = new Dictionary<UITabType, Func<WindowHandle>>
+        {
+            [UITabType.Character] = () => windows.Open<CharacterTabWindow>(new CharacterTabArgs()),
+            [UITabType.Skill] = () => windows.Open<SkillTabWindow>(new SkillTabArgs()),
+        };
+        new TabBarPresenter(tabBar, tabs, () => windows.CloseBelow(UISortBand.System)).AddTo(disposables);
     }
 
     private void Update()
@@ -155,17 +167,16 @@ public class UIRoot : MonoBehaviour
         backAction.Disable();
         backAction.Dispose();
 
-        DisconnectLegacyUI();
-        windows.Dispose();
+        // HUD Presenter(탭바 포함)를 먼저 버린다. 창을 닫을 때 나오는 알림에 파괴 중인 위젯이 반응하지 않게.
         disposables.Dispose();
+        windows.Dispose();
     }
 
+    // 스택이 비었으면 아무 일도 없다(종료 확인창은 2차).
     private void HandleBack(InputAction.CallbackContext _)
     {
         if (inputBlocker.IsBlocked.Value) return;
-        if (windows.Back()) return;
-
-        uiManager.Back();
+        windows.Back();
     }
 
     // 모달과 입력 차단은 터치만 막아서는 부족하다. 키보드 이동/Submit이 밑의 버튼을 누를 수 있다.
@@ -175,26 +186,6 @@ public class UIRoot : MonoBehaviour
 
         EventSystem.current.sendNavigationEvents = !inputBlocker.IsBlocked.Value && !windows.HasModal.Value;
     }
-
-    // ── 이관 기간 연결 ──────────────────────────────────────
-
-    private void ConnectLegacyUI()
-    {
-        skillSlotBar.SkillManageRequested += OpenSkillManage;
-        uiManager.OnTabChanged += HandleTabChanged;
-    }
-
-    private void DisconnectLegacyUI()
-    {
-        if (skillSlotBar != null) skillSlotBar.SkillManageRequested -= OpenSkillManage;
-        if (uiManager != null) uiManager.OnTabChanged -= HandleTabChanged;
-    }
-
-    private void OpenSkillManage() => windows.Open<SkillManageWindow>(new SkillManageArgs());
-
-    // 탭은 Exclusive(스택을 비우고 바닥이 됨)다. System 구분(세이브 오류 등)은 탭 전환으로 닫지 않는다.
-    // 탭을 WindowManager로 옮기면 이 연결은 사라지고, Exclusive 창이 열릴 때 같은 함수를 쓴다.
-    private void HandleTabChanged(UITabType _) => windows.CloseBelow(UISortBand.System);
 
     private bool ValidateReferences()
     {
@@ -207,8 +198,7 @@ public class UIRoot : MonoBehaviour
         if (fxCanvas == null) { Debug.LogError("[UIRoot] fxCanvas(DynamicCanvas)가 연결되지 않았습니다."); ok = false; }
         if (bossChallengeButton == null) { Debug.LogError("[UIRoot] bossChallengeButton이 연결되지 않았습니다."); ok = false; }
         if (stageAnnouncement == null) { Debug.LogError("[UIRoot] stageAnnouncement가 연결되지 않았습니다."); ok = false; }
-        if (uiManager == null) { Debug.LogError("[UIRoot] uiManager가 연결되지 않았습니다."); ok = false; }
-        if (skillSlotBar == null) { Debug.LogError("[UIRoot] skillSlotBar가 연결되지 않았습니다."); ok = false; }
+        if (tabBar == null) { Debug.LogError("[UIRoot] tabBar가 연결되지 않았습니다."); ok = false; }
         return ok;
     }
 }

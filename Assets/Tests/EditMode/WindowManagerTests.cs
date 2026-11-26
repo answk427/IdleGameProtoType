@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
@@ -11,44 +12,13 @@ using Object = UnityEngine.Object;
 // 로드 중인 창은 구분을 모르므로 맨 위에서 뒤로가기를 먹기만 하고, 로드가 끝나면 자기 자리로 가며,
 // 로드 중에 받은 닫기 기준은 로드가 끝날 때 적용된다(구분을 처음부터 알았던 것과 결과가 같다).
 //
-// 로더는 가짜다: 창마다 로드 완료를 늦출 수 있다. AwaitableCompletionSource의 완료는 그 자리에서 이어지므로
-// Finish를 부르면 WindowManager의 열기가 끝까지 진행된다.
+// 로더는 가짜다(FakeWindowLoader): 창마다 로드 완료를 늦출 수 있다.
 [TestFixture]
 public class WindowManagerTests
 {
     private const int PopupBand = (int)UISortBand.Popup;
     private const int SystemBand = (int)UISortBand.System;
     private const int WindowBand = (int)UISortBand.Window;
-
-    private sealed class FakeLoader : IWindowLoader
-    {
-        private readonly Dictionary<Type, UIWindow> prefabs = new Dictionary<Type, UIWindow>();
-        private readonly HashSet<Type> deferred = new HashSet<Type>();
-        private readonly Dictionary<Type, AwaitableCompletionSource<UIWindow>> pending = new Dictionary<Type, AwaitableCompletionSource<UIWindow>>();
-
-        public void Add(UIWindow prefab) => prefabs[prefab.GetType()] = prefab;
-
-        // 다음 로드를 Finish까지 끝내지 않는다.
-        public void Defer<TWindow>() where TWindow : UIWindow => deferred.Add(typeof(TWindow));
-
-        public void Finish<TWindow>() where TWindow : UIWindow
-        {
-            AwaitableCompletionSource<UIWindow> source = pending[typeof(TWindow)];
-            pending.Remove(typeof(TWindow));
-            source.SetResult(prefabs[typeof(TWindow)]);
-        }
-
-        public Awaitable<UIWindow> LoadAsync(Type windowType, CancellationToken cancellationToken)
-        {
-            var source = new AwaitableCompletionSource<UIWindow>();
-            Awaitable<UIWindow> awaitable = source.Awaitable;
-
-            if (deferred.Remove(windowType)) pending[windowType] = source;
-            else source.SetResult(prefabs[windowType]);
-
-            return awaitable;
-        }
-    }
 
     private sealed class FakePresenter : IWindowPresenter
     {
@@ -58,7 +28,7 @@ public class WindowManagerTests
 
     private GameObject root;
     private readonly List<GameObject> prefabObjects = new List<GameObject>();
-    private FakeLoader loader;
+    private FakeWindowLoader loader;
     private InputBlocker inputBlocker;
     private WindowManager windows;
     private Dictionary<Type, UIWindow> views;
@@ -71,11 +41,13 @@ public class WindowManagerTests
         root = new GameObject("UIRootForTest", typeof(RectTransform));
         root.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
 
-        loader = new FakeLoader();
+        loader = new FakeWindowLoader();
         AddPrefab<TestPopupAWindow>();
         AddPrefab<TestPopupBWindow>();
         AddPrefab<TestPanelWindow>();
         AddPrefab<TestSystemWindow>();
+        AddPrefab<TestTabAWindow>();
+        AddPrefab<TestTabBWindow>();
 
         inputBlocker = new InputBlocker(root.transform);
         windows = new WindowManager(root.transform, loader, inputBlocker);
@@ -86,6 +58,8 @@ public class WindowManagerTests
         windows.Bind<TestPopupBWindow, TestPopupBArgs>((view, _, __) => Present(view));
         windows.Bind<TestPanelWindow, TestPanelArgs>((view, _, __) => Present(view));
         windows.Bind<TestSystemWindow, TestSystemArgs>((view, _, __) => Present(view));
+        windows.Bind<TestTabAWindow, TestTabAArgs>((view, _, __) => Present(view));
+        windows.Bind<TestTabBWindow, TestTabBArgs>((view, _, __) => Present(view));
     }
 
     [TearDown]
@@ -296,6 +270,125 @@ public class WindowManagerTests
 
         loader.Finish<TestPanelWindow>();
         Assert.AreEqual(WindowStatus.Dismissed, StatusOf(panel));
+    }
+
+    // ── Exclusive(탭) ──────────────────────────────────────
+    // 열릴 때 System 밑을 닫는다. 스택 방식도 로드해야 알므로 로드가 끝난 순간, 먼저 요청된 창에만 적용한다.
+
+    [Test]
+    public void Exclusive_ClosesEarlierWindowsBelowSystem_KeepsSystem()
+    {
+        WindowHandle system = windows.Open<TestSystemWindow>(new TestSystemArgs());
+        WindowHandle tabA = windows.Open<TestTabAWindow>(new TestTabAArgs());
+        WindowHandle panel = windows.Open<TestPanelWindow>(new TestPanelArgs());
+        WindowHandle popup = windows.Open<TestPopupAWindow>(new TestPopupAArgs());
+
+        WindowHandle tabB = windows.Open<TestTabBWindow>(new TestTabBArgs());
+
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(tabA), "이전 탭");
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(panel), "같은 구분의 다른 창");
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(popup), "위 구분이어도 System 밑이면 닫힌다");
+        Assert.IsFalse(IsClosed(system), "System 창은 화면 이동과 상관없이 남는다");
+        Assert.IsFalse(IsClosed(tabB));
+        Assert.AreEqual(WindowBand, OrderOf<TestTabBWindow>(), "새 탭이 Window 구분의 바닥(깊이 0)");
+    }
+
+    [Test]
+    public void Exclusive_KeepsWindowsRequestedAfterIt()
+    {
+        WindowHandle tabA = windows.Open<TestTabAWindow>(new TestTabAArgs());
+
+        loader.Defer<TestTabBWindow>();
+        WindowHandle tabB = windows.Open<TestTabBWindow>(new TestTabBArgs());
+        Assert.IsFalse(IsClosed(tabA), "새 탭이 보이기 전까지 이전 탭은 그대로");
+
+        WindowHandle popup = windows.Open<TestPopupAWindow>(new TestPopupAArgs()); // 새 탭을 요청한 뒤에 연 팝업
+        loader.Finish<TestTabBWindow>();
+
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(tabA));
+        Assert.IsFalse(IsClosed(popup), "나중에 요청한 팝업은 새 탭 위에 남는다");
+        Assert.IsFalse(IsClosed(tabB));
+        Assert.AreEqual(WindowBand, OrderOf<TestTabBWindow>());
+        Assert.AreEqual(PopupBand, OrderOf<TestPopupAWindow>());
+
+        windows.Back();
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(popup), "뒤로가기는 화면 맨 위(팝업)부터");
+        Assert.IsFalse(IsClosed(tabB));
+        windows.Back();
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(tabB), "탭도 뒤로가기로 닫힌다");
+    }
+
+    [Test]
+    public void Exclusive_EarlierWindowStillLoading_IsDismissedWhenItLoads()
+    {
+        loader.Defer<TestPopupAWindow>();
+        WindowHandle popup = windows.Open<TestPopupAWindow>(new TestPopupAArgs());
+
+        WindowHandle tab = windows.Open<TestTabAWindow>(new TestTabAArgs());
+        Assert.IsFalse(IsClosed(popup), "로드 중인 창은 구분을 모르므로 그 자리에서 닫지 않는다");
+
+        int before = presentersCreated;
+        loader.Finish<TestPopupAWindow>();
+
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(popup), "탭보다 먼저 요청된 팝업은 새 탭 위에 뜨지 않는다");
+        Assert.AreEqual(before, presentersCreated, "Presenter를 만들지 않는다");
+        Assert.IsFalse(IsClosed(tab));
+    }
+
+    [Test]
+    public void Exclusive_EarlierSystemWindowStillLoading_Stays()
+    {
+        loader.Defer<TestSystemWindow>();
+        WindowHandle system = windows.Open<TestSystemWindow>(new TestSystemArgs());
+
+        windows.Open<TestTabAWindow>(new TestTabAArgs());
+        loader.Finish<TestSystemWindow>();
+
+        Assert.IsFalse(IsClosed(system));
+        Assert.AreEqual(SystemBand, OrderOf<TestSystemWindow>());
+    }
+
+    [Test]
+    public void Exclusive_LaterRequestWins_WhenLoadsFinishOutOfOrder()
+    {
+        loader.Defer<TestTabAWindow>();
+        WindowHandle tabA = windows.Open<TestTabAWindow>(new TestTabAArgs());
+        WindowHandle tabB = windows.Open<TestTabBWindow>(new TestTabBArgs()); // 나중에 요청했지만 먼저 로드가 끝난다
+
+        loader.Finish<TestTabAWindow>();
+
+        Assert.AreEqual(WindowStatus.Dismissed, StatusOf(tabA), "먼저 요청한 탭은 늦게 로드돼도 뜨지 않는다");
+        Assert.IsFalse(IsClosed(tabB));
+    }
+
+    [Test]
+    public void Exclusive_LoadFailure_KeepsPreviousWindows()
+    {
+        WindowHandle tabA = windows.Open<TestTabAWindow>(new TestTabAArgs());
+        WindowHandle popup = windows.Open<TestPopupBWindow>(new TestPopupBArgs());
+
+        loader.Defer<TestTabBWindow>();
+        WindowHandle tabB = windows.Open<TestTabBWindow>(new TestTabBArgs());
+
+        LogAssert.Expect(LogType.Error, new Regex("TestTabBWindow 프리팹이 없습니다"));
+        loader.FinishMissing<TestTabBWindow>();
+
+        Assert.AreEqual(WindowStatus.Failed, StatusOf(tabB));
+        Assert.IsFalse(IsClosed(tabA), "새 탭을 열지 못하면 화면이 바뀌지 않는다");
+        Assert.IsFalse(IsClosed(popup));
+    }
+
+    [Test]
+    public void Exclusive_ReopeningSameTab_IsAlreadyOpen_AndClosesNothing()
+    {
+        WindowHandle tab = windows.Open<TestTabAWindow>(new TestTabAArgs());
+        WindowHandle popup = windows.Open<TestPopupAWindow>(new TestPopupAArgs());
+
+        WindowHandle again = windows.Open<TestTabAWindow>(new TestTabAArgs());
+
+        Assert.AreEqual(WindowStatus.AlreadyOpen, StatusOf(again));
+        Assert.IsFalse(IsClosed(tab));
+        Assert.IsFalse(IsClosed(popup), "열지 않았으니 아무것도 닫지 않는다");
     }
 
     // ── 닫히지 않는 창 ─────────────────────────────────────

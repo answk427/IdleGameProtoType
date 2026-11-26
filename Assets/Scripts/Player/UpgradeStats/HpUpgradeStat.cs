@@ -14,7 +14,4 @@ public class HpUpgradeStat : IUpgradeStat
     public int GetLevel() => stats.GetSaveData().hpUpgradeLevel;
     public void IncrementLevel() => stats.GetSaveData().hpUpgradeLevel++;
     public GameNumber GetCost(int level) => config.GetHpUpgradeCost(level);
-    // 업그레이드 표시 API는 아직 float(UI 이관 때 GameNumber로, D14)
-    public float GetCurrentValue() => (float)stats.CombatStats.Value.MaxHp.ToDouble();
-    public float GetNextValue() => (float)(stats.CombatStats.Value.MaxHp.ToDouble() + config.settings.hpPerUpgrade);
 }
