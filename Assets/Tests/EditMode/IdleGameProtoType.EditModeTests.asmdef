@@ -5,7 +5,8 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "IdleGameProtoType.Runtime",
-        "IdleGameProtoType.DevTools"
+        "IdleGameProtoType.DevTools",
+        "IdleGameProtoType.TestSupport"
     ],
     "includePlatforms": [
         "Editor"

@@ -4,6 +4,7 @@ using UnityEngine;
 
 // 스테이지 안내("Stage N")의 View(docs/UI_DESIGN.md 5-7). 언제, 무슨 글을 띄울지는 StageAnnouncementPresenter가 정한다.
 // 애니메이션은 화면 시간(unscaledDeltaTime)이라 배속·일시정지와 무관하게 같은 속도로 보인다(docs/UI_DESIGN.md 6-5).
+// 게임이 시작되지 않으면(세이브를 읽지 못함) Presenter가 없으므로 숨긴 채로 남는다(PlayerHud와 같은 규칙).
 public class StageAnnouncement : MonoBehaviour, IStageAnnouncementView
 {
     [SerializeField] private TextMeshProUGUI label;
@@ -12,12 +13,21 @@ public class StageAnnouncement : MonoBehaviour, IStageAnnouncementView
     [SerializeField] private float fadeDuration = 0.4f;
 
     private Coroutine routine;
+    private bool playRequested;
+
+    private void Awake()
+    {
+        // Presenter가 재생하기 전에는 숨긴다(씬에는 "Stage 1"이 보이는 채로 저장돼 있다).
+        // 꺼진 채 저장돼 있어도 Play가 켤 때의 Awake가 다시 끄지 않게 표시를 본다.
+        if (!playRequested) gameObject.SetActive(false);
+    }
 
     public void Play(string text)
     {
         if (label != null) label.text = text;
         if (canvasGroup != null) canvasGroup.alpha = 0f;
 
+        playRequested = true;
         gameObject.SetActive(true);
         if (routine != null) StopCoroutine(routine);
         routine = StartCoroutine(ShowAndFade());

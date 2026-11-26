@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: IdleGameProtoType.Runtime::WindowRegistry
   prefabs:
   - {fileID: 168404692315274929, guid: 2d09ad79c310fb743b0566285fc2f187, type: 3}
+  - {fileID: 8417164808346906770, guid: f91901af19cf5c547a356ae30d17d522, type: 3}

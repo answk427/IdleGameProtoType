@@ -6,6 +6,10 @@ using UnityEngine;
 // 창 로드/열기/닫기, 스택, 정렬 순서, 뒤로가기, 열린 창 Tick (docs/UI_DESIGN.md 6장).
 //
 // - 스택(windows)은 닫는 순서, UISortBand는 그리는 순서. 깊이는 저장하지 않고 스택에서 매번 계산한다.
+// - 스택은 항상 [로드된 창: 구분 순, 같은 구분은 열린 순] + [로드 중인 창]이다(6-4). 그래서 스택 맨 위가 화면 맨 위다:
+//   System 창 위로 Popup이 열려도 Popup은 그 밑에 들어가고, 뒤로가기는 System 창이 받는다.
+//   창의 구분은 프리팹을 로드해야 알므로(옵션은 View의 가상 프로퍼티) 로드 중인 창은 맨 위에 두고(뒤로가기를 먹기만 한다),
+//   로드가 끝나는 순간 자기 구분 자리로 옮긴다.
 // - 요청 큐는 없다. 같은 창이 열려 있으면 AlreadyOpen, 로드 중 입력은 InputBlocker가 막는다.
 // - 어떤 창이 있고 무엇이 필요한지는 모른다. 조립은 UIRoot가 Bind로 한다.
 public sealed class WindowManager : IDisposable
@@ -19,7 +23,7 @@ public sealed class WindowManager : IDisposable
     private readonly Dictionary<Type, WindowHost> hosts = new Dictionary<Type, WindowHost>();
     private readonly Dictionary<UISortBand, int> depths = new Dictionary<UISortBand, int>();
 
-    // 인덱스 0이 바닥, 마지막이 맨 위. 로드 중인 창도 들어 있다(로드 중에 닫을 수 있어야 해서).
+    // 인덱스 0이 바닥, 마지막이 맨 위. 로드 중인 창도 들어 있다(로드 중에 닫을 수 있어야 해서). 순서 규칙은 맨 위 주석.
     private readonly List<Entry> windows = new List<Entry>();
 
     private readonly ReactiveProperty<bool> hasModal = new ReactiveProperty<bool>();
@@ -90,8 +94,20 @@ public sealed class WindowManager : IDisposable
         return true;
     }
 
-    // 위에서부터 전부 닫는다.
-    public void CloseAll() => CloseEvery(WindowStatus.Dismissed);
+    // band보다 낮은 구분의 창을 위에서부터 닫는다(Dismissed). 탭 전환(Exclusive)은 System 밑의 창만 닫는다:
+    // System 구분(치명 오류, 강제 안내)은 화면 이동과 상관없이 남아야 한다.
+    // 로드 중인 창은 구분을 아직 모르므로 그 자리에서 닫지 않고 기준만 기억해 두었다가, 로드가 끝날 때 같은 규칙을 적용한다.
+    // 그래서 결과가 구분을 처음부터 알았던 것과 같다(로드 중인 System 창은 남고, 로드 중인 Popup은 새 탭 위에 뜨지 않는다).
+    public void CloseBelow(UISortBand band)
+    {
+        Entry[] current = windows.ToArray();
+        for (int i = current.Length - 1; i >= 0; i--)
+        {
+            Entry entry = current[i];
+            if (!entry.IsLoaded) entry.RememberCloseBelow(band);
+            else if (entry.Options.Band < band) Close(entry, WindowStatus.Dismissed);
+        }
+    }
 
     public void Tick()
     {
@@ -162,8 +178,19 @@ public sealed class WindowManager : IDisposable
                 hosts[entry.WindowType] = host;
             }
 
+            WindowOptions options = host.View.Options;
+
+            // 로드 중에 받은 닫기 기준을, 구분을 처음부터 알았던 것처럼 적용한다(CloseBelow).
+            if (entry.ClosesOnLoad(options.Band))
+            {
+                host.Hide(); // 새로 만든 창은 보이는 채로 생긴다. 다시 쓰는 창은 이미 숨어 있다.
+                Close(entry, WindowStatus.Dismissed);
+                return;
+            }
+
             entry.Host = host;
-            entry.Options = host.View.Options;
+            entry.Options = options;
+            PlaceByBand(entry);
 
             host.Show();
             Reorder();
@@ -236,6 +263,18 @@ public sealed class WindowManager : IDisposable
 
     // ── 정렬 ───────────────────────────────────────────────
 
+    // 로드가 끝난 창을 자기 구분 자리로 옮긴다: 같거나 낮은 구분의 로드된 창들 바로 위, 높은 구분과 로드 중인 창의 밑.
+    private void PlaceByBand(Entry entry)
+    {
+        windows.Remove(entry);
+
+        int index = 0;
+        while (index < windows.Count && windows[index].IsLoaded && windows[index].Options.Band <= entry.Options.Band) index++;
+
+        windows.Insert(index, entry);
+    }
+
+    // 깊이는 같은 구분 안에서 센다. 스택이 구분 순이라 아래에서부터 세면 된다.
     private void Reorder()
     {
         depths.Clear();
@@ -292,9 +331,12 @@ public sealed class WindowManager : IDisposable
 
         public WindowState State = WindowState.Opening;
         public WindowHost Host;
-        public WindowOptions Options;
+        public WindowOptions Options; // Host가 생긴 뒤에만(IsLoaded) 의미가 있다.
         public IWindowPresenter Presenter;
         public IDisposable InputLease;
+
+        // 로드 중에 받은 가장 높은 닫기 기준(CloseBelow). 없으면 null.
+        private UISortBand? closeBelowOnLoad;
 
         public Entry(WindowManager owner, Type windowType, Action<WindowStatus, object> complete)
         {
@@ -302,6 +344,16 @@ public sealed class WindowManager : IDisposable
             WindowType = windowType;
             Complete = complete;
         }
+
+        // 구분(옵션)을 안다. 로드가 끝나 자기 구분 자리에 놓인 뒤다.
+        public bool IsLoaded => Host != null;
+
+        public void RememberCloseBelow(UISortBand band)
+        {
+            if (closeBelowOnLoad == null || band > closeBelowOnLoad.Value) closeBelowOnLoad = band;
+        }
+
+        public bool ClosesOnLoad(UISortBand band) => closeBelowOnLoad != null && band < closeBelowOnLoad.Value;
 
         public void Close() => CloseWith(null);
         public void CloseWith(object result) => owner.Close(this, WindowStatus.Closed, result);
