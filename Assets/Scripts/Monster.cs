@@ -4,22 +4,16 @@
 // 전투 규칙은 Combatant가 갖고, 둘의 차이는 데이터다:
 //   공격 간격 > 0이면 기본 공격, skillId가 있으면 스킬, movePolicy가 Approach면 자기 이동 속도(moveSpeed)로 다가온다.
 // 보스인지는 스폰할 때 정하는 역할이다(흐름이 어느 전투원이 보스인지 안다).
+// 처치 보상은 스폰할 때 전투원에 넣고(사망 사건이 싣고 간다), 이 뷰는 보상을 모른다.
 public class Monster : CombatantHost
 {
     [SerializeField] private FloatingHpBar hpBar;
 
     private readonly int[] skillSlot = { SkillLoadout.EmptySlot };
     private SkillLoadout skills;
-    private GameNumber goldReward;
-    private int expReward;
-    private bool isBoss;
 
     protected override Team Team => Team.Enemy;
 
-    // 처치 보상 골드. 스테이지 배율로 지수적으로 커지므로 GameNumber.
-    public GameNumber GoldReward => goldReward;
-    public int ExpReward => expReward;
-    public bool IsBoss => isBoss;
     public GameObject OriginPrefab { get; set; }
 
     protected override void Awake()
@@ -36,11 +30,10 @@ public class Monster : CombatantHost
     }
 
     // 스포너가 위치를 정한 뒤에 부른다(풀에서 꺼낸 같은 객체를 다시 쓰므로 이전 상태를 모두 지운다).
-    public void Spawn(MonsterData data, double hpMultiplier, double damageMultiplier, double goldMultiplier, bool isBoss)
+    // 처치 보상 골드는 스테이지 배율로 지수적으로 커지므로 GameNumber.
+    public void Spawn(MonsterData data, double hpMultiplier, double damageMultiplier, double goldMultiplier)
     {
-        this.isBoss = isBoss;
-        goldReward = GameNumber.Round(data.GoldReward * goldMultiplier);
-        expReward = data.ExpReward;
+        var reward = new CombatReward(GameNumber.Round(data.GoldReward * goldMultiplier), data.ExpReward);
 
         skillSlot[0] = data.SkillId > 0 ? data.SkillId : SkillLoadout.EmptySlot;
         skills.SetSlots(skillSlot);
@@ -56,20 +49,18 @@ public class Monster : CombatantHost
             MovePolicy = data.MovePolicy,
         };
 
-        // 체력바가 먼저 켜져 있어야 스폰 때 HP 알림을 받는다.
+        // 체력바가 먼저 켜져 있어야 등록(Joined) 때 HP 알림을 받는다.
         if (hpBar != null) hpBar.gameObject.SetActive(true);
-        Combatant.Spawn(stats, BodyCenterX(transform.position.x), hitboxProfile.HalfWidth, timelines, skills);
+        Combatant.Spawn(stats, BodyCenterX(transform.position.x), hitboxProfile.HalfWidth, timelines, skills, reward);
     }
 
-    public override void HandleDied(Combatant self)
+    protected override void HandleDied()
     {
-        base.HandleDied(self);
+        base.HandleDied();
 
         // 시체는 인카운터가 끝날 때까지 화면에 남으므로 빈 체력바를 숨긴다.
+        // 보상 지급은 사망 사건을 받은 GameManager가, 동전 연출은 CombatEffectManager가 한다.
+        // 보스 처치(스테이지 클리어)는 흐름(EncounterDirector)이 다음 단계 ①에서 월드에 묻는다.
         if (hpBar != null) hpBar.gameObject.SetActive(false);
-
-        // 골드/경험치 지급은 GlobalCombatEvents.MonsterDied 구독자(GameManager)가 처리한다.
-        // 보스 처치(스테이지 클리어)는 알리지 않는다: 흐름(EncounterDirector)이 다음 단계 ①에서 월드에 묻는다.
-        GlobalCombatEvents.RaiseMonsterDied(this, goldReward, transform.position);
     }
 }

@@ -90,8 +90,8 @@ public class CombatWorldTests
 
         Run(world, 60);
 
-        Assert.AreEqual(1, caster.SkillHits);
-        Assert.AreEqual(2, caster.LastSkillHitCount);
+        Assert.AreEqual(1, caster.ActionsStarted, "시전은 한 번");
+        Assert.AreEqual(2, caster.SkillHits, "타격 사건은 맞은 대상마다 하나");
         Assert.AreEqual(1, left.Damaged);
         Assert.AreEqual(1, right.Damaged);
         Assert.AreEqual(0, apart.Damaged);
@@ -212,11 +212,12 @@ public class CombatWorldTests
         CombatantPhase phase = ally.Phase;
         Combatant target = ally.Target;
         float shifted = 0f;
-        world.OriginShifted += d => shifted += d;
+        world.Events.Subscribe(e => { if (e.Type == CombatEventType.OriginShifted) shifted += e.Delta; });
 
         world.RecenterOn(ally);
+        Deliver(world);
 
-        Assert.AreEqual(1000f, shifted, "정수 부분만큼");
+        Assert.AreEqual(1000f, shifted, "정수 부분만큼(뷰가 살아 있는 연출을 옮기는 사건)");
         Assert.AreEqual(1000.0, world.TotalShift);
         Assert.That(ally.X, Is.InRange(0f, 1f));
         Assert.AreEqual(gap, CombatWorld.Gap(ally, enemy), 1e-4f);
@@ -244,16 +245,89 @@ public class CombatWorldTests
         Assert.AreEqual(20000 * 20.0, world.TotalShift + ally.X, 1.0, "이동한 거리 = 누적 재설정 + 지금 좌표");
     }
 
+    // 사건은 단계가 끝난 뒤 배달된다(5-A). 그래서 받는 쪽이 원점을 옮겨도 처리 도중이 아니다(예전에는 처리 도중의 알림이라 막아야 했다).
+    // 그 재설정이 낸 사건은 이번 배달에 섞이지 않고 다음 배달로 간다.
     [Test]
-    public void ShiftingDuringAStep_IsRejected()
+    public void Listener_MayShiftOrigin_BecauseDeliveryIsAfterTheStep()
     {
         CombatWorld world = World();
         var host = new FakeHost();
         Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, damage: 1000, interval: 0.1, range: 5f, policy: MovePolicy.Advance));
         Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 1), host: host);
-        host.OnDiedCallback = _ => world.ShiftOrigin(1f); // 사건 처리 중에 재설정하려는 잘못된 코드
+        int shifted = 0;
+        world.Events.Subscribe(e => { if (e.Type == CombatEventType.OriginShifted) shifted++; });
+        host.OnDiedCallback = (_, __) => world.ShiftOrigin(1f);
 
-        Assert.Throws<System.InvalidOperationException>(() => Run(world, 10));
+        Assert.DoesNotThrow(() => Run(world, 10));
+        Assert.AreEqual(1.0, world.TotalShift);
+        Assert.AreEqual(1, shifted, "재설정 사건은 다음 배달에 온다");
+    }
+
+    [Test]
+    public void Delivery_IsInOrder_WithEventTimes_AndOnlyAfterDeliver()
+    {
+        CombatWorld world = World();
+        var host = new FakeHost();
+        Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, damage: 30, interval: 0.1, range: 5f, policy: MovePolicy.Advance));
+        Combatant enemy = Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 100), host: host, reward: new CombatReward((GameNumber)12, 3));
+        var times = new System.Collections.Generic.List<double>();
+        var types = new System.Collections.Generic.List<CombatEventType>();
+        world.Events.Subscribe(e => { if (e.Source == enemy) { times.Add(e.Time); types.Add(e.Type); } });
+
+        enemy.TakeDamage(10);
+        Assert.AreEqual(0, host.Damaged, "배달 전에는 오지 않는다");
+        Assert.Greater(world.PendingEventCount, 0);
+        Deliver(world);
+        Assert.AreEqual(1, host.Damaged);
+
+        Run(world, 30);
+
+        CollectionAssert.IsOrdered(times, "일어난 시각 순서로 온다");
+        Assert.AreEqual(1, host.Died);
+        Assert.AreEqual(CombatEventType.Died, types[types.IndexOf(CombatEventType.Died)]);
+        Assert.AreEqual((GameNumber)12, host.LastReward.Gold, "사망 사건이 스폰 때 정한 보상을 싣는다");
+        Assert.AreEqual(3, host.LastReward.Exp);
+        Assert.AreEqual(0, world.PendingEventCount);
+    }
+
+    [Test]
+    public void BeforeJoiningAWorld_NothingIsEmitted_ThenJoinedAnnouncesIt()
+    {
+        CombatWorld world = World();
+        var host = new FakeHost();
+        var c = new Combatant(Team.Enemy);
+        Attach(world, c, host);
+
+        c.Spawn(Stats(hp: 50), 0f, 0.5f, Timelines(), null);
+        c.TakeDamage(1); // 월드가 없다: 사건 없음
+        world.Add(c);
+        Deliver(world);
+
+        Assert.AreEqual(1, host.Joined);
+        Assert.AreEqual(0, host.Damaged);
+    }
+
+    // 배달 중에 생긴 사건(구독자가 피해를 주는 등)은 이번 순회에 섞이지 않고 다음 배달로 간다.
+    [Test]
+    public void EventsRaisedWhileDelivering_GoToTheNextDelivery()
+    {
+        CombatWorld world = World();
+        var host = new FakeHost();
+        Combatant enemy = Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 100), host: host);
+        Deliver(world);
+        bool hitBack = false;
+        world.Events.Subscribe(e =>
+        {
+            if (e.Type == CombatEventType.Damaged && !hitBack) { hitBack = true; enemy.TakeDamage(1); }
+        });
+
+        enemy.TakeDamage(1);
+        Deliver(world);
+        Assert.AreEqual(1, host.Damaged);
+        Assert.AreEqual(1, world.PendingEventCount);
+
+        Deliver(world);
+        Assert.AreEqual(2, host.Damaged);
     }
 
     // ── 사망 ──
@@ -286,7 +360,7 @@ public class CombatWorldTests
         Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, damage: 1000, interval: 0.1, range: 5f, policy: MovePolicy.Advance));
         Combatant enemy = Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 1), host: enemyHost);
         Spawn(world, Team.Enemy, 1.5f, 0.5f, Stats(hp: 1e9));
-        enemyHost.OnDiedCallback = self => world.Remove(self); // 사건 처리 중에 흐름 코드가 빼는 경우
+        enemyHost.OnDiedCallback = (self, _) => world.Remove(self); // 사망 사건을 받은 쪽이 빼는 경우(배달은 처리 밖)
 
         Assert.DoesNotThrow(() => Run(world, 10));
         Assert.IsNull(enemy.World);

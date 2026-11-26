@@ -183,9 +183,9 @@ flowchart LR
 - **파생 상태(`DerivedProperty`)는 저장 데이터에서 계산**해서, 교체 도중의 조합(새 레벨 + 옛 업그레이드)이 바깥에 보이지 않습니다.
 - **`GameSession.Apply`는 객체를 새로 만들지 않고 값만 덮어씁니다.** 구독하는 쪽이 옛 객체를 붙잡지 않으므로 세이브 로드, 개발자 도구의 진행도 교체, (나중의) 서버 롤백이 같은 경로를 씁니다.
 - **재화와 전투 수치는 `GameNumber`**(내부 double)로 감쌌습니다. 방치형 경제는 상한 없이 커지므로, 표현을 바꿔야 할 때 구조체 내부만 바뀌게 했습니다. 세이브와 데이터 테이블에는 기본 타입을 둡니다(직렬화 모양을 바꾸지 않기 위해).
-- 전투 → 연출·보상 방향의 알림은 정적 버스 `GlobalCombatEvents`(사건만, 구조체라 발행에 할당 없음)입니다. 몬스터는 죽었다는 사실만 알리고 보상 지급은 `GameManager`가 합니다.
+- 전투 → 연출·보상 방향의 알림은 월드의 사건(`CombatEvent`, 구조체라 할당 없음)입니다. 시뮬레이션은 일어난 일을 버퍼에 쌓기만 하고, 드라이버가 고정 단계가 끝난 뒤 뷰·이펙트·보상에 배달합니다. 그래서 연출이 시뮬레이션 도중에 끼어들 수 없고, 연출을 바꾸거나 빼도 결과가 같습니다. 처치 보상은 스폰할 때 전투원에 넣고 사망 사건이 싣고 가서 `GameManager`가 지급합니다.
 
-([GameSession.cs](Assets/Scripts/Player/GameSession.cs), [PlayerStats.cs](Assets/Scripts/Player/PlayerStats.cs), [ReactiveProperty.cs](Assets/Scripts/Reactive/ReactiveProperty.cs), [DerivedProperty.cs](Assets/Scripts/Reactive/DerivedProperty.cs), [GameNumber.cs](Assets/Scripts/Economy/GameNumber.cs), [GlobalCombatEvents.cs](Assets/Scripts/Event/GlobalCombatEvents.cs))
+([GameSession.cs](Assets/Scripts/Player/GameSession.cs), [PlayerStats.cs](Assets/Scripts/Player/PlayerStats.cs), [ReactiveProperty.cs](Assets/Scripts/Reactive/ReactiveProperty.cs), [DerivedProperty.cs](Assets/Scripts/Reactive/DerivedProperty.cs), [GameNumber.cs](Assets/Scripts/Economy/GameNumber.cs), [CombatEvent.cs](Assets/Scripts/Combat/CombatEvent.cs))
 
 ---
 
@@ -292,7 +292,7 @@ ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래�
 
 - **저장**: 손상을 막기만 하고 복구 수단(백업으로 되돌리기, 확인 후 새로 시작)이 아직 없습니다. 저장이 원자적이지 않고(쓰는 도중 종료되면 파일이 잘릴 수 있음) 세이브 버전·마이그레이션이 없습니다. WebGL 데모는 새로고침하면 세이브가 사라집니다(템플릿 설정).
 - **게임 기능**: 오프라인 보상이 없습니다. 스킬 쿨다운은 저장하지 않습니다.
-- **구조**: 전투에서 연출(데미지 숫자, 이펙트, 소리)을 아직 직접 호출합니다(전투 5단계에서 사건으로 분리). 게임 런타임 코드가 어셈블리 하나라 "모델은 UI를 모른다"를 컴파일러가 강제하지는 않습니다(개발자 도구만 따로 나뉘어 있습니다). 하단 UI 비율 값이 세 곳에 있습니다.
+- **구조**: 전투 시뮬레이션 어셈블리가 아직 분리되지 않아 "시뮬레이션은 Unity를 모른다"를 컴파일러가 강제하지 않습니다(전투 5단계의 남은 일). 게임 런타임 코드가 어셈블리 하나라 "모델은 UI를 모른다"를 컴파일러가 강제하지는 않습니다(개발자 도구만 따로 나뉘어 있습니다). 하단 UI 비율 값이 세 곳에 있습니다.
 - **밸런스 수치는 기준이 아닙니다.** 구조를 먼저 만들고 있어서 지금 값(예: 슬라임 처치 보상)은 시험용입니다.
 
 ## 문서
@@ -312,7 +312,7 @@ ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래�
 DataTables/GameData.xlsx     # 게임 데이터 원본(엑셀)
 Assets/
 ├─ Scripts/
-│  ├─ Combat/        # Combatant, CombatWorld, 시계·스케줄러, 행동 시간표, 전투원 호스트
+│  ├─ Combat/        # Combatant, CombatWorld, 전투 사건(CombatEvent), 시계·스케줄러, 행동 시간표, 전투원 호스트·뷰 표
 │  ├─ Flow/          # EncounterDirector(인카운터·보스·스테이지 흐름)
 │  ├─ Player/        # GameSession, PlayerStats, 세이브(저장소·검사·프로필)
 │  ├─ Reactive/      # ReactiveProperty, Subject, DerivedProperty
@@ -321,7 +321,6 @@ Assets/
 │  ├─ Data/          # IData 구현체, 데이터베이스 정의, 튜닝 덮어쓰기
 │  ├─ Manager/       # GameInitializer, CombatSimulation, GameManager, PoolManager, CombatEffectManager 등
 │  ├─ UI/            # Core(UIRoot, WindowManager, 창 베이스), 탭·HUD·창별 View와 Presenter
-│  ├─ Event/         # GlobalCombatEvents(전투 사건 버스)
 │  └─ DevTools/      # 개발자 도구(에디터·개발 빌드 전용 어셈블리)
 ├─ Editor/           # Excel → JSON → ScriptableObject 변환, 행동 시간표 굽기, 데이터 검사
 ├─ Data/             # 데이터베이스·시간표·창 레지스트리 에셋

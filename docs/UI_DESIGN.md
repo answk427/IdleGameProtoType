@@ -169,7 +169,7 @@ Q3. 다른 상태들로부터 계산되나?                            예 → �
 
   4-A 결과: 흐름 쪽 항목(`OnBossKilled`, `OnStageCleared`, `OnPlayerDied`, `OnStageChanged`)은 버스로 옮기지 않고 없앴다. 흐름이 지난 단계의 결과를 월드에 직접 묻고(처치, 전멸), 스테이지는 `EncounterDirector`의 상태(`CurrentStageNumber`)와 사건(`StageEntered`)이 됐다. `GlobalGameEvents`는 삭제했다. `GlobalCombatEvents`의 `Subject`화는 4-B다.
 
-- **정적 이벤트 버스는 원칙의 예외로 유지한다.** "예외"는 접근 방식(주입 대신 정적)에 대한 것이고, 알림 수단은 다른 경계 알림과 같이 반응형(`Subject`)이다. `GlobalGameEvents`/`GlobalCombatEvents`는 GameInitializer가 넘겨주는 대신 정적으로 남긴다(풀에서 생성되는 몬스터까지 참조를 넘기는 비용 대비 얻는 것이 적다). 버튼 클릭 사건(`UIButtonEvents`, 소리가 듣는다, 10-6)도 같은 이유의 예외다(버튼은 프리팹·View·목록 항목이 만들고 HUD 버튼은 UIRoot 밑에 없다). 밖으로 내는 사건만 정적으로 두고, 정적으로 무엇을 묻는 길(서비스 찾기)은 두지 않는다. 대신 `[RuntimeInitializeOnLoadMethod]`로 플레이 시작 시 구독자를 비운다. 도메인 리로드를 끄면(Enter Play Mode Options) 정적 상태가 플레이 세션 사이에 남아, 지난 플레이의 파괴된 구독자에게 알림이 가기 때문이다. 현재 프로젝트 설정은 도메인 리로드를 하므로 지금은 안전하지만 설정이 바뀌어도 안전하게 해 둔다.
+- **정적 이벤트 버스는 원칙의 예외로 유지한다.** "예외"는 접근 방식(주입 대신 정적)에 대한 것이고, 알림 수단은 다른 경계 알림과 같이 반응형(`Subject`)이다. 처음에는 `GlobalGameEvents`/`GlobalCombatEvents`를 정적으로 남겼다(풀에서 생성되는 몬스터까지 참조를 넘기는 비용 대비 얻는 것이 적다). 둘 다 지금은 없다: 흐름 쪽은 4-A에서, 전투 쪽은 전투 5-A에서 월드의 사건(드라이버가 배달, [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 11절)으로 바뀌어 정적일 이유가 사라졌다. 남은 예외는 버튼 클릭 사건(`UIButtonEvents`, 소리가 듣는다, 10-6) 하나다(버튼은 프리팹·View·목록 항목이 만들고 HUD 버튼은 UIRoot 밑에 없다). 밖으로 내는 사건만 정적으로 두고, 정적으로 무엇을 묻는 길(서비스 찾기)은 두지 않는다. 대신 `[RuntimeInitializeOnLoadMethod]`로 플레이 시작 시 구독자를 비운다. 도메인 리로드를 끄면(Enter Play Mode Options) 정적 상태가 플레이 세션 사이에 남아, 지난 플레이의 파괴된 구독자에게 알림이 가기 때문이다. 현재 프로젝트 설정은 도메인 리로드를 하므로 지금은 안전하지만 설정이 바뀌어도 안전하게 해 둔다.
 
 ### 5-4. 이름 규칙
 
@@ -541,6 +541,7 @@ GameInitializer.Start()  — 씬에 하나, [DefaultExecutionOrder(-1000)]로 �
 | 시작 코드 이름 `Bootstrap` | `GameInitializer` | 웹 CSS 프레임워크 Bootstrap과 헷갈림. 역할(게임 시작 시 객체를 순서대로 만들고 연결)이 이름에 드러나게 함 |
 | 정렬 구분 간격 200, 깊이 한도 없음 | 간격 1000, 구분 안 깊이 100까지, 초과 시 에러 | 깊이가 쌓이면 다음 구분을 조용히 침범할 수 있었음. 16비트 범위라 간격을 아낄 이유가 없음 |
 | 정적 이벤트 버스에 사건과 상태 혼재 | 버스에는 사건만, 상태는 주인의 `ReactiveProperty` | 정적 버스의 상태는 전역 가변 변수가 됨 |
+| 전투 → 연출·보상은 정적 버스 `GlobalCombatEvents`(5-3의 예외) | 월드의 사건(`CombatEvent`), 드라이버가 고정 단계 끝에 배달(전투 5-A) | 정적의 이유는 "풀의 몬스터까지 참조를 넘기기 어렵다"였는데, 월드가 사건을 쌓고 드라이버가 배달하면 넘길 것이 없다. 연출이 시뮬레이션 처리 도중에 끼어들 길도 사라진다([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 11-4) |
 | 재진입 무한 루프를 깊이 제한으로 감지 | 총 전달 수로 감지 | 구현 중 재현: 구독자 둘이면 깊이 17에서 알림이 30만 번을 넘어 깊이 100에 닿지 못함 |
 | 새 팝업은 전부 `UIWindow` | 개발자 도구 패널만 IMGUI(예외) | 릴리스 빌드에서 통째로 빠져야 해서 에셋을 가질 수 없음. 창 프리팹을 `WindowRegistry`에 등록하면 릴리스 빌드에 스크립트가 빠진 프리팹이 들어간다([DEV_TOOLS.md](DEV_TOOLS.md) T3) |
 | `UIRoot.Initialize(세션, …)` 하나 | `Prepare`(창 시스템) + `BindGame`(게임) | 시작에 실패하면 세션이 없어 창 시스템을 만들 수 없었다. 실패 전용 조립 경로는 평소에 검증되지 않으므로 두지 않는다(3장) |

@@ -40,7 +40,7 @@ public class EncounterDirectorTests
             }
             else
             {
-                c = new Combatant(Team.Enemy, new FakeHost());
+                c = new Combatant(Team.Enemy);
             }
 
             c.Spawn(isBoss ? BossStats : NormalStats, pivotX, HalfWidth, timelines, null);
@@ -219,7 +219,10 @@ public class EncounterDirectorTests
 
         // 보스 등장 대기는 정확히 1초(50단계)
         long diedAt = -1;
-        rig.Host.OnSpawned += (c, boss, x) => { if (boss) ((FakeHost)c.Host).OnDiedCallback = _ => diedAt = rig.Now; };
+        Combatant bossCombatant = null;
+        rig.Host.OnSpawned += (c, boss, x) => { if (boss) bossCombatant = c; };
+        // 사건은 단계가 끝나고 시계가 넘어간 뒤 배달된다: 죽은 단계 = 배달 때의 단계 - 1
+        rig.World.Events.Subscribe(e => { if (e.Type == CombatEventType.Died && e.Source == bossCombatant) diedAt = rig.Now - 1; });
         rig.RunUntil(() => d.Phase.Value == FlowPhase.Boss, what: "보스전");
         Assert.That(rig.StepOf(FlowPhase.Boss) - rig.StepOf(FlowPhase.BossIntro), NUnit.Framework.Is.EqualTo(50));
         Assert.That(rig.Host.BossesSpawned, NUnit.Framework.Is.EqualTo(1));

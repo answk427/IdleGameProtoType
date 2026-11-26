@@ -9,6 +9,11 @@ public class MonsterSpawner : MonoBehaviour, IEncounterHost
     [Tooltip("보스를 둘 부모(일반 몬스터는 부모 없이 둔다)")]
     [SerializeField] private Transform spawnRoot;
 
+    private CombatantViews views;
+
+    // 드라이버(CombatSimulation)가 시작할 때 넘긴다. 만든 몬스터의 뷰를 여기에 등록한다(사건 배달, 반납).
+    public void Initialize(CombatantViews combatantViews) => views = combatantViews;
+
     public Combatant Spawn(int monsterId, StageData stage, float pivotX, bool isBoss)
     {
         MonsterEntry entry = GameDatabaseManager.Instance.GetMonster(monsterId);
@@ -34,16 +39,17 @@ public class MonsterSpawner : MonoBehaviour, IEncounterHost
             return null;
         }
 
-        // 보스와 일반 몬스터는 같은 Monster다. 차이는 데이터(스킬, 이동 정책, 공격)와 처치 알림용 역할뿐이다.
+        // 보스와 일반 몬스터는 같은 Monster다. 차이는 데이터(스킬, 이동 정책, 공격)뿐이고, 보스인지는 흐름이 안다.
         monster.OriginPrefab = prefab;
+        views?.Register(monster); // 풀에서 다시 꺼낸 것이면 이미 있다
         CalcStageMultiplier(stage, out double hpMult, out double dmgMult, out double goldMult);
-        monster.Spawn(entry.data, hpMult, dmgMult, goldMult, isBoss);
+        monster.Spawn(entry.data, hpMult, dmgMult, goldMult);
         return monster.Combatant;
     }
 
     public void Despawn(Combatant combatant)
     {
-        if (combatant?.Host is Monster monster && monster != null)
+        if (views != null && views.TryGet(combatant, out CombatantHost host) && host is Monster monster)
             PoolManager.Instance.Despawn(monster.OriginPrefab, monster.gameObject);
     }
 

@@ -1,13 +1,11 @@
-using System.Collections.Generic;
 using UnityEngine;
 
-// 스킬 시전/타격 연출(이펙트, 소리). 플레이어와 보스가 같이 쓴다.
-// 전투 로직이 연출을 직접 부르는 구조(P7)는 5단계에서 이벤트로 바꾼다. 그때까지 부르는 곳을 여기 한 곳으로 모아 둔다.
+// 스킬 시전/타격 연출(이펙트, 소리). CombatEffectManager가 전투 사건(ActionStarted, SkillHit)을 받아 부른다(5-A).
+// 스킬의 연출 자산(VFX 프리팹, 소리)은 SkillEntry에 있고, 사건은 스킬 id만 싣는다. 전투 규칙은 이것을 모른다(P7).
 public static class SkillPresentation
 {
-    public static void PlayCast(Skill skill, Vector3 casterPosition)
+    public static void PlayCast(SkillEntry entry, Vector3 casterPosition)
     {
-        SkillEntry entry = skill?.Entry;
         if (entry == null) return;
 
         if (entry.castVfxPrefab != null && CombatEffectManager.Instance != null)
@@ -17,21 +15,15 @@ public static class SkillPresentation
             AudioSource.PlayClipAtPoint(entry.castSfx, casterPosition);
     }
 
-    // 맞은 전투원마다 그 몸 위치에 재생한다.
-    public static void PlayHit(Skill skill, IReadOnlyList<Combatant> hitTargets)
+    // 맞은 전투원 하나의 몸 위치에 재생한다(맞은 수만큼 사건이 온다).
+    public static void PlayHit(SkillEntry entry, Vector3 targetPosition)
     {
-        SkillEntry entry = skill?.Entry;
-        if (entry == null || hitTargets == null) return;
+        if (entry == null) return;
 
-        for (int i = 0; i < hitTargets.Count; i++)
-        {
-            Vector3 position = CombatantHost.EffectPositionOf(hitTargets[i]);
+        if (entry.hitVfxPrefab != null && CombatEffectManager.Instance != null)
+            CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, targetPosition);
 
-            if (entry.hitVfxPrefab != null && CombatEffectManager.Instance != null)
-                CombatEffectManager.Instance.PlayVfx(entry.hitVfxPrefab, position);
-
-            if (entry.hitSfx != null)
-                AudioSource.PlayClipAtPoint(entry.hitSfx, position);
-        }
+        if (entry.hitSfx != null)
+            AudioSource.PlayClipAtPoint(entry.hitSfx, targetPosition);
     }
 }

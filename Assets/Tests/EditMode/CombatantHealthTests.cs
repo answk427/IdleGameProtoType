@@ -24,6 +24,7 @@ public class CombatantHealthTests
         c.TakeDamage(GameNumber.FromDouble(1e31));
         Assert.AreEqual(GameNumber.Zero, c.Hp);
         Assert.IsFalse(c.IsAlive);
+        Deliver(c.World);
         Assert.AreEqual(1, host.Died);
     }
 
@@ -35,6 +36,7 @@ public class CombatantHealthTests
 
         c.TakeDamage(GameNumber.FromDouble(-50));
         c.TakeDamage(GameNumber.FromDouble(double.NaN));
+        Deliver(c.World);
 
         Assert.AreEqual((GameNumber)100, c.Hp);
         Assert.AreEqual(0, host.Died);
@@ -50,8 +52,10 @@ public class CombatantHealthTests
         Assert.AreEqual((GameNumber)100, c.Hp);
 
         c.TakeDamage(1000);
+        Deliver(c.World);
         int healedBefore = host.Healed;
         c.Heal(50);
+        Deliver(c.World);
         Assert.AreEqual(GameNumber.Zero, c.Hp);
         Assert.AreEqual(healedBefore, host.Healed);
     }
@@ -64,6 +68,7 @@ public class CombatantHealthTests
 
         c.TakeDamage(10);
         c.TakeDamage(10);
+        Deliver(c.World);
 
         Assert.AreEqual(1, host.Died);
         Assert.AreEqual(1, host.Damaged);
@@ -77,6 +82,7 @@ public class CombatantHealthTests
         c.TakeDamage(80);
 
         c.Revive();
+        Deliver(c.World);
 
         Assert.AreEqual((GameNumber)80, c.Hp);
         Assert.AreEqual(CombatantPhase.Moving, c.Phase);

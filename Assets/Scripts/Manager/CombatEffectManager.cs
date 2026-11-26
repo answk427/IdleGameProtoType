@@ -1,8 +1,9 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-// 전투 연출(데미지 숫자, 타격 이펙트, 스킬 이펙트, 보상 동전). 모두 월드 위치에 생기고, 카메라가 지나간다(3단계).
-// 원점 재설정(CombatSimulation이 전함) 때는 지금 살아 있는 것을 같은 양만큼 옮긴다(docs/COMBAT_ARCHITECTURE.md 9-3).
+// 전투 연출(데미지 숫자, 타격 이펙트, 스킬 이펙트·소리, 보상 동전). 모두 월드 위치에 생기고, 카메라가 지나간다(3단계).
+// 전투 사건(CombatEvent, 5-A)을 구독해서 그린다. 전투 규칙은 이 클래스를 모른다(P7).
+// 원점 재설정 사건 때는 지금 살아 있는 것을 같은 양만큼 옮긴다(docs/COMBAT_ARCHITECTURE.md 9-3).
 // 이펙트 프리팹은 로컬 시뮬레이션 공간이어야 한다(트랜스폼만 옮기면 파티클도 따라오게). 월드 공간이면 데이터 검사가 잡는다.
 public class CombatEffectManager : MonoBehaviour
 {
@@ -32,7 +33,8 @@ public class CombatEffectManager : MonoBehaviour
     private readonly List<RewardDropEffect> liveDrops = new List<RewardDropEffect>();
     private readonly List<Transform> liveEffects = new List<Transform>();
 
-    private CompositeDisposable busSubscriptions;
+    private System.IDisposable eventSubscription;
+    private CombatantViews views;
 
     private Sprite defaultCoinSprite;
     private Sprite defaultChestSprite;
@@ -49,34 +51,52 @@ public class CombatEffectManager : MonoBehaviour
         EnsureRewardDropPrefab();
     }
 
-    private void OnEnable()
+    // GameInitializer가 전투 월드를 만든 뒤 잇는다. 위치는 뷰 표에서 찾는다(시뮬레이션 위치 기준).
+    public void Bind(CombatWorld world, CombatantViews combatantViews)
     {
-        busSubscriptions = new CompositeDisposable();
-        GlobalCombatEvents.TargetDamaged.Subscribe(HandleTargetDamaged).AddTo(busSubscriptions);
-        GlobalCombatEvents.MonsterDied.Subscribe(HandleMonsterDied).AddTo(busSubscriptions);
-        GlobalCombatEvents.Healed.Subscribe(HandleHealed).AddTo(busSubscriptions);
+        eventSubscription?.Dispose();
+        views = combatantViews;
+        eventSubscription = world.Events.Subscribe(HandleEvent);
     }
 
-    private void OnDisable()
+    private void OnDestroy() => eventSubscription?.Dispose();
+
+    private void HandleEvent(CombatEvent e)
     {
-        busSubscriptions?.Dispose();
-        busSubscriptions = null;
+        switch (e.Type)
+        {
+            // 데미지 숫자는 출처와 무관하게 항상 표시하되, 맞은 대상이 아군인지에 따라 색만 다르게 한다(아군 빨강, 적 흰색).
+            case CombatEventType.Damaged:
+                SpawnDamageText(e.Amount, PivotOf(e.Source), e.Source.Team == Team.Ally ? playerDamageColor : monsterDamageColor);
+                break;
+            case CombatEventType.Healed:
+                SpawnDamageText(e.Amount, PivotOf(e.Source), healColor, "+");
+                break;
+            case CombatEventType.BasicAttackHit:
+                SpawnHitParticle(e.Other);
+                break;
+            case CombatEventType.ActionStarted:
+                if (e.SkillId > 0) SkillPresentation.PlayCast(FindSkill(e.SkillId), EffectOf(e.Source));
+                break;
+            case CombatEventType.SkillHit:
+                SkillPresentation.PlayHit(FindSkill(e.SkillId), EffectOf(e.Other));
+                break;
+            case CombatEventType.Died:
+                if (e.Source.Team == Team.Enemy) SpawnRewardDrop(e.Gold, PivotOf(e.Source));
+                break;
+            case CombatEventType.OriginShifted:
+                ShiftOrigin(e.Delta);
+                break;
+        }
     }
 
-    // 데미지 숫자는 출처와 무관하게 항상 표시하되, 맞은 대상이 플레이어인지에 따라
-    // 색만 다르게 한다 (플레이어가 맞으면 빨강, 몬스터가 맞으면 기존 흰색 유지).
-    private void HandleTargetDamaged(GlobalCombatEvents.Damage e)
-    {
-        Color color = e.Target.Team == Team.Ally ? playerDamageColor : monsterDamageColor;
-        SpawnDamageText(e.Amount, e.Position, color);
-    }
+    private Vector3 PivotOf(Combatant combatant) =>
+        views != null && views.TryGet(combatant, out CombatantHost host) ? host.PivotPosition : Vector3.zero;
 
-    private void HandleHealed(GlobalCombatEvents.Heal e)
-    {
-        SpawnDamageText(e.Amount, e.Position, healColor, "+");
-    }
+    private Vector3 EffectOf(Combatant combatant) =>
+        views != null && views.TryGet(combatant, out CombatantHost host) ? host.EffectPosition : Vector3.zero;
 
-    private void HandleMonsterDied(GlobalCombatEvents.MonsterDeath e) => SpawnRewardDrop(e.Monster, e.GoldReward, e.Position);
+    private static SkillEntry FindSkill(int skillId) => GameDatabaseManager.Instance != null ? GameDatabaseManager.Instance.GetSkill(skillId) : null;
 
     public void SpawnDamageText(GameNumber amount, Vector3 worldPos, Color color, string prefix = "")
     {
@@ -107,7 +127,7 @@ public class CombatEffectManager : MonoBehaviour
             ? playerHitParticlePrefab
             : hitParticlePrefab;
 
-        Vector3 worldPos = CombatantHost.EffectPositionOf(target);
+        Vector3 worldPos = EffectOf(target);
         GameObject obj = PoolManager.Instance.Spawn(
             prefab,
             worldPos,
@@ -124,7 +144,7 @@ public class CombatEffectManager : MonoBehaviour
         hitParticle.Play(worldPos, returnedObj => ReturnHitParticle(prefab, returnedObj));
     }
 
-    public void SpawnRewardDrop(Object target, GameNumber goldAmount, Vector3 worldPos)
+    public void SpawnRewardDrop(GameNumber goldAmount, Vector3 worldPos)
     {
         // 골드가 아무리 커도 코인 개수는 [min, max]로 제한되므로, 먼저 max로 잘라서 int로 바꾼다.
         int cappedAmount = (int)GameNumber.Min(goldAmount, maxCoinDropCount).ToDouble();

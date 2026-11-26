@@ -24,7 +24,7 @@ public class CameraRig : MonoBehaviour
     {
         CombatWorld world = simulation != null ? simulation.World : null;
         Combatant lead = world?.LeadAlly;
-        if (targetCamera == null || lead == null || !(lead.Host is CombatantHost host)) return;
+        if (targetCamera == null || lead == null || !simulation.Views.TryGet(lead, out CombatantHost host)) return;
 
         Transform cameraTransform = targetCamera.transform;
         float allyX = host.transform.position.x; // 이번 화면 프레임의 보간 위치(CombatSimulation.Update가 그림)

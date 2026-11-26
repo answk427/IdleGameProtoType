@@ -24,15 +24,16 @@ public class GameManager : MonoBehaviour
         Instance = this;
     }
 
-    // GameInitializer가 세션, 캐릭터, 시뮬레이션(디렉터)을 만든 뒤, 흐름을 시작하기(Begin) 전에 호출한다.
-    public void Initialize(GameSession session, PlayerController player, EncounterDirector director)
+    // GameInitializer가 세션, 캐릭터, 시뮬레이션(월드, 디렉터)을 만든 뒤, 흐름을 시작하기(Begin) 전에 호출한다.
+    public void Initialize(GameSession session, PlayerController player, CombatWorld world, EncounterDirector director)
     {
         this.session = session ?? throw new ArgumentNullException(nameof(session));
         this.player = player != null ? player : throw new ArgumentNullException(nameof(player));
         this.director = director ?? throw new ArgumentNullException(nameof(director));
+        if (world == null) throw new ArgumentNullException(nameof(world));
 
-        // 처치 보상
-        GlobalCombatEvents.MonsterDied.Subscribe(HandleMonsterDied).AddTo(subscriptions);
+        // 처치 보상: 사망 사건이 스폰 때 정한 보상을 싣고 온다(5-A). 몬스터 뷰는 보상을 모른다.
+        world.Events.Subscribe(HandleCombatEvent).AddTo(subscriptions);
 
         // 저장 계기: 레벨업, 업그레이드, 스킬 학습·장착(플레이어가 직접 한 명령), 스테이지 입장(게임 시작 제외)
         session.Stats.LevelReached.Subscribe(_ => SaveGame()).AddTo(subscriptions);
@@ -44,10 +45,12 @@ public class GameManager : MonoBehaviour
 
     private void OnDestroy() => subscriptions.Dispose();
 
-    private void HandleMonsterDied(GlobalCombatEvents.MonsterDeath death)
+    private void HandleCombatEvent(CombatEvent e)
     {
-        session.Wallet.AddGold(death.GoldReward);
-        player.AddExp(death.Monster.ExpReward);
+        if (e.Type != CombatEventType.Died) return;
+
+        if (e.Gold > GameNumber.Zero) session.Wallet.AddGold(e.Gold);
+        if (e.Exp > 0) session.Stats.AddExp(e.Exp);
     }
 
     // 스테이지에 들어갈 때마다 세션의 스테이지 번호에 반영하고 저장한다. 게임 시작은 읽은 세이브 그대로라 저장하지 않는다.

@@ -58,7 +58,11 @@ public class PlayerController : CombatantHost
         stats.EquippedSlots.Subscribe(_ => RefreshEquippedSkills()).AddTo(subscriptions);
     }
 
-    private void OnDestroy() => subscriptions.Dispose();
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        subscriptions.Dispose();
+    }
 
     private CombatantStats BuildStats(PlayerCombatStats s) => new CombatantStats
     {
@@ -72,17 +76,14 @@ public class PlayerController : CombatantHost
 
     // ── 연출 ──
 
-    public override void HandleLocomotion(Combatant self, bool moving)
+    protected override void HandleLocomotion(bool moving)
     {
         if (view != null) view.PlayLocomotion(moving);
     }
 
-    // 사망 동작이 끝나도 알리지 않는다: 흐름(EncounterDirector)이 다음 단계 ①에서 아군 전멸을 월드에 묻는다.
-    // 부활·회복도 흐름이 전투원(Combatant)에 직접 한다.
+    // 사망 동작이 끝나도 할 일이 없다: 흐름(EncounterDirector)이 다음 단계 ①에서 아군 전멸을 월드에 묻는다.
+    // 부활·회복도 흐름이 전투원(Combatant)에 직접 한다. 처치 보상은 사망 사건을 받은 GameManager가 진행도에 직접 준다.
 
-    // ── 보상(GameManager)이 부른다 ──
-
-    public void AddExp(int amount) => stats.AddExp(amount);
     public void SaveProgress() => GameManager.Instance?.SaveGame();
 
     // ── 스킬(UI 입구) ──

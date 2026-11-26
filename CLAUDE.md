@@ -42,11 +42,12 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 ## 전투원 모델 (`docs/COMBAT_ARCHITECTURE.md` 8절)
 
 - **플레이어, 일반 몬스터, 보스는 모두 `Combatant`(순수 C#, `Assets/Scripts/Combat/`) 하나다.** 차이는 데이터다: 공격 간격 > 0이면 기본 공격, `skillId`가 있으면 스킬, 몬스터 표의 `movePolicy`(Hold: 제자리 / Approach: 자기 `moveSpeed`로 다가옴)가 이동 방식. 기본 공격도 스킬도 없으면 교전하지 않는다(지금의 일반 슬라임). 엑셀에서 슬라임의 공격 간격을 넣으면 코드 수정 없이 공격한다(슬라임 프리팹에 공격 동작과 시간표를 미리 둠).
-- **호스트(MonoBehaviour)는 그리기와 Unity 연결만 한다.** 공통 기반 `CombatantHost`(뷰, 시간표, 판정 몸, 위치 보간, HP 상태 `Hp` — 머리 위 바와 HUD가 같이 구독, D29) ← `PlayerController`(진행도의 `CombatStats`와 캐릭터 표 → 능력치, UI 입구), `Monster`(몬스터 표 × 스테이지 배율 → 능력치, 보상, 풀). `BossMonster`는 없다: 보스인지는 스폰할 때 정하는 역할이다(흐름이 어느 전투원이 보스인지 안다). `Combatant` → 호스트 알림은 `ICombatantHost` 하나로 모았다(5단계에서 이벤트로 분리).
+- **호스트(MonoBehaviour)는 그리기와 Unity 연결만 한다.** 공통 기반 `CombatantHost`(뷰, 시간표, 판정 몸, 위치 보간, HP 상태 `Hp` — 머리 위 바와 HUD가 같이 구독, D29) ← `PlayerController`(진행도의 `CombatStats`와 캐릭터 표 → 능력치, UI 입구), `Monster`(몬스터 표 × 스테이지 배율 → 능력치와 처치 보상, 풀). `BossMonster`는 없다: 보스인지는 스폰할 때 정하는 역할이다(흐름이 어느 전투원이 보스인지 안다).
+- **로직은 연출을 모른다: 사건으로만 잇는다**(`docs/COMBAT_ARCHITECTURE.md` 11절 5-A). `Combatant`는 자기 호스트를 모르고, 일어난 일(피해, 회복, 이동/교전, 행동 시작, 타격, 사망, 부활, 원점 이동 …)을 `CombatEvent`(구조체, 시각 포함)로 월드 버퍼에 쌓는다. **드라이버가 고정 단계 끝(⑥)에 `CombatWorld.DeliverEvents`로 배달**하고(단계 밖의 사건은 화면 프레임에), 받는 쪽은 셋이다: 전투원 뷰(`CombatantViews`가 주인 전투원의 호스트에 넘김), `CombatEffectManager`(데미지 숫자, 타격·스킬 이펙트·소리, 동전), `GameManager`(처치 보상). 처치 보상은 스폰할 때 전투원에 넣고(`CombatReward`) 사망 사건이 싣고 간다. 배달은 처리 밖이라 받는 쪽이 월드를 바꿔도 된다(재진입 없음). 배달 중에 생긴 사건은 다음 배달로 간다. **단계마다 배달한다**: 풀에서 다시 꺼낸 몬스터는 같은 전투원이라 지난 사건이 재스폰 뒤에 오면 안 된다. 월드에 등록되기 전의 일은 사건이 아니다(등록할 때 `Joined`). 전투원 → 뷰는 `CombatSimulation.Views`(`CombatantViews`)에서 찾는다(카메라, 보간, 이펙트 위치, 풀 반납). 이펙트 위치는 시뮬레이션 x 기준(`CombatantHost.EffectPosition`/`PivotPosition`)이다.
 - **`CombatWorld`(순수 C#)가 전투원 전체와 규칙을 갖는다.** 처리 순서는 아군 → 적, 각 팀 안에서는 등록 순이다(플레이어는 시작 때, 몬스터는 스폰 때 등록하고 정리할 때 해제). 처리 도중의 등록·해제는 그 국면이 끝난 뒤에 반영한다.
 - **거리 규칙 하나: 표면 거리**(`CombatWorld.Gap` = 중심 거리 − 두 반너비, 겹치면 음수). 교전, 단일 대상, 범위 스킬 반경이 모두 이것이다. **대상은 반대 팀의 살아 있는 가장 가까운 전투원**(앞뒤 무관, 같은 거리면 등록 순)이고, 지금 대상이 유효하면 바꾸지 않는다.
 - **판정 몸은 프리팹의 `HitboxProfile`**: 중심 = 피벗 + `bodyOffset.x`, `halfWidth` > 0 필수(스프라이트 바운드 자동 계산은 없앴다). 판정과 이펙트 위치가 같은 몸을 쓴다.
-- **상태는 단계 값 하나**(`CombatantPhase`: Inactive / Moving / Engaged / Dead). 상태 객체와 `StateMachine`은 없다. 이동 ↔ 교전 전환은 양쪽이 같은 판정(`TryAcquireTarget`)을 써서 떨지 않는다. 사망 시간표가 있으면(플레이어) 그것이 끝날 때 호스트에 알리고(`HandleDeathCompleted` → 재시작 요청), 없으면 바로 알린다.
+- **상태는 단계 값 하나**(`CombatantPhase`: Inactive / Moving / Engaged / Dead). 상태 객체와 `StateMachine`은 없다. 이동 ↔ 교전 전환은 양쪽이 같은 판정(`TryAcquireTarget`)을 써서 떨지 않는다. 사망 시간표가 있으면(플레이어) 그것이 끝날 때 사망 완료(`IsDeathComplete`, 사건 `DeathCompleted`)가 되고, 없으면 바로 된다. 아군 전멸은 흐름이 월드에 묻는다(`IsDefeated`).
 - **HP·데미지는 `GameNumber`**(D5, D14). 데미지는 `GameNumber.Round(공격력 × 배율)`, 몬스터 성장 배율은 `Math.Pow`(double). `PlayerStats.CombatStats`의 최대 HP·공격력도 `GameNumber`다(업그레이드 표시도 float를 거치지 않는다: `PreviewUpgrade` → Presenter 포맷).
 - **전투 진행 중 할당 0**(R6): 상태 객체 없음, 범위·스킬 결과는 재사용 버퍼, 몬스터의 `Combatant`는 풀 객체마다 하나를 다시 쓴다(`Spawn`이 이전 상태를 지움). `CombatAllocationTests`가 확인한다.
 - **데이터와 프리팹의 짝은 에디터·빌드가 검사한다**(`CombatDataValidator`, `ActionTimelineTools.ValidateCombatData`에서 호출): 몬스터의 공격 간격 > 0이면 프리팹 시간표에 `Attack`, `skillId`의 스킬과 그 행동 키, 캐릭터 프리팹의 `Attack`·`Death`와 배울 수 있는 모든 스킬의 행동 키, 스테이지가 가리키는 몬스터, 모든 전투원 프리팹의 판정 몸·시간표·뷰.
@@ -69,7 +70,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 전투/스킬
 
-목표 구조와 단계는 `docs/COMBAT_ARCHITECTURE.md`(1~3단계와 4-A(흐름) 완료, 4-B·5단계 남음). 고정 타임스텝 수정의 설계·검증 기록은 `docs/COMBAT_DESIGN.md`.
+목표 구조와 단계는 `docs/COMBAT_ARCHITECTURE.md`(1~4단계 완료, 5단계 진행 중: 5-A 사건으로 잇기 완료, 5-B 순수 C# 드라이버·5-C 어셈블리 분리 남음, 11절). 고정 타임스텝 수정의 설계·검증 기록은 `docs/COMBAT_DESIGN.md`.
 
 - **전투 규칙을 애니메이션이 정하지 않는다.** 행동의 길이는 게임 데이터가, 타격 시점(행동 안의 비율)은 행동 시간표가 정하고, 전투 로직은 애니메이션 이벤트와 애니메이터 전이를 하나도 읽지 않는다. 애니메이터를 꺼도 처치 시각이 같다(검증함).
   - **행동 시간표**(`ActionTimeline`, 캐릭터마다 `ActionTimelineSet` 에셋, `Assets/Data/Combat/Timelines/`): 키(= 애니메이터 상태 이름), 클립, 그리고 클립에서 구운 값(클립 길이, 타격 비율들). 타이밍은 스킬이 아니라 **시전자의 애니메이션**에 속한다(같은 스킬 1번을 플레이어와 BossSlime이 다른 클립으로 쓴다). 스킬의 키는 `SkillData.AnimationTrigger`(이름은 옛 그대로, 의미는 "행동 키").
@@ -89,7 +90,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - **스킬 쿨다운은 스킬 id에 붙는다**(`SkillLoadout`). 슬롯을 옮기거나 장착을 풀었다 껴도 유지되고, 준비 시각이 절대 시각이라 장착하지 않은 동안에도 흐른다(`Tick` 없음). UI는 `PlayerController.GetSkillCooldownRatio`(시계 기준)로 표시한다. 저장하지는 않는다.
 - **애니메이터는 재생기다**(`CharacterAnimationView`). 컨트롤러는 조건 전이 없는 상태 모음이고, 상태를 이름으로 `Play`/`CrossFade`한다. 행동 상태(Attack, Skill, Healing)의 속도는 `ActionSpeed` 파라미터(`클립 길이 ÷ 실제 길이`). Animator Update Mode는 Normal.
 
-- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 국면 순서로 진행한다: ① 흐름(`EncounterDirector.Tick`) → ② 전투 사건(`CombatWorld.RunEvents` → `CombatScheduler`) → ③ 단계 전이와 이동(`CombatWorld.StepPhases`, 아군 → 적) → ⑤ 보간용 기록(`CombatWorld.CaptureStep`), 시계 진행. (④ 배경은 3단계에서 없어졌다.) 전투원·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각과 스테이지 입장 시각이 같다(검증함).
+- **전투는 고정 타임스텝(0.02초)으로 돈다.** `CombatSimulation`(`Assets/Scripts/Manager/`, 씬에 하나)이 전투에서 유일한 `FixedUpdate`를 갖고, 매 단계 국면 순서로 진행한다: ① 흐름(`EncounterDirector.Tick`) → ② 전투 사건(`CombatWorld.RunEvents` → `CombatScheduler`) → ③ 단계 전이와 이동(`CombatWorld.StepPhases`, 아군 → 적) → ⑤ 보간용 기록(`CombatWorld.CaptureStep`), 시계 진행 → ⑥ 사건 배달(`CombatWorld.DeliverEvents`, 5-A). (④ 배경은 3단계에서 없어졌다.) 전투원·배경에는 `Update`가 없다. 같은 세이브면 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각과 스테이지 입장 시각이 같다(검증함).
   - **단계 길이는 설정값 그대로(0.02):** Unity 6은 고정 단계를 유리수로 저장해서 `Time.fixedDeltaTime`이 0.0199999921로 들어온다. 시계는 `CombatSimulation.StepLengthOf`(유효숫자 6자리)로 설정이 뜻하는 값을 쓴다. 안 그러면 데이터의 초가 단계 수와 맞지 않는다(0.5초 대기가 26단계).
   - **시간 규칙:** 위치를 읽거나 움직이는 전투 로직과 전투 시간은 고정 단계 안에서만 돈다. 행동·쿨다운은 ②에서 단계 안의 정확한 시각으로, 이동과 달리기↔교전 전환은 ③에서 단계 단위로(위치를 단계마다 적분하는 모델. 교전 시작을 단계 안의 접촉 시각으로 정밀화하는 것은 하지 않기로 했다, D19). UI 입력 중 위치를 읽는 것(스킬 슬롯 탭)은 `PlayerController.RequestSkillSlot`으로 다음 단계에 처리한다. 흐름(스폰, 대기, 스테이지 전환)도 ①의 시뮬레이션 시간이다. 페이드는 그 시간을 그리기만 한다(배속에서 같이 빨라진다). 화면 시간(`unscaledDeltaTime`)은 UI 애니메이션(스테이지 안내 등)뿐이다. 코루틴으로 흐름을 기다리지 말 것.
   - **보간:** 위치의 주인은 `Combatant.X`(판정 몸 중심, 월드 x)이고, 화면 프레임에서는 호스트(`CombatantHost.ApplyRenderPose`)가 직전 두 단계 사이를 그린다(최대 0.02초 늦게 보임). 위치를 직접 정할 때는 `Combatant.Place`/`Spawn`을 쓴다(보간 기준도 같이 맞춘다). 안 하면 예전 자리에서 미끄러져 온다.
@@ -140,10 +141,10 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 이벤트 버스
 
-버튼 클릭 → 소리의 `UIButtonEvents`(`Assets/Scripts/UI/Core/`)도 같은 예외의 정적 사건이다(버튼은 프리팹·View가 만들어 재생기를 넘길 길이 없다). 밖으로 내는 사건만 정적으로 두고, 정적으로 서비스를 찾는 길은 만들지 않는다.
+**전투 → 연출·보상은 정적 버스가 아니라 월드의 사건(`CombatWorld.Events`, 위 "전투원 모델")이다.** 예전의 `GlobalCombatEvents`(정적 버스, 호스트가 발행)는 5-A에서 지웠다. 드라이버가 배달하므로 "풀에서 나오는 몬스터까지 참조를 넘기기 어렵다"는 정적의 이유가 없어졌다.
+흐름의 상태와 사건(스테이지, 보스 도전 가능, 입장)도 정적 버스가 아니라 `EncounterDirector`의 반응형 값이다. 예전의 `GlobalGameEvents`(보스 처치 → 클리어 → 전환으로 이어지던 정적 사건 사슬, `OnGameStarted`)는 4-A에서 지웠다.
 
-`GlobalCombatEvents`(`Assets/Scripts/Event/`) — 전투 → 연출·보상 방향의 정적 이벤트 버스로 매니저 간 직접 참조를 끊음. 예: `Monster`는 죽었다는 사실만 `GlobalCombatEvents.RaiseMonsterDied`로 알리고, 골드/경험치 지급은 `GameManager`가 `MonsterDied`를 구독해서 처리 — `Monster`는 보상 지급 방법을 모름. 사건은 `Subject`(`TargetDamaged`, `MonsterDied`, `Healed`, 내용은 구조체라 발행에 할당 없음)이고 구독은 `IDisposable`로 해제한다. 플레이를 시작할 때 구독자를 비운다(`ResetSubscribers`, UI_DESIGN 5-3).
-흐름의 상태와 사건(스테이지, 보스 도전 가능, 입장)은 정적 버스가 아니라 `EncounterDirector`의 반응형 값이다. 예전의 `GlobalGameEvents`(보스 처치 → 클리어 → 전환으로 이어지던 정적 사건 사슬, `OnGameStarted`)는 4-A에서 지웠다.
+남은 정적 사건은 버튼 클릭 → 소리의 `UIButtonEvents`(`Assets/Scripts/UI/Core/`) 하나다(버튼은 프리팹·View가 만들어 재생기를 넘길 길이 없다, UI_DESIGN 5-3의 예외). 밖으로 내는 사건만 정적으로 두고, 정적으로 서비스를 찾는 길은 만들지 않는다. 플레이를 시작할 때 구독자를 비운다(`ResetSubscribers`).
 
 ## 저장 시스템
 

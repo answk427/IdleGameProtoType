@@ -2,12 +2,17 @@ using System;
 using System.Collections.Generic;
 
 // 전투원 전체와 그 사이의 규칙(거리, 대상, 처리 순서)을 갖는다(docs/COMBAT_ARCHITECTURE.md 8-3, 8-4). 순수 C#.
-// CombatSimulation(드라이버)이 고정 단계마다 국면 순서로 부른다: (① 흐름) → ② RunEvents → ③ StepPhases → ⑤ CaptureStep.
+// CombatSimulation(드라이버)이 고정 단계마다 국면 순서로 부른다:
+//   (① 흐름) → ② RunEvents → ③ StepPhases → ⑤ CaptureStep → ⑥ DeliverEvents.
 // 위치는 월드 x다(3단계). 좌표가 커지지 않게 인카운터를 스폰할 때마다 원점을 재설정한다(ShiftOrigin).
 //
 // 처리 순서는 아군 → 적, 각 팀 안에서는 등록 순서다. 같은 시각의 전투 사건(CombatScheduler)도 이 순서다.
-// 처리 도중의 등록·해제(사망 알림을 받은 연출 코드가 부르는 경우)는 그 국면이 끝난 뒤에 반영한다.
+// 처리 도중의 등록·해제는 그 국면이 끝난 뒤에 반영한다.
 // 흐름(스폰, 정리, 원점 재설정)은 처리 밖인 국면 ①(EncounterDirector)에서 한다.
+//
+// 바깥(뷰, 이펙트, 보상)에는 사건(CombatEvent)으로만 알린다(5-A, P7). 사건은 일어날 때 버퍼에 쌓이고, 드라이버가 단계가 끝난 뒤
+// DeliverEvents로 배달한다. 배달 중에 생긴 사건(구독자가 전투원을 스폰하는 등)은 다음 배달로 간다.
+// 단계마다 배달하는 이유: 풀에서 다시 꺼낸 전투원은 같은 객체라, 지난 사건이 다음 단계의 재스폰 뒤에 도착하면 새 몬스터에 잘못 간다.
 public sealed class CombatWorld
 {
     private readonly List<Combatant> combatants = new List<Combatant>(16);
@@ -15,8 +20,12 @@ public sealed class CombatWorld
     private readonly List<Combatant> pendingRemove = new List<Combatant>(4);
     private readonly List<CombatActions> participants = new List<CombatActions>(16);
     private readonly CombatScheduler scheduler = new CombatScheduler();
+    private readonly Subject<CombatEvent> events = new Subject<CombatEvent>();
+    private List<CombatEvent> pendingEvents = new List<CombatEvent>(64);
+    private List<CombatEvent> deliveringEvents = new List<CombatEvent>(64);
     private int nextOrder;
     private bool busy;
+    private bool delivering;
 
     public CombatWorld(SimClock clock)
     {
@@ -29,8 +38,36 @@ public sealed class CombatWorld
     // 원점 재설정으로 뺀 거리의 합. 월드가 처음부터 실제로 이동한 거리 = 지금 좌표 + 이 값(배경의 연속성).
     public double TotalShift { get; private set; }
 
-    // 원점을 재설정한 뒤에 알린다(뷰가 살아 있는 연출을 같은 양만큼 옮긴다).
-    public event Action<float> OriginShifted;
+    // 전투 사건. 드라이버가 DeliverEvents를 부를 때 일어난 순서대로 온다.
+    public Observable<CombatEvent> Events => events;
+
+    // 아직 배달하지 않은 사건 수(테스트·진단용).
+    public int PendingEventCount => pendingEvents.Count;
+
+    internal void Emit(in CombatEvent e) => pendingEvents.Add(e);
+
+    // ⑥ 사건 배달. 처리 밖에서만 부른다(드라이버의 단계 끝, 단계 밖의 명령 뒤). 버퍼를 바꿔 끼우므로
+    // 배달 중에 생긴 사건은 이번 순회에 섞이지 않고 다음 배달로 간다.
+    public void DeliverEvents()
+    {
+        if (busy) throw new InvalidOperationException("고정 단계 처리 중에는 사건을 배달하지 않습니다.");
+        if (delivering || pendingEvents.Count == 0) return;
+
+        List<CombatEvent> batch = pendingEvents;
+        pendingEvents = deliveringEvents;
+        deliveringEvents = batch;
+
+        delivering = true;
+        try
+        {
+            for (int i = 0; i < batch.Count; i++) events.OnNext(batch[i]);
+        }
+        finally
+        {
+            batch.Clear();
+            delivering = false;
+        }
+    }
 
     // 대열의 앞장(전진 정책의 첫 아군, 지금은 플레이어). 카메라와 스폰 위치의 기준이다.
     public Combatant LeadAlly
@@ -89,6 +126,9 @@ public sealed class CombatWorld
         combatant.Order = nextOrder++;
         if (busy) pendingAdd.Add(combatant);
         else combatants.Add(combatant);
+
+        // 뷰가 처음 상태(HP, 이동 동작)를 그린다. 스폰은 보통 등록 전에 일어나서 그때의 사건은 월드가 없어 남지 않는다.
+        Emit(CombatEvent.Joined(Clock.Now, combatant));
     }
 
     public void Remove(Combatant combatant)
@@ -170,7 +210,7 @@ public sealed class CombatWorld
 
         for (int i = 0; i < combatants.Count; i++) combatants[i].ShiftOrigin(delta);
         TotalShift += delta;
-        OriginShifted?.Invoke(delta);
+        Emit(CombatEvent.OriginShifted(Clock.Now, delta)); // 뷰가 살아 있는 연출을 같은 양만큼 옮긴다
     }
 
     // anchor가 원점 근처(0 이상 1 미만)에 오도록 정수만큼 옮긴다.

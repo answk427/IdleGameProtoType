@@ -5,25 +5,38 @@ public static class CombatTestKit
 {
     public const double Step = 0.02;
 
-    // 연출 대신 호출 횟수만 센다(할당 측정 중에도 할당하지 않게 값만 기록).
-    public sealed class FakeHost : ICombatantHost
+    // 연출 대신 그 전투원이 주인인 사건(CombatEvent, 5-A)의 수만 센다(할당 측정 중에도 할당하지 않게 값만 기록).
+    // 사건은 배달(world.DeliverEvents, StepOnce가 부른다) 때 온다. 단계 밖에서 직접 부른 명령(TakeDamage 등) 뒤에는 Deliver를 부른다.
+    public sealed class FakeHost
     {
-        public int HpChanged, Damaged, Healed, Died, DeathCompleted, Revived, BasicHits, SkillHits, ActionsStarted;
-        public int LastSkillHitCount;
+        public int Joined, StatsChanged, Damaged, Healed, Died, DeathCompleted, Revived, BasicHits, SkillHits, ActionsStarted;
         public GameNumber LastDamage;
-        public System.Action<Combatant> OnDiedCallback;
+        public CombatReward LastReward;
+        public System.Action<Combatant, CombatEvent> OnDiedCallback;
 
-        public void HandleHpChanged(Combatant self) => HpChanged++;
-        public void HandleDamaged(Combatant self, GameNumber amount) { Damaged++; LastDamage = amount; }
-        public void HandleHealed(Combatant self, GameNumber amount) => Healed++;
-        public void HandleLocomotion(Combatant self, bool moving) { }
-        public void HandleActionStarted(Combatant self, ActionTimeline action, double duration, Skill skill) => ActionsStarted++;
-        public void HandleBasicAttackHit(Combatant self, Combatant target) => BasicHits++;
-        public void HandleSkillHit(Combatant self, Skill skill, IReadOnlyList<Combatant> hitTargets) { SkillHits++; LastSkillHitCount = hitTargets.Count; }
-        public void HandleDied(Combatant self) { Died++; OnDiedCallback?.Invoke(self); }
-        public void HandleDeathCompleted(Combatant self) => DeathCompleted++;
-        public void HandleRevived(Combatant self) => Revived++;
+        public void Record(CombatEvent e)
+        {
+            switch (e.Type)
+            {
+                case CombatEventType.Joined: Joined++; break;
+                case CombatEventType.StatsChanged: StatsChanged++; break;
+                case CombatEventType.Damaged: Damaged++; LastDamage = e.Amount; break;
+                case CombatEventType.Healed: Healed++; break;
+                case CombatEventType.ActionStarted: ActionsStarted++; break;
+                case CombatEventType.BasicAttackHit: BasicHits++; break;
+                case CombatEventType.SkillHit: SkillHits++; break; // 맞은 대상 하나마다 하나
+                case CombatEventType.Died: Died++; LastReward = new CombatReward(e.Gold, e.Exp); OnDiedCallback?.Invoke(e.Source, e); break;
+                case CombatEventType.DeathCompleted: DeathCompleted++; break;
+                case CombatEventType.Revived: Revived++; break;
+            }
+        }
     }
+
+    // 그 전투원의 사건을 host에 센다(테스트 준비 때 한 번 구독한다).
+    public static void Attach(CombatWorld world, Combatant combatant, FakeHost host) =>
+        world.Events.Subscribe(e => { if (e.Source == combatant) host.Record(e); });
+
+    public static void Deliver(CombatWorld world) => world.DeliverEvents();
 
     public sealed class FakeTimelines : IActionTimelineSource
     {
@@ -55,11 +68,12 @@ public static class CombatTestKit
     public static CombatWorld World() => new CombatWorld(new SimClock(Step));
 
     public static Combatant Spawn(CombatWorld world, Team team, float x, float halfWidth, CombatantStats stats,
-        IActionTimelineSource timelines = null, SkillLoadout skills = null, FakeHost host = null)
+        IActionTimelineSource timelines = null, SkillLoadout skills = null, FakeHost host = null, CombatReward reward = default)
     {
-        var combatant = new Combatant(team, host ?? new FakeHost());
-        combatant.Spawn(stats, x, halfWidth, timelines ?? Timelines(), skills);
+        var combatant = new Combatant(team);
+        combatant.Spawn(stats, x, halfWidth, timelines ?? Timelines(), skills, reward);
         world.Add(combatant);
+        if (host != null) Attach(world, combatant, host);
         return combatant;
     }
 
@@ -77,13 +91,14 @@ public static class CombatTestKit
         return loadout;
     }
 
-    // 고정 단계 한 번(CombatSimulation의 국면 순서와 같다)
+    // 고정 단계 한 번(CombatSimulation의 국면 순서와 같다: ② → ③ → ⑤ → ⑥ 배달)
     public static void StepOnce(CombatWorld world)
     {
         world.RunEvents();
         world.StepPhases();
         world.CaptureStep();
         world.Clock.AdvanceStep();
+        world.DeliverEvents();
     }
 
     public static void Run(CombatWorld world, int steps)

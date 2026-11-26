@@ -11,13 +11,15 @@ using UnityEngine;
 // - 상태는 단계 값 하나(이동 / 교전 / 사망). 상태 객체를 만들지 않는다.
 // - 행동의 결정과 진행은 CombatActions(1단계)가 하고, 이 클래스가 그것이 요구하는 것(ICombatActor)을 제공한다.
 // - 기본 공격 능력은 데이터다: 공격 간격 > 0이면 있다. 기본 공격도 스킬도 없으면 교전하지 않는다.
+// - 바깥(뷰, 이펙트, 보상)을 모른다. 일어난 일은 월드에 사건으로 남긴다(CombatEvent, 5-A). 월드에 등록되기 전의 일은
+//   사건이 되지 않는다(등록할 때 Joined가 처음 상태를 알린다).
 public sealed class Combatant : ICombatActor, IActionListener
 {
-    private readonly ICombatantHost host;
     private readonly ActionRunner deathRunner = new ActionRunner();
     private readonly List<Combatant> hitBuffer = new List<Combatant>(8);
 
     private CombatantStats stats;
+    private CombatReward reward;
     private IActionTimelineSource timelines;
     private SkillLoadout skills;
     private bool deathCompletionReported;
@@ -26,16 +28,14 @@ public sealed class Combatant : ICombatActor, IActionListener
     private float previousStepX;
     private float stepX;
 
-    public Combatant(Team team, ICombatantHost host)
+    public Combatant(Team team)
     {
         Team = team;
-        this.host = host ?? throw new ArgumentNullException(nameof(host));
         Combat = new CombatActions(this);
         Phase = CombatantPhase.Inactive;
     }
 
     public Team Team { get; }
-    public ICombatantHost Host => host;
     public CombatActions Combat { get; }
 
     // 등록한 월드와 등록 순번(같은 팀 안의 처리 순서, 같은 거리의 대상 순서). CombatWorld가 정한다.
@@ -59,6 +59,8 @@ public sealed class Combatant : ICombatActor, IActionListener
     public float MoveSpeed => stats.MoveSpeed;
     public MovePolicy MovePolicy => stats.MovePolicy;
     public SkillLoadout Skills => skills;
+    // 처치 보상(사망 사건이 싣고 간다). 스폰할 때 정한다.
+    public CombatReward Reward => reward;
 
     public bool HasBasicAttack => stats.AttackInterval > 0.0 && !double.IsInfinity(stats.AttackInterval);
     // 행동할 수단(기본 공격이나 스킬)이 있어야 교전한다.
@@ -67,9 +69,12 @@ public sealed class Combatant : ICombatActor, IActionListener
     // ── 생애 ──
 
     // 스폰(풀에서 다시 꺼낼 때 포함). 같은 객체를 다시 쓰므로 이전 상태를 모두 지운다.
-    public void Spawn(in CombatantStats newStats, float x, float halfWidth, IActionTimelineSource timelineSource, SkillLoadout skillLoadout)
+    // newReward: 처치 보상(몬스터). 사망 사건이 싣고 가서 게임 쪽이 지급한다.
+    public void Spawn(in CombatantStats newStats, float x, float halfWidth, IActionTimelineSource timelineSource, SkillLoadout skillLoadout,
+        in CombatReward newReward = default)
     {
         stats = Sanitize(newStats);
+        reward = newReward;
         timelines = timelineSource;
         skills = skillLoadout;
 
@@ -83,7 +88,6 @@ public sealed class Combatant : ICombatActor, IActionListener
         Combat.Disengage();
         Combat.ClearRequest();
 
-        host.HandleHpChanged(this);
         EnterMoving();
     }
 
@@ -92,7 +96,7 @@ public sealed class Combatant : ICombatActor, IActionListener
     {
         stats = Sanitize(newStats);
         if (Hp > stats.MaxHp) Hp = stats.MaxHp;
-        host.HandleHpChanged(this);
+        Emit(CombatEvent.StatsChanged(Now, this));
     }
 
     // 위치를 직접 정한다(스폰, 순간이동). 보간 기준도 같이 맞춰서 예전 자리에서 미끄러져 오지 않게 한다.
@@ -110,7 +114,7 @@ public sealed class Combatant : ICombatActor, IActionListener
 
         Hp = GameNumber.Max(Hp - amount, GameNumber.Zero);
         if (amount > GameNumber.Zero) World?.NoteProgress();
-        host.HandleDamaged(this, amount);
+        Emit(CombatEvent.Damaged(Now, this, amount));
 
         if (Hp <= GameNumber.Zero) Die();
     }
@@ -121,7 +125,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         if (!(amount.ToDouble() >= 0.0)) amount = GameNumber.Zero;
 
         Hp = GameNumber.Min(Hp + amount, stats.MaxHp);
-        host.HandleHealed(this, amount);
+        Emit(CombatEvent.Healed(Now, this, amount));
     }
 
     // 스테이지를 다시 시작할 때(흐름이 부른다). 살아 있어도 교전 중이던 행동을 버리고 처음 상태(이동)로 돌아간다.
@@ -134,7 +138,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         deathCompletionReported = false;
         Target = null;
         Hp = stats.MaxHp;
-        host.HandleRevived(this);
+        Emit(CombatEvent.Revived(Now, this));
         EnterMoving();
     }
 
@@ -151,7 +155,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         if (World != null && timelines != null && timelines.TryGet(ActionKeys.Death, out ActionTimeline death) && death.IsValid)
             deathRunner.Start(death, death.ClipLength, World.Clock.Now);
 
-        host.HandleDied(this);
+        Emit(CombatEvent.Died(Now, this, reward));
     }
 
     // ── 고정 단계 ③: 단계 전이와 이동 (CombatWorld가 아군 → 적, 각 팀은 등록 순으로 부른다) ──
@@ -166,7 +170,7 @@ public sealed class Combatant : ICombatActor, IActionListener
                 if (TryAcquireTarget())
                 {
                     Phase = CombatantPhase.Engaged;
-                    host.HandleLocomotion(this, false);
+                    Emit(CombatEvent.Locomotion(Now, this, false));
                     Combat.Engage(); // 첫 결정은 다음 단계 시작(같은 순간)
                 }
                 break;
@@ -206,8 +210,13 @@ public sealed class Combatant : ICombatActor, IActionListener
     private void EnterMoving()
     {
         Phase = CombatantPhase.Moving;
-        host.HandleLocomotion(this, true);
+        Emit(CombatEvent.Locomotion(Now, this, true));
     }
+
+    // 월드에 등록된 뒤의 일만 사건이 된다.
+    private void Emit(in CombatEvent e) => World?.Emit(e);
+
+    private double Now => World != null ? World.Clock.Now : 0.0;
 
     private void AdvanceDeath()
     {
@@ -216,9 +225,8 @@ public sealed class Combatant : ICombatActor, IActionListener
         if (deathRunner.IsRunning && World != null) deathRunner.FireMarkersUpTo(World.Clock.Now, this);
         if (deathRunner.IsRunning) return;
 
-        // 알림은 러너 처리가 끝난 뒤에 보낸다(받는 쪽이 부활시켜도 러너가 처리 중이 아니게).
         deathCompletionReported = true;
-        host.HandleDeathCompleted(this);
+        Emit(CombatEvent.DeathCompleted(Now, this));
     }
 
     private void Move()
@@ -298,7 +306,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         if (target == null) return; // 헛침
 
         target.TakeDamage(ComputeDamage(1.0));
-        host.HandleBasicAttackHit(this, target);
+        Emit(CombatEvent.BasicAttackHit(Now, this, target));
     }
 
     void ICombatActor.ApplySkillHit(Skill skill)
@@ -306,13 +314,15 @@ public sealed class Combatant : ICombatActor, IActionListener
         // 단일 대상 효과는 대상을 다시 확인하고, 범위·자기 효과는 대상이 없어도 적용된다(효과 구현이 판단).
         hitBuffer.Clear();
         skill.Apply(this, AcquireTarget(), hitBuffer);
-        host.HandleSkillHit(this, skill, hitBuffer);
+
+        int skillId = skill.Data != null ? skill.Data.Id : 0;
+        for (int i = 0; i < hitBuffer.Count; i++) Emit(CombatEvent.SkillHit(Now, this, skillId, hitBuffer[i]));
     }
 
     void ICombatActor.OnActionStarted(ActionTimeline action, double duration, Skill skill) =>
-        host.HandleActionStarted(this, action, duration, skill);
+        Emit(CombatEvent.ActionStarted(Now, this, action.Key, duration, skill?.Data != null ? skill.Data.Id : 0));
 
-    void ICombatActor.OnActionsIdle() => host.HandleLocomotion(this, false);
+    void ICombatActor.OnActionsIdle() => Emit(CombatEvent.Locomotion(Now, this, false));
 
     // 사망 러너의 알림(표식 처리 중). 완료 여부는 AdvanceDeath가 러너 상태로 확인한다.
     void IActionListener.OnActionHit(ActionTimeline action, int hitIndex) { }

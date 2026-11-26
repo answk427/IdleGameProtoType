@@ -15,11 +15,13 @@ public sealed class HitboxOverlay
     private static readonly Color DeadColor = new Color(0.6f, 0.6f, 0.6f);
 
     private readonly CombatWorld world;
+    private readonly CombatantViews views;
     private GUIStyle labelStyle;
 
-    public HitboxOverlay(CombatWorld world)
+    public HitboxOverlay(CombatWorld world, CombatantViews views)
     {
         this.world = world;
+        this.views = views;
     }
 
     public bool Enabled { get; set; }
@@ -37,7 +39,7 @@ public sealed class HitboxOverlay
 
             // 아래 변은 캐릭터가 서는 바닥(PlayAreaBounds.GroundY). 피벗은 발이 아닐 수 있다.
             float baseY = PlayAreaBounds.Instance != null ? PlayAreaBounds.Instance.GroundY
-                : c.Host is Component host ? host.transform.position.y : 0f;
+                : views != null && views.TryGet(c, out CombatantHost host) ? host.transform.position.y : 0f;
             Color color = !c.IsAlive ? DeadColor : c.Team == Team.Ally ? AllyColor : EnemyColor;
 
             // 몸

@@ -106,7 +106,10 @@ public class GameInitializer : MonoBehaviour
         combatSimulation.Initialize(player, FindStage, FlowTimings.From(database.Balance));
         EncounterDirector director = combatSimulation.Director;
 
-        gameManager.Initialize(Session, player, director);
+        // 전투 사건의 구독자: 연출(이펙트, 데미지 숫자, 동전)과 보상(GameManager). 흐름을 시작하기 전에 잇는다.
+        if (CombatEffectManager.Instance != null) CombatEffectManager.Instance.Bind(combatSimulation.World, combatSimulation.Views);
+        else Debug.LogError("[GameInitializer] 씬에 CombatEffectManager가 없어 전투 연출이 보이지 않습니다.");
+        gameManager.Initialize(Session, player, combatSimulation.World, director);
         background.Bind(director.CurrentStageNumber);
         uiRoot.BindGame(Session, database.GetAllSkills(), player, director);
 
