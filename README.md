@@ -3,10 +3,13 @@
 데이터 기반 설계로 만든 2D 방치형 액션 RPG 프로토타입입니다.
 
 - 엔진: Unity 6000.4.9f1 (Unity 6)
+- 목표 플랫폼: Android (최종 확인은 실기기). WebGL은 데모용
 - 개발 기간: 2026.06 ~ 진행 중
 
 ## 직접 플레이
 https://answk427.itch.io/unityidlegame
+
+> 데모와 아래 영상은 전투·흐름·UI 구조를 다시 만들기 전 버전입니다. 게임 규칙(전진, 전투, 보스, 업그레이드, 스킬)은 같고, 내부 구조는 이 문서가 설명하는 지금 코드와 다릅니다.
 
 ## 목차
 
@@ -14,7 +17,9 @@ https://answk427.itch.io/unityidlegame
 - [핵심 설계](#핵심-설계)
 - [핵심 게임플레이](#핵심-게임플레이)
 - [아키텍처](#아키텍처)
+- [테스트와 검증](#테스트와-검증)
 - [트러블슈팅](#트러블슈팅)
+- [알려진 한계](#알려진-한계)
 - [프로젝트 구조](#프로젝트-구조)
 
 ## 플레이영상
@@ -33,218 +38,290 @@ https://answk427.itch.io/unityidlegame
 
 ## 핵심 설계
 
-1. **엑셀 → JSON → ScriptableObject 데이터 파이프라인을 설계 / 변환 툴 구현**: 기획자가 엑셀만 수정해도 게임 데이터가 자동 반영되고, 프리팹/텍스처 등 외부 참조는 이름 기반으로 자동 매칭하며, 수동으로 연결한 아이콘/VFX 참조는 재동기화해도 보존됩니다.
-2. **인터페이스 기반 확장 구조**: 데이터 타입(`IData`)과 동기화기(`IDataSyncer`)는 리플렉션으로 자동 탐색되어 새 데이터 테이블을 추가해도 변환기 코드를 건드리지 않고, 스탯(`IUpgradeStat`)·스킬 효과(`ISkillBehavior`)도 구현 클래스 하나만 추가하면 확장됩니다.
-3. **컴포넌트 자동 등록 기반 UI 프레임워크**: `UIManager`가 하위의 모든 `UIBase` 패널을 타입별로 자동 탐색·등록해서, 새 화면을 추가해도 `UIManager` 코드는 건드리지 않습니다. 레이어(`UILayer`)로 일괄 표시/숨김을, 탭(`UITabPanel`)으로 UI 전환을 관리합니다.
-4. **이벤트·인터페이스로 일관되게 낮춘 결합도**: 전투 보상, UI 갱신, 스테이지·배경 전환까지 — 한 시스템은 "무슨 일이 일어났는지"만 흘려보내고 처리는 각 구독자가 맡는 구조를 프로젝트 전반에 동일하게 적용했습니다. 구체 타입 의존이 필요한 곳도 `IDamageable` / `IHasHp` 같은 인터페이스로 추상화해 플레이어와 몬스터를 같은 코드로 다룹니다.
-5. **하나의 FSM 코어로 전체 엔티티 행동을 제어**: `IState` / `StateMachine`라는 작은 계약 하나로 플레이어·몬스터·보스의 이동·전투·사망을 전부 처리합니다. 엔티티마다 독립된 `StateMachine` 인스턴스를 가지며, 보스는 `BossRunState : MonsterRunState`처럼 기존 상태를 상속해 이동 로직은 재사용하고 고유 행동만 추가합니다.
+1. **엑셀 → JSON → ScriptableObject 데이터 파이프라인**: 기획 데이터는 엑셀 하나가 원본입니다. 변환기는 리플렉션으로 데이터 타입을 찾아 열을 필드에 맞추고, 없는 열·형식이 틀린 값·같은 키가 하나라도 있으면 아무것도 바꾸지 않습니다(예전에는 조용히 0이 됐습니다). 프리팹·배경은 이름으로 자동 연결하고, 손으로 연결한 아이콘·VFX는 다시 변환해도 남습니다.
+2. **전투원은 하나, 차이는 데이터**: 플레이어·일반 몬스터·보스가 모두 순수 C# `Combatant` 하나입니다. 공격 간격이 있으면 기본 공격, 스킬 id가 있으면 스킬, 이동 정책(제자리/접근)이 이동 방식을 정합니다. 엑셀에 슬라임의 공격 간격만 넣으면 코드 수정 없이 공격합니다.
+3. **결정적인 전투 시뮬레이션**: 전투는 고정 타임스텝(0.02초)으로만 돌고, 시계 하나·절대 시각·시간 순서 사건 처리로 진행합니다. 행동의 길이는 데이터가, 타격 시점은 행동 시간표가 정하고 애니메이션은 그것을 재생만 합니다. 그래서 30fps, 120fps, 렉이 섞여도, 애니메이터를 꺼도 처치·타격 시각이 같습니다(측정으로 확인).
+4. **흐름과 진행도는 한 주인, 바깥에는 반응형 값**: 인카운터·보스·스테이지 전환은 `EncounterDirector` 하나가, 저장되는 진행도는 `GameSession` 하나가 갖습니다. 바깥에는 상태(`ReactiveProperty`)·파생 상태·사건(`Subject`)으로 내보내서, 진행도를 통째로 바꿔도(세이브 로드, 서버 롤백 자리) 화면과 캐릭터가 따라옵니다.
+5. **창 관리자 + View/Presenter UI**: 창은 전부 `WindowManager`가 열고 닫습니다(정렬 구분, 스택, 뒤로가기, 입력 차단). 화면 로직은 uGUI를 모르는 순수 C# Presenter에 있어서 가짜 View로 테스트합니다.
+6. **진행도를 잃지 않는다**: 세이브는 변환 전에 검사하고, 읽을 수 없으면 새 데이터로 덮어쓰는 대신 시작을 멈추고 "세이브 파일은 바꾸지 않았다"를 알립니다.
 
 ## 핵심 게임플레이
 
-- 캐릭터가 앞으로 계속 전진 -> 몬스터를 만나면 전투를 무한 반복
-- 몬스터 무리를 일정 횟수 클리어하면 보스 도전 버튼이 열리고, 보스를 처치하면 다음 스테이지로 전환
-- 레벨업 및 체력 / 공격력 / 공격속도 등 골드를 소모하여 스탯 업그레이드
-- 스킬 학습 → 슬롯 배치 → 쿨다운 기반 자동 사용 (피해 / 광역피해 / 회복 타입)
-- 골드·상자 드랍, 데미지·힐 텍스트, 히트 파티클 등 전투 피드백
+- 캐릭터가 앞으로 계속 전진 -> 몬스터를 만나면 자동 전투
+- 몬스터 무리를 일정 횟수 처치하면 보스 도전 버튼이 열리고, 보스를 처치하면 다음 스테이지로 전환. 아군이 전멸하면 같은 스테이지를 처음부터
+- 경험치가 차면 레벨업 버튼, 골드로 체력 / 공격력 / 공격속도 업그레이드
+- 스킬 학습 → 슬롯 배치 → 쿨다운이 차면 자동 사용(피해 / 광역 피해 / 회복), 슬롯을 누르면 다음 기회에 사용
+- 골드·상자 드랍, 데미지·힐 숫자, 히트 파티클 등 전투 피드백
 
 ## 아키텍처
 
-### 1. 데이터 파이프라인: Excel → JSON/ScriptableObject
-<video src="https://github.com/user-attachments/assets/86fc8e3e-2afe-4501-b435-67a08636b12a" width="100%" controls></video>
-> 엑셀 시트 기준 변환, IData를 상속한 클래스로 변환 가능
-
-```
-기획자가 작성한 .xlsx
-        │  ExcelToJsonConverter (Editor 전용 윈도우, ExcelDataReader로 파싱)
-        │  - IData 구현 클래스를 리플렉션으로 자동 탐색
-        │  - 엑셀 헤더 ↔ 클래스 필드를 매칭, 불일치 시 변환 자체를 중단
-        ▼
-Resources/Data/*.json (Newtonsoft.Json으로 직렬화)
-        │  IDataSyncer 구현체를 리플렉션으로 자동 탐색해 타입별로 디스패치
-        │  (Monster / Skill / Stage / PlayerStat 전용 Syncer)
-        ▼
-ScriptableObject 데이터베이스 (Assets/Data/**/*.asset)
-        │  프리팹·텍스처는 이름 기반 자동 매칭
-        │  아이콘·VFX·SFX 등 수동 연결 참조는 재동기화해도 보존
-        ▼
-GameDatabaseManager → 런타임 게임 로직
-```
-
-새로운 데이터 테이블을 추가해도 변환기 본체 코드는 수정하지 않고, `IDataSyncer` 구현 클래스 하나만 추가하면 자동으로 인식됩니다.
-([ExcelToJsonConverter.cs](Assets/Editor/DataImporter/ExcelToJsonConverter.cs), [IDataSyncer.cs](Assets/Editor/DataImporter/IDataSyncer.cs))
-
----
-
-### 2. 전투 FSM
+### 1. 전체 구조
 
 ```mermaid
-stateDiagram-v2
-    direction LR
-
-    state "Player" as PlayerFSM {
-        P_Run : Run
-        P_Atk : Attack
-        P_Skill : Skill
-        P_Die : Die
-        [*] --> P_Run
-        P_Run --> P_Atk : 사거리 진입
-        P_Atk --> P_Skill : 스킬 준비됨
-        P_Skill --> P_Atk : 모션 종료
-        P_Atk --> P_Run : 타겟 사망
-        P_Skill --> P_Run : 타겟 사망
-        P_Run --> P_Die : HP 0
-        P_Die --> P_Run : Revive()
-    }
-
-    state "Monster (일반)" as MonsterFSM {
-        M_Idle : Idle
-        M_Run : Run
-        M_Die : Die
-        [*] --> M_Idle
-        M_Idle --> M_Run : 스크롤 ON
-        M_Run --> M_Idle : 스크롤 OFF
-        M_Run --> M_Die : HP 0
-    }
-
-    state "Boss (MonsterRunState 상속)" as BossFSM {
-        B_Run : Run
-        B_Atk : Attack
-        B_Skill : Skill
-        B_Die : Die
-        [*] --> B_Run
-        B_Run --> B_Atk : 사거리 진입
-        B_Atk --> B_Skill : 스킬 준비됨
-        B_Skill --> B_Atk : 모션 종료
-        B_Run --> B_Die : HP 0
-    }
+flowchart TB
+    GI["GameInitializer.Start()<br/>생성 순서를 한 곳에서"] --> UIP["UIRoot.Prepare()<br/>창 시스템(항상)"]
+    GI --> LOAD["ISaveStorage.Load()<br/>+ SaveDataValidator"]
+    LOAD -->|"읽을 수 없음"| ERR["세이브 오류 창<br/>시작 중단, 원본 보존"]
+    LOAD --> GS["GameSession<br/>진행도의 단일 소유자"]
+    GS --> SIM["CombatSimulation<br/>전투의 유일한 FixedUpdate"]
+    SIM --> ED["EncounterDirector<br/>흐름(순수 C#)"]
+    SIM --> CW["CombatWorld<br/>전투원 전체와 규칙(순수 C#)"]
+    CW --> HOST["CombatantHost<br/>PlayerController · Monster<br/>(그리기와 Unity 연결만)"]
+    GS --> UIB["UIRoot.BindGame()<br/>HUD·탭바 Presenter, 창 Bind"]
+    ED --> UIB
 ```
-> 셋 다 같은 `IState` 계약(Enter/Execute/Exit)을 쓰지만 전이 트리거는 다릅니다 — 스크롤 on/off는 이벤트 구독, 사거리 진입은 매 프레임 검사.
+> 다른 객체에 의존하는 초기화는 각자의 `Awake`가 아니라 `GameInitializer`가 부르는 `Initialize`에서 합니다. 모든 구독을 연결한 뒤 흐름을 시작하므로 처음 값도 반응형으로 전달됩니다.
 
-`IState`(Enter / Execute / Exit 메서드)와 `StateMachine`만으로 플레이어·일반 몬스터·보스의 이동·전투·사망을 전부 같은 방식으로 제어합니다. 엔티티마다 자신만의 `StateMachine` 인스턴스를 가져서, 화면에 몬스터가 여러 마리 있어도 서로 간섭 없이 독립적으로 동작합니다. 전이 방식도 상황에 맞게 나누는데, 스크롤 on/off 같은 전역 흐름 변화는 `GlobalGameEvents` 구독으로 반응하고(Idle ↔ Run), 사거리 진입처럼 매 프레임 바뀌는 조건은 `Execute()`에서 직접 검사합니다(Run → Attack). 보스는 `BossRunState : MonsterRunState`로 기존 이동 로직을 상속해 재사용하면서 공격 사거리 판정만 추가하고, 전투 상태는 `PlayerCombatState` / `BossCombatState` 추상 클래스가 쿨타임 계산과 타격 처리를 메서드로 공유합니다.
-
-([StateMachine.cs](Assets/Scripts/FSM/StateMachine.cs), [PlayerCombatState.cs](Assets/Scripts/FSM/Player/PlayerCombatState.cs), [BossCombatState.cs](Assets/Scripts/FSM/Monster/BossCombatState.cs))
+([GameInitializer.cs](Assets/Scripts/Manager/GameInitializer.cs), [GameSession.cs](Assets/Scripts/Player/GameSession.cs))
 
 ---
 
-### 3. UI 프레임워크
+### 2. 데이터 파이프라인: Excel → JSON → ScriptableObject
+<video src="https://github.com/user-attachments/assets/86fc8e3e-2afe-4501-b435-67a08636b12a" width="100%" controls></video>
+> 엑셀 시트 기준 변환, IData를 구현한 클래스로 변환 가능
+
+```
+DataTables/GameData.xlsx (원본, 시트 이름 = JSON 이름 = 데이터베이스 에셋 이름)
+        │  ExcelToJsonConverter (Editor, ExcelDataReader로 파싱)
+        │  - IData 구현 클래스를 리플렉션으로 탐색, 엑셀 열 ↔ 직렬화 필드 매칭
+        │  - 없는 열 / 남는 열 / 형식 오류 / 같은 키 → 전부 거부, 아무것도 바꾸지 않음
+        ▼
+Resources/Data/*.json (Newtonsoft.Json)
+        │  IDataSyncer 구현체를 리플렉션으로 탐색해 타입별로 디스패치
+        ▼
+ScriptableObject 데이터베이스 (Monster / Stage / Skill / PlayerStat / Character)
+        │  프리팹·배경은 이름으로 자동 연결(못 찾으면 기존 연결 유지 + 경고)
+        │  아이콘·VFX·SFX 등 엑셀에 없는 값은 보존
+        ▼
+GameDatabaseManager → 런타임
+```
+
+- 새 데이터 테이블은 데이터 클래스와 `IDataSyncer` 구현 하나로 추가되고, 변환기 본체는 고치지 않습니다.
+- **에디터에서 값만 바꿔 보기**는 튜닝 덮어쓰기(메뉴 `IdleGame/Data/Tuning Overrides`)로 합니다. 플레이 중 데이터베이스 사본에만 적용되고 엑셀과 에셋은 그대로이며, 빌드에는 이 코드가 없습니다.
+- 데이터와 프리팹의 짝(공격 간격이 있으면 공격 시간표, 스킬 행동 키, 판정 몸 등)은 에디터와 빌드가 검사합니다.
+
+([ExcelToJsonConverter.cs](Assets/Editor/DataImporter/ExcelToJsonConverter.cs), [IDataSyncer.cs](Assets/Editor/DataImporter/IDataSyncer.cs), [DataTuning.cs](Assets/Scripts/Data/DataTuning.cs))
+
+---
+
+### 3. 전투: 전투원 하나, 월드 하나, 고정 타임스텝
 
 ```mermaid
 flowchart LR
-    subgraph Scene["씬 하이어라키 (UIBase 자식들)"]
-        A1["PlayerHud"]
-        A2["StatUpgradePanel\n(UITabPanel)"]
-        A3["SkillSlotBar\n(UITabPanel)"]
-        A4["새 패널 추가 시\n여기에만 배치"]
-    end
-
-    Scene --> Scan["UIManager.Awake()\nGetComponentsInChildren로 전체 탐색"]
-
-    Scan --> D1["uiDict\nType → UIBase"]
-    Scan --> D2["layerGroup\nUILayer → 목록"]
-    Scan --> D3["tabDict\nUITabType → UIBase"]
-
-    D1 --> U1["ShowUI / HideUI\n(타입 기반)"]
-    D2 --> U2["HideAllUI(layer)"]
-    D3 --> U3["ToggleTab(tabType)"]
+    FU["CombatSimulation.FixedUpdate<br/>0.02초마다"] --> P1["① 흐름<br/>EncounterDirector.Tick<br/>스폰 · 대기 · 보스 · 전환"]
+    P1 --> P2["② 전투 사건<br/>CombatScheduler<br/>단계 안 사건을 시각 순서로"]
+    P2 --> P3["③ 단계 전이와 이동<br/>CombatWorld.StepPhases<br/>sweep 이동"]
+    P3 --> P5["⑤ 보간 기록<br/>CaptureStep, 시계 진행"]
+    P5 -.->|"화면 프레임"| R["호스트가 직전 두 단계<br/>사이를 그림"]
 ```
-> 새 패널을 씬에 배치만 하면 `UIManager`가 알아서 찾아서 등록 — 등록 코드를 따로 안 써도 됨.
 
-모든 화면을 `UIBase`(일반 패널) 또는 `UITabPanel`(`UIBase` + 탭 연동 정보)로 표준화하고, `UIManager.Awake()`에서 `GetComponentsInChildren<UIBase>()`로 하위 패널을 한 번에 탐색해 타입을 키로 등록합니다. 새 패널을 추가할 때 `UIManager`에는 등록 코드를 추가하지 않고, 해당 컴포넌트가 붙은 오브젝트만 하이어라키에 배치하면 됩니다. `ShowUI<T>()` / `HideUI<T>()`로 타입 기반 제네릭 호출이 가능하고, `UILayer`(Static/Dynamic/Top)로 레이어 단위 일괄 제어를, `UITabType`으로 탭 간 배타적 전환(같은 탭 재클릭 시 닫힘)을 관리합니다.
+- **`Combatant`(순수 C#)**: HP(`GameNumber`), 단계 값 하나(`Inactive / Moving / Engaged / Dead`, 상태 객체 없음), 행동. 호스트(MonoBehaviour)는 그리기와 Unity 연결만 합니다. 보스는 따로 클래스가 없고 스폰할 때 정하는 역할입니다.
+- **`CombatWorld`**: 전투원 전체와 규칙을 갖습니다. 거리 규칙은 **표면 거리** 하나(중심 거리 − 두 반너비)이고 교전·단일 대상·범위 스킬이 모두 이것을 씁니다. 대상은 반대 팀의 살아 있는 가장 가까운 전투원(앞뒤 무관)입니다.
+- **시간 모델**: `SimClock`이 유일한 시계이고 모든 시각은 절대 시각(초, double)입니다. 행동의 시작·끝·타격 시각과 스킬 준비 시각은 한 번 계산해 저장하고 다시 계산하지 않아서, 같은 시각 비교가 정확히 같습니다(여유값 없음). `CombatScheduler`가 한 단계 안의 모든 전투원의 사건을 시각 순서로 처리하므로, 0.005초에 죽은 전투원은 0.018초의 타격을 하지 않습니다.
+- **공간**: 플레이어가 월드에서 실제로 전진하고 카메라가 따라갑니다. 시체·동전·이펙트처럼 가만히 있는 것은 아무 처리 없이 화면에서 지나갑니다. 이동은 sweep 하나(그 방향의 가장 가까운 살아 있는 몸까지만)라서 한 단계 이동량과 상관없이 몸을 통과하지 않습니다(이동 속도 1e6에서 테스트). 인카운터마다 원점을 재설정해 오래 달려도 좌표가 커지지 않습니다.
+- **전투 중 할당 0**: 범위·스킬 결과는 재사용 버퍼, 몬스터 전투원은 풀 객체마다 하나를 다시 씁니다(테스트로 확인).
 
-([UIBase.cs](Assets/Scripts/UI/UIBase.cs), [UIManager.cs](Assets/Scripts/Manager/UIManager.cs))
+([Combatant.cs](Assets/Scripts/Combat/Combatant.cs), [CombatWorld.cs](Assets/Scripts/Combat/CombatWorld.cs), [CombatScheduler.cs](Assets/Scripts/Combat/CombatScheduler.cs), [SimClock.cs](Assets/Scripts/Combat/SimClock.cs), [CombatSimulation.cs](Assets/Scripts/Manager/CombatSimulation.cs))
 
 ---
 
-### 4. 스킬 시스템 (Strategy Pattern)
+### 4. 행동 시간표와 스킬
 
 <video src="https://github.com/user-attachments/assets/dcd362f5-cd88-47b0-9840-fc482eaa7fbd" width="100%" controls></video>
 > 스킬 배치 -> 배치된 스킬 자동 사용
 
-스킬의 실제 동작(`ISkillBehavior`)은 코드가 아니라 데이터(`SkillData.effectType`)로 결정되므로, 같은 효과 타입의 새 스킬을 추가할 때는 수치(`value1` / `value2`), (EffectFX / SoundFX)등만 다른 데이터로 추가하고 코드는 건드리지 않습니다. `Skill` 클래스가 쿨다운 계산과 실행을 함께 감싸서, FSM(`PlayerSkillState`/`BossSkillState`)는 스킬이 피해 · 광역 · 회복 중 무엇인지 몰라도 `IsReady` / `Use()` 만으로 동일하게 다룹니다. 캐스터 쪽도 `ISkillCaster` 인터페이스로 추상화해서, 플레이어와 보스가 같은 스킬 실행 코드를 공유합니다 — 보스도 쿨다운이 차면 일반 공격 대신 스킬을 자동으로 씁니다.
+- **전투 규칙을 애니메이션이 정하지 않습니다.** 행동의 길이는 데이터(기본 공격 = 공격 간격, 스킬 = `castTime`), 타격 시점은 행동 시간표(`ActionTimeline`)의 비율입니다. 시간표는 클립의 타격 표식 이벤트를 에디터 메뉴로 비율로 구운 값이고, 클립이 바뀌었는데 다시 굽지 않으면 에디터가 에러를 내고 빌드가 실패합니다. 애니메이터는 상태를 이름으로 재생하는 재생기이고, 클립은 데이터 길이에 맞춰 재생 속도가 바뀝니다(아트를 바꿔도 밸런스가 안 바뀝니다).
+- **취소 없음**: 모든 행동은 끝까지 하고, 다음 행동은 지금 행동이 완료된 시각에 정합니다(수동 요청 → 슬롯 순서 → 기본 공격). 행동을 끊는 것은 사망과 교전 종료뿐입니다. 타격 순간에 대상을 다시 확인하고, 없으면 헛칩니다.
+- **스킬 효과는 Strategy**: `Skill`이 수치(`SkillData`)와 효과(`ISkillBehavior`: 피해 / 광역 피해 / 회복)를 묶고, 효과는 데이터의 `effectType`으로 고릅니다. 같은 효과의 새 스킬은 데이터만 추가합니다. 쿨다운은 슬롯이 아니라 스킬 id에 붙어서 슬롯을 옮기거나 풀었다 껴도 유지됩니다.
 
-([Skill.cs](Assets/Scripts/Skill/Skill.cs), [ISkillBehavior.cs](Assets/Scripts/Skill/ISkillBehavior.cs))
+([ActionRunner.cs](Assets/Scripts/Combat/ActionRunner.cs), [ActionTimeline.cs](Assets/Scripts/Combat/ActionTimeline.cs), [CombatActions.cs](Assets/Scripts/Combat/CombatActions.cs), [Skill.cs](Assets/Scripts/Skill/Skill.cs), [SkillLoadout.cs](Assets/Scripts/Combat/SkillLoadout.cs))
 
 ---
 
-### 5. 이벤트·인터페이스 기반 결합도 분리
+### 5. 흐름: `EncounterDirector`
 
 ```mermaid
-flowchart LR
-    M["Monster.Die()"] --> E1(("OnMonsterDied"))
-    E1 --> GM1["GameManager\n골드 / 경험치 지급"]
-    E1 --> CE["CombatEffectManager\n드랍 이펙트"]
-
-    PS["PlayerStats\nOnExpChanged 등"] --> E2(("이벤트"))
-    E2 --> HUD["PlayerHud"]
-    E2 --> SUP["StatUpgradePanel"]
-    E2 --> SSB["SkillSlotBar"]
-
-    SM["StageManager"] --> E3(("OnStageChanged"))
-    E3 --> GM2["GameManager\n안내 UI 표시"]
-    E3 --> BS["BackgroundScroller\n배경 교체"]
+stateDiagram-v2
+    direction LR
+    Starting --> Encounter : 첫 인카운터 스폰
+    Encounter --> EncounterCleared : 살아 있는 적 없음
+    EncounterCleared --> Encounter : 정리 대기 끝, 다음 인카운터<br/>(정해진 횟수를 깨면 보스 도전 가능)
+    Encounter --> BossIntro : 보스 도전 (버튼)
+    EncounterCleared --> BossIntro : 보스 도전 (버튼)
+    BossIntro --> Boss : 등장 대기 끝
+    Boss --> Transition : 보스 처치 → 다음 스테이지
+    Encounter --> Transition : 아군 전멸 → 같은 스테이지
+    Boss --> Transition : 전멸 또는 제한 시간 초과
+    Transition --> Encounter : 가운데에서 스테이지 입장
 ```
-> 발행자 하나가 구독자 여러 명에게 동시에 영향을 주지만, 발행자는 구독자가 누군지 전혀 모릅니다.
 
-`GlobalGameEvents`(스테이지 전환, 스크롤 상태 등 흐름)와 `GlobalCombatEvents`(피격, 사망, 회복 등 전투)로 정적 이벤트를 분리했습니다. 몬스터(`Monster.Die()`)는 죽었다는 사실과 보상치만 흘려보내고, 실제 골드/경험치 지급(`GameManager`)과 드랍 이펙트(`CombatEffectManager`)는 각자의 구독자가 처리합니다. 같은 원칙이 UI에도 쓰여서 `PlayerStats`가 `OnExpChanged` / `OnLevelUp` / `OnUpgraded` 등을 흘려보내면 `PlayerHud` · `StatUpgradePanel` · `SkillSlotBar`가 각자 구독해서 갱신하고, 스테이지가 바뀌면(`OnStageChanged`) 안내 UI와 `BackgroundScroller`가 서로의 존재를 모른 채 독립적으로 반응합니다. 구체 타입 의존이 필요한 곳은 `IDamageable` / `IHasHp` 인터페이스로 추상화해 플레이어와 몬스터를 동일한 코드로 처리합니다.
+- 흐름은 순수 C#이고 고정 단계 ①에서 돕니다. 전투 알림(사망 등)이 흐름을 직접 부르지 않고, 흐름이 지난 단계의 결과(보스 처치, 전멸)를 월드에 묻습니다(재진입 없음). 같은 단계에 처치와 전멸이 보이면 클리어가 먼저입니다.
+- **명령은 검사와 결과는 즉시, 실행은 다음 단계**: `RequestBossChallenge()`(받음 / 지금은 불가 / 바쁨), `RestartAt(스테이지)`. 보스 버튼, 개발자 도구, 진행도 교체가 모두 이것만 부릅니다.
+- 대기 시간(정리, 보스 등장, 전환)과 보스전 제한 시간은 데이터이고, 시뮬레이션 시간이라 배속과 프레임률에 상관없이 같은 시각에 일어납니다. 화면 페이드는 그 시간을 그리기만 합니다.
+- 개발 빌드에서는 게임 시간 30초 동안 피해·사망·이동·흐름 변화가 없으면 경고합니다(진전 감시).
 
-([GlobalCombatEvents.cs](Assets/Scripts/Event/GlobalCombatEvents.cs), [GlobalGameEvents.cs](Assets/Scripts/Event/GlobalGameEvents.cs), [PlayerStats.cs](Assets/Scripts/Player/PlayerStats.cs), [BackgroundScroller.cs](Assets/Scripts/Texture/BackgroundScroller.cs))
-
----
-
-### 6. 오브젝트 풀링
-
-몬스터, 데미지 텍스트, 히트 파티클, 보상 드랍 이펙트를 모두 `PoolManager`가 Unity 내장 `ObjectPool<GameObject>`로 관리합니다. 스테이지 전환 시 해당 프리팹의 풀만 선택적으로 비우는 방식으로 메모리를 관리합니다.
-
-([PoolManager.cs](Assets/Scripts/Manager/PoolManager.cs))
+([EncounterDirector.cs](Assets/Scripts/Flow/EncounterDirector.cs), [FlowTypes.cs](Assets/Scripts/Flow/FlowTypes.cs))
 
 ---
 
-### 7. 저장 시스템
+### 6. 진행도와 반응형 모델
 
 ```mermaid
 flowchart LR
-    E["업그레이드 · 스킬 학습/장착\n스테이지 전환 · 종료/일시정지"] --> SG["GameManager.SaveGame()"]
-    SG --> ISS(("ISaveStorage"))
+    subgraph Model["GameSession (진행도의 단일 소유자)"]
+        PS["PlayerStats<br/>상태: Level, Exp, 업그레이드 단계, 배운 스킬, 장착 슬롯<br/>파생: RequiredExp, CanLevelUp, CombatStats<br/>사건: LevelReached, Upgraded, …"]
+        GW["GoldWallet<br/>상태: Gold"]
+    end
+    PS --> PC["PlayerController<br/>능력치 · 장착 스킬"]
+    PS --> UI["HUD · 캐릭터 탭 · 스킬 탭<br/>(Presenter)"]
+    GW --> UI
+    PS -->|"사건"| GM["GameManager<br/>저장 계기"]
+    SNAP["세이브 / 스냅샷"] -->|"Apply: 값만 덮어씀"| Model
+```
+
+- **상태와 사건을 구분합니다.** "지금 값이 있나?"가 기준입니다: 골드·레벨은 상태(`ReactiveProperty`: 구독하는 순간 지금 값을 주고 같은 값은 무시), 레벨업 순간·몬스터 사망은 사건(`Subject`). 구독하는 쪽의 모양은 둘 다 `Subscribe → IDisposable`이라 해제 누락이 없습니다. 반응형 타입은 R3와 같은 모양으로 직접 만들었습니다.
+- **파생 상태(`DerivedProperty`)는 저장 데이터에서 계산**해서, 교체 도중의 조합(새 레벨 + 옛 업그레이드)이 바깥에 보이지 않습니다.
+- **`GameSession.Apply`는 객체를 새로 만들지 않고 값만 덮어씁니다.** 구독하는 쪽이 옛 객체를 붙잡지 않으므로 세이브 로드, 개발자 도구의 진행도 교체, (나중의) 서버 롤백이 같은 경로를 씁니다.
+- **재화와 전투 수치는 `GameNumber`**(내부 double)로 감쌌습니다. 방치형 경제는 상한 없이 커지므로, 표현을 바꿔야 할 때 구조체 내부만 바뀌게 했습니다. 세이브와 데이터 테이블에는 기본 타입을 둡니다(직렬화 모양을 바꾸지 않기 위해).
+- 전투 → 연출·보상 방향의 알림은 정적 버스 `GlobalCombatEvents`(사건만, 구조체라 발행에 할당 없음)입니다. 몬스터는 죽었다는 사실만 알리고 보상 지급은 `GameManager`가 합니다.
+
+([GameSession.cs](Assets/Scripts/Player/GameSession.cs), [PlayerStats.cs](Assets/Scripts/Player/PlayerStats.cs), [ReactiveProperty.cs](Assets/Scripts/Reactive/ReactiveProperty.cs), [DerivedProperty.cs](Assets/Scripts/Reactive/DerivedProperty.cs), [GameNumber.cs](Assets/Scripts/Economy/GameNumber.cs), [GlobalCombatEvents.cs](Assets/Scripts/Event/GlobalCombatEvents.cs))
+
+---
+
+### 7. UI: 창 관리자와 View / Presenter
+
+```mermaid
+flowchart LR
+    UR["UIRoot<br/>조립 지점"] --> WM["WindowManager<br/>로드 · 스택 · 정렬 · 뒤로가기 · Tick"]
+    UR --> HUD["HUD 위젯 (씬)<br/>PlayerHud · 보스 버튼 · 스테이지 안내 · 탭바"]
+    WM --> W1["캐릭터 탭 / 스킬 탭<br/>Exclusive"]
+    WM --> W2["스킬 관리 창<br/>Overlay, 모달"]
+    WM --> W3["세이브 오류 창<br/>System, 닫히지 않음"]
+    W1 --- P["View(MonoBehaviour) ↔ Presenter(순수 C#)<br/>→ 모델 명령 / ← 상태 구독"]
+```
+
+- **그리는 순서는 코드의 정렬 구분**(`UISortBand`: Fx 0 · Hud 1000 · Window 2000 · Popup 3000 · System 9000)이고, 창의 sortingOrder = 구분 + 깊이 × 10입니다. 데미지 숫자는 HUD 아래, 탭 내용은 HUD 위, 모달 딤은 맨 위 모달 바로 아래에 놓입니다.
+- **스택은 [로드된 창: 구분 순] + [로드 중인 창]**이라 스택 맨 위가 화면 맨 위이고, 뒤로가기는 화면 맨 위 창부터 닫습니다. 탭(Exclusive)은 열릴 때 System 구분 밑의 창을 닫는데, 스택 방식도 프리팹을 로드해야 알기 때문에 **자기보다 먼저 열기를 요청한 창에만** 적용합니다(나중에 요청한 팝업은 새 탭 위에 남고, 로드가 실패하면 이전 탭이 그대로).
+- **창의 구조는 코드**(`WindowOptions`: 구분, 스택 방식, 모달, 바깥 터치, 뒤로가기), 연출(딤 색 등)만 프리팹입니다. 인자 타입이 자기 창을 가리켜서(`IWindowArgs<TWindow>`) 다른 창의 인자를 넘기면 컴파일되지 않고, 닫힘과 결과는 `await handle.Closed`로 기다립니다.
+- **Presenter는 uGUI·싱글턴을 모릅니다.** 서비스를 생성자로 받고, 구독은 창 수명에 묶어 닫힐 때 한 번에 해제합니다. 탭 잠금은 "UIRoot가 창을 연결한 탭만 열림"이라 다른 코드가 잠금을 우회할 길이 없습니다.
+- 입력 차단(`InputBlocker`)은 참조 카운트와 스코프 해제로, 창을 여는 동안과 화면 전환 중에 걸립니다. 모달이 떠 있으면 키보드 이동도 막습니다.
+
+([UIRoot.cs](Assets/Scripts/UI/Core/UIRoot.cs), [WindowManager.cs](Assets/Scripts/UI/Core/WindowManager.cs), [WindowOptions.cs](Assets/Scripts/UI/Core/WindowOptions.cs), [TabBarPresenter.cs](Assets/Scripts/UI/Tabs/TabBarPresenter.cs), [SkillManagePresenter.cs](Assets/Scripts/UI/SkillManage/SkillManagePresenter.cs))
+
+---
+
+### 8. 저장 시스템
+
+```mermaid
+flowchart LR
+    E["업그레이드 · 레벨업 · 스킬 학습/장착<br/>스테이지 입장 · 종료/일시정지"] --> SG["GameManager.SaveGame()<br/>session.ToSaveData()"]
+    SG --> V{"SaveDataValidator"}
+    V -->|"통과"| ISS(("ISaveStorage"))
+    V -->|"NaN 등"| KEEP["기존 파일 유지 + 에러 로그"]
     ISS --> L["Load() 동기"]
     ISS --> S["Save() 코루틴"]
-    ISS -.교체 지점.-> SV["ServerSaveStorage\n(나중에)"]
+    ISS -.교체 지점.-> SV["ServerSaveStorage<br/>(나중에)"]
 ```
-> 주기적 자동저장은 없고 이 4개 이벤트에서만 저장합니다. `Load()`는 결과가 즉시 필요해서 동기, `Save()`는 호출부가 안 기다려도 돼서 코루틴 — 종료/일시정지처럼 다음 프레임을 보장 못 받는 시점만 그 코루틴을 동기적으로 끝까지 돌려서 저장을 보장합니다. 백엔드 교체는 `ISaveStorage` 구현체 하나 + 진입점 한 줄.
 
-### 추후 고려사항
-- 서버 저장으로 전환할 경우 종료 직전(`OnApplicationQuit`) 동기 저장 로직은 응답을 기다리지 못하고 끊길 수 있어, 그 시점엔 별도 보장 전략이 필요합니다.
+- **손상된 세이브는 새 데이터로 대신하지 않습니다.** `JsonUtility`는 없는 필드를 기본값으로 채워서 변환 뒤에는 손상을 알 수 없으므로, 변환 전에 필수 키·타입·하한·슬롯 길이·중복 키를 봅니다. 파일이 없을 때만 새로 시작하고, 읽을 수 없으면 세션을 만들지 않고 멈춥니다. 그래서 종료 저장을 포함한 어떤 저장도 원본을 건드리지 않고, 화면에는 닫히지 않는 오류 창이 "세이브 파일은 바꾸지 않았다"를 알립니다(파일 경로는 화면에 내지 않습니다).
+- 주기적 자동저장은 없고 위 계기에서만 저장합니다. `Load()`는 결과가 즉시 필요해서 동기, `Save()`는 호출부가 기다리지 않아도 돼서 코루틴 모양입니다. 종료/일시정지처럼 다음 프레임을 보장받지 못하는 시점만 그 코루틴을 끝까지 직접 돌려 저장을 끝냅니다.
+- 백엔드 교체는 `ISaveStorage` 구현체 하나 + 진입점 한 줄입니다. 서버로 바꾸면 종료 직전 저장은 응답을 기다리지 못할 수 있어서 그때 따로 보장 전략이 필요합니다.
 
-([ISaveStorage.cs](Assets/Scripts/Player/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/Player/LocalFileSaveStorage.cs), [GameManager.cs](Assets/Scripts/Manager/GameManager.cs))
+([SaveDataValidator.cs](Assets/Scripts/Player/SaveDataValidator.cs), [ISaveStorage.cs](Assets/Scripts/Player/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/Player/LocalFileSaveStorage.cs), [GameManager.cs](Assets/Scripts/Manager/GameManager.cs))
 
 ---
+
+### 9. 오브젝트 풀링
+
+몬스터·보스, 데미지 숫자, 히트 파티클, 보상 드랍, 스킬 VFX를 `PoolManager`가 Unity 내장 `ObjectPool<GameObject>`로 프리팹별로 관리합니다. 다른 스테이지에 들어갈 때 이전 스테이지의 몬스터 풀만 비웁니다. 몬스터의 `Combatant`도 풀 객체마다 하나를 다시 씁니다.
+
+([PoolManager.cs](Assets/Scripts/Manager/PoolManager.cs), [MonsterSpawner.cs](Assets/Scripts/MonsterSpawner.cs))
+
+---
+
+### 10. 개발자 도구
+
+에디터와 개발 빌드에만 있는 패널입니다(스테이지 이동, 보스 도전, 골드·경험치, 레벨 지정, 백업·복원·새로 시작, 배속, 판정 몸 표시). 어셈블리의 define constraint가 `UNITY_EDITOR || DEVELOPMENT_BUILD`라 릴리스 빌드에는 통째로 없고, 게임 코드는 도구를 모릅니다. 도구 전용 게임 API를 만들지 않아서, 더하는 명령은 보상 경로를, 바꾸는 명령은 진행도 교체(`LoadSnapshot`) 하나를 지납니다. 덮어쓰기 전에는 자동으로 백업합니다.
+
+([DevCommands.cs](Assets/Scripts/DevTools/DevCommands.cs), [docs/DEV_TOOLS.md](docs/DEV_TOOLS.md))
+
+---
+
+## 테스트와 검증
+
+- **EditMode 테스트 253개**(`Assets/Tests/EditMode/`): 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 봅니다. 예: 기대 시각을 오차 0으로 비교, 단계보다 짧은 공격 간격, 이동 속도 1e6에서도 몸을 통과하지 않음, HP·데미지 1e30, 전투 중 할당 0, 흐름의 정확한 대기와 무작위 데이터 장시간 진행, 창 스택의 로드 순서 뒤바뀜, 진행도 교체 뒤 화면 일치.
+- **프레임률 무관**: 같은 세이브로 30fps, 120fps, 렉을 섞은 실행, 애니메이터를 끈 실행의 처치·타격 시각과 스테이지 입장 시각이 같습니다.
+- **실기기**: Android(Galaxy S24 Ultra) 개발 빌드에 adb로 설치해 화면 캡처, 실제 터치·뒤로가기 키, logcat으로 확인합니다.
 
 ## 트러블슈팅
 
-### 충돌/이펙트 위치 보정
+### 프레임이 한 번 튀면 게임이 영구히 멈춤
+몬스터가 `속도 × deltaTime`만큼 순간이동하고 이동 중에는 판정이 없어서, 긴 프레임 한 번에 플레이어 뒤로 넘어갈 수 있었습니다. 플레이어는 앞쪽만 찾고 인카운터 종료는 앞뒤를 다 세서, 뒤로 넘어간 몬스터는 영원히 살아 있는 것으로 남았습니다. 렉을 섞는 재현법(시드 1~3)에서 각각 301초, 312초, 71초에 멈췄습니다.
+→ 전투를 고정 타임스텝 + 보간으로 옮기고, 이동을 sweep 하나로, 대상 규칙을 "앞뒤 무관 가장 가까운 상대"로 바꿨습니다. 같은 재현법에서 셋 다 1500초까지 진행합니다.
 
+### 공격 간격 0.1초 설정이 실제 0.14초
+공격이 끝났는지를 애니메이터 전이와 끝 이벤트가 알려 줘서(Attack → Idle → Attack 왕복), 간격이 짧을수록 실제 간격이 늘어났습니다. 보스는 데이터(1.0초) 대신 클립 길이(약 1.7초)를 따랐습니다.
+→ 행동의 길이는 데이터가, 타격 시점은 구운 시간표가 정하게 했습니다. 기본 공격 사이 간격이 설정의 float 값과 비트 단위로 같습니다.
+
+### 0.5초 대기가 25단계가 아니라 26단계
+Unity 6은 고정 단계를 유리수로 저장해서 `Time.fixedDeltaTime`이 0.02가 아니라 0.0199999921로 들어옵니다. 시간을 단계 수로 바꾸면 데이터의 초와 맞지 않았습니다.
+→ 시계는 설정이 뜻하는 값(유효숫자 6자리로 읽은 0.02)을 쓰고, 흐름 시간 데이터는 double로 둡니다.
+
+### 필드 이름을 바꿨더니 데이터가 조용히 사라짐
+ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래스의 `_stageNumber`를 `stageNumber`로 바꾸자 기존 에셋의 값이 기본값으로 읽혀 스테이지를 찾지 못했고, 캐릭터가 달리지 않고 배경도 바뀌지 않았습니다. 컴파일 에러도 런타임 에러도 없었습니다.
+→ 이름을 바꿀 때는 `[FormerlySerializedAs]` 또는 데이터를 같이 옮기는 규칙을 두고, 변환기는 클래스의 필드에 해당하는 열이 없으면 거부합니다. 시작할 때 저장된 스테이지가 데이터에 없으면 세이브 오류 창으로 멈춥니다(세이브는 건드리지 않습니다).
+
+### 불완전한 세이브가 진행도를 덮어씀
+`{"gold":5}`처럼 일부가 빠진 세이브가 레벨 1로 로드되고, 종료할 때 그대로 저장돼 원래 진행도가 사라졌습니다.
+→ 변환 전 검사(`SaveDataValidator`)와 "읽을 수 없으면 멈추고 원본 보존"으로 바꿨습니다. 변조한 입력 30만 건에서 검사를 통과한 뒤 값이 달라진 경우는 0건이었습니다.
+
+### 판정 몸 위치 보정
 <img width="1024" height="618" alt="Image" src="https://github.com/user-attachments/assets/e99a215c-97a8-446f-aa05-3ed365a8e1bb" />
 
-> PIVOT 중심거리만으로 사거리를 재면 덩치가 다른 캐릭터의 판정이 부정확합니다. SpriteRenderer/Collider2D 바운드의 중심·폭을 계산해서 자동으로 보정하려 했지만, 바운드가 캐릭터 실루엣보다 크게 잡히거나 애니메이션 프레임마다 달라져서 자동 계산 자체가 불안정했습니다. 그래서 디자이너가 직접 값을 넣는 `halfWidthOverride`로 바꿨고, 이펙트 위치 보정(`hitPositionOffset`)도 같은 이유로 같은 방식을 택했습니다.
+> 피벗 중심 거리만으로 사거리를 재면 덩치가 다른 캐릭터의 판정이 부정확합니다. 스프라이트 바운드로 몸의 중심과 폭을 자동 계산하려 했지만 바운드가 실루엣보다 크게 잡히거나 애니메이션 프레임마다 달라져서 판정이 흔들렸습니다. 그래서 자동 계산을 지우고 프리팹의 `HitboxProfile`(반너비 필수, 몸 중심 오프셋)에 값을 넣게 했고, 판정과 이펙트 위치가 같은 몸을 씁니다. 반너비가 0 이하이면 에디터·빌드 검사가 에러를 냅니다.
 
-([CombatRangeUtility.cs](Assets/Scripts/CombatRangeUtility.cs), [HitboxProfile.cs](Assets/Scripts/HitboxProfile.cs), [IDamageable.cs](Assets/Scripts/UI/IDamageable.cs))
+([HitboxProfile.cs](Assets/Scripts/HitboxProfile.cs))
 
----
+## 알려진 한계
 
+숨기지 않기 위해 적어 둡니다. 전체 목록은 [docs/TODO.md](docs/TODO.md)입니다.
+
+- **저장**: 손상을 막기만 하고 복구 수단(백업으로 되돌리기, 확인 후 새로 시작)이 아직 없습니다. 저장이 원자적이지 않고(쓰는 도중 종료되면 파일이 잘릴 수 있음) 세이브 버전·마이그레이션이 없습니다. WebGL 데모는 새로고침하면 세이브가 사라집니다(템플릿 설정).
+- **게임 기능**: 오프라인 보상이 없습니다. 스킬 쿨다운은 저장하지 않습니다.
+- **구조**: 전투에서 연출(데미지 숫자, 이펙트, 소리)을 아직 직접 호출합니다(전투 5단계에서 사건으로 분리). 게임 런타임 코드가 어셈블리 하나라 "모델은 UI를 모른다"를 컴파일러가 강제하지는 않습니다(개발자 도구만 따로 나뉘어 있습니다). 하단 UI 비율 값이 세 곳에 있습니다.
+- **밸런스 수치는 기준이 아닙니다.** 구조를 먼저 만들고 있어서 지금 값(예: 슬라임 처치 보상)은 시험용입니다.
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [docs/COMBAT_ARCHITECTURE.md](docs/COMBAT_ARCHITECTURE.md) | 전투 구조 재설계: 요구사항, 단계별 설계와 결정, 검증 결과 |
+| [docs/COMBAT_DESIGN.md](docs/COMBAT_DESIGN.md) | 고정 타임스텝 + 보간 + CCD 설계와 측정 |
+| [docs/UI_DESIGN.md](docs/UI_DESIGN.md) | UI 시스템 설계(정렬 구분, 창, 반응형, View/Presenter)와 결정 변경 이력 |
+| [docs/SERVER_DESIGN.md](docs/SERVER_DESIGN.md) | 서버가 판정하게 될 때를 대비한 규칙(데이터 소유권, 스냅샷 롤백) |
+| [docs/DEV_TOOLS.md](docs/DEV_TOOLS.md) | 개발자 도구 |
+| [docs/TODO.md](docs/TODO.md) | 다음 작업과 알려진 한계 |
 
 ## 프로젝트 구조
 
 ```
+DataTables/GameData.xlsx     # 게임 데이터 원본(엑셀)
 Assets/
 ├─ Scripts/
-│  ├─ Data/         # IData 구현체 + ScriptableObject 데이터베이스 정의
-│  ├─ Manager/       # GameManager, StageManager, PoolManager, UIManager 등 매니저
-│  ├─ FSM/           # 상태머신 + Player/Monster 상태 클래스
-│  ├─ Skill/         # 전략 패턴 기반 스킬 효과
-│  ├─ Player/        # 스탯 / 저장데이터 / 업그레이드
-│  ├─ UI/            # UIBase 계층 + 화면별 컴포넌트
-│  └─ Event/         # 전역 이벤트 버스
-├─ Editor/DataImporter/  # Excel → JSON → ScriptableObject 변환 툴
-├─ Data/                 # 데이터베이스 ScriptableObject 에셋
-├─ Resources/             # 런타임 로드 프리팹 / JSON
-└─ Tests/EditMode/        # 스탯/업그레이드/스킬 쿨다운 등 핵심 도메인 로직 단위 테스트
+│  ├─ Combat/        # Combatant, CombatWorld, 시계·스케줄러, 행동 시간표, 전투원 호스트
+│  ├─ Flow/          # EncounterDirector(인카운터·보스·스테이지 흐름)
+│  ├─ Player/        # GameSession, PlayerStats, 세이브(저장소·검사·프로필)
+│  ├─ Reactive/      # ReactiveProperty, Subject, DerivedProperty
+│  ├─ Economy/       # GameNumber
+│  ├─ Skill/         # Skill + 효과(ISkillBehavior)
+│  ├─ Data/          # IData 구현체, 데이터베이스 정의, 튜닝 덮어쓰기
+│  ├─ Manager/       # GameInitializer, CombatSimulation, GameManager, PoolManager, CombatEffectManager 등
+│  ├─ UI/            # Core(UIRoot, WindowManager, 창 베이스), 탭·HUD·창별 View와 Presenter
+│  ├─ Event/         # GlobalCombatEvents(전투 사건 버스)
+│  └─ DevTools/      # 개발자 도구(에디터·개발 빌드 전용 어셈블리)
+├─ Editor/           # Excel → JSON → ScriptableObject 변환, 행동 시간표 굽기, 데이터 검사
+├─ Data/             # 데이터베이스·시간표·창 레지스트리 에셋
+├─ Resources/Data/   # 변환된 JSON
+└─ Tests/            # EditMode 테스트, 테스트용 창(Support)
 ```
