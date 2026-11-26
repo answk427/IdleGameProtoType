@@ -48,6 +48,7 @@ public class CharacterTabPresenterTests
     private GameSession session;
     private FakeView view;
     private CharacterTabPresenter presenter;
+    private FakeToasts toasts;
 
     private static PlayerStatData MakeLevel(int level, int requiredExp, int baseMaxHp, int baseAttackDamage) =>
         JsonConvert.DeserializeObject<PlayerStatData>(
@@ -75,6 +76,7 @@ public class CharacterTabPresenterTests
 
         session = new GameSession(statDatabase, upgradeConfig);
         view = new FakeView();
+        toasts = new FakeToasts();
     }
 
     [TearDown]
@@ -86,7 +88,7 @@ public class CharacterTabPresenterTests
         Object.DestroyImmediate(upgradeConfig);
     }
 
-    private void Bind() => presenter = new CharacterTabPresenter(view, session.Stats, session.Wallet.Gold, session.TryUpgrade);
+    private void Bind() => presenter = new CharacterTabPresenter(view, session.Stats, session.Wallet.Gold, session.CheckUpgrade, session.TryUpgrade, toasts);
 
     private UpgradeRowModel Row(UpgradeStatType type) => view.Shown[type];
 
@@ -206,6 +208,55 @@ public class CharacterTabPresenterTests
         Assert.AreEqual("EXP 50 / 200", view.ExpText);
         Assert.IsFalse(view.LevelUpAvailable);
         Assert.AreEqual("70 → 90", Row(UpgradeStatType.Hp).Value, "레벨 기본 HP가 바뀐다");
+        Assert.IsEmpty(toasts.Shown, "성공은 화면이 따라오므로 따로 알리지 않는다");
+    }
+
+    // 실패 이유(10-1)는 토스트로. 판정은 진행도가 한다(버튼이 꺼져 보여도 누르면 이유가 나온다, 2-2 UIButton.Available).
+    [Test]
+    public void FailedCommands_ShowTheirReason()
+    {
+        Bind();
+
+        view.TapUpgrade(UpgradeStatType.Hp);   // 골드 0, 비용 50
+        view.TapLevelUp();                     // 경험치 0 / 100
+
+        CollectionAssert.AreEqual(new[] { "골드가 부족합니다", "경험치가 부족합니다" }, toasts.Shown);
+        Assert.AreEqual("Lv.1", Row(UpgradeStatType.Hp).Level, "실패는 진행도를 바꾸지 않는다");
+    }
+
+    [Test]
+    public void AtTheLimits_SaysMaxLevelAndMaxUpgrade()
+    {
+        upgradeConfig.maxUpgradeLevel = 1;
+        session.Apply(new PlayerSaveData
+        {
+            stats = new PlayerStatsSaveData { level = 3, hpUpgradeLevel = 1 },
+            gold = 1e300, // 아주 큰 골드여도 최대 단계는 최대 단계다
+        });
+        Bind();
+
+        view.TapUpgrade(UpgradeStatType.Hp);
+        view.TapLevelUp();
+
+        CollectionAssert.AreEqual(new[] { "최대 단계입니다", "최대 레벨입니다" }, toasts.Shown);
+    }
+
+    [Test]
+    public void FailureText_ExistsForEveryResult_AndSuccessHasNone()
+    {
+        foreach (UpgradeResult result in Enum.GetValues(typeof(UpgradeResult)))
+        {
+            string text = CharacterTabPresenter.FormatUpgradeFailure(result);
+            if (result == UpgradeResult.Success) Assert.IsNull(text);
+            else Assert.IsFalse(string.IsNullOrEmpty(text) || text == result.ToString(), $"{result}의 안내 문장이 없다");
+        }
+
+        foreach (LevelUpResult result in Enum.GetValues(typeof(LevelUpResult)))
+        {
+            string text = CharacterTabPresenter.FormatLevelUpFailure(result);
+            if (result == LevelUpResult.Success) Assert.IsNull(text);
+            else Assert.IsFalse(string.IsNullOrEmpty(text) || text == result.ToString(), $"{result}의 안내 문장이 없다");
+        }
     }
 
     [Test]

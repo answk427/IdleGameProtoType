@@ -19,7 +19,19 @@ public static class CombatDataValidator
         ValidateStages(LoadFirst<StageDatabase>(), monsters, errors);
         ValidateSkillEffects(skills, errors);
         ValidateFlowTimings(LoadFirst<BalanceConfig>(), errors);
+        ValidateContentUnlocks(errors);
         return errors;
+    }
+
+    // 콘텐츠 해금 조건(docs/UI_DESIGN.md 10-6): 모든 콘텐츠에 행이 있고, 조건이 닿을 수 있는 값(레벨 표·스테이지 표 안)인지.
+    // 전투 데이터는 아니지만 같은 시점(에디터가 열릴 때, 빌드 직전)에 같은 방식으로 막는다.
+    private static void ValidateContentUnlocks(List<string> errors)
+    {
+        PlayerStatDatabase levels = LoadFirst<PlayerStatDatabase>();
+        StageDatabase stages = LoadFirst<StageDatabase>();
+        int maxLevel = levels != null ? levels.MaxLevel : 0;
+        errors.AddRange(ContentUnlockDatabase.Validate(LoadFirst<ContentUnlockDatabase>(), maxLevel,
+            stage => stages != null && stages.GetByNumber(stage) != null));
     }
 
     // 흐름의 대기 시간(D24): 0 이상의 유한한 값. 0이면 그 대기가 없다.

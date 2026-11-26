@@ -1059,6 +1059,7 @@ MonoBehaviour:
   skillDatabase: {fileID: 11400000, guid: 800e941405285a24986c3f9a63149977, type: 2}
   characterDatabase: {fileID: 11400000, guid: 10c47468da2341545aecd91a93e1750d, type: 2}
   balanceConfig: {fileID: 11400000, guid: a1dae11590d510a45aa64b4c1447d3cd, type: 2}
+  contentUnlockDatabase: {fileID: 11400000, guid: 3c0d5d0018db33d49a7b275affdfc0f2, type: 2}
 --- !u!4 &1177051874
 Transform:
   m_ObjectHideFlags: 0
@@ -1249,6 +1250,8 @@ MonoBehaviour:
   registry: {fileID: 11400000, guid: 15d75a5fb4f304b4c95a4af7d02ecdcc, type: 2}
   fadeLayer: {fileID: 119688928}
   fadeController: {fileID: 1698183982}
+  toastPrefab: {fileID: 3353794078151386105, guid: 643e2e30aaabfc7469fd59a63630e1d3, type: 3}
+  soundSet: {fileID: 11400000, guid: 534c2d0fc67708a4ab4d0fc86fdb5d24, type: 2}
   playerHud: {fileID: 6414485674498160178}
   bossChallengeButton: {fileID: 8862145974461050685}
   stageAnnouncement: {fileID: 1176470795}

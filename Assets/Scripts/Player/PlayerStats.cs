@@ -10,6 +10,13 @@ public enum UpgradeStatType
     AttackSpeed
 }
 
+public enum LevelUpResult
+{
+    Success,
+    NotEnoughExp,
+    MaxLevel,
+}
+
 public enum LearnSkillResult
 {
     Success,
@@ -62,6 +69,10 @@ public sealed class PlayerStats
     private PlayerUpgradeConfig upgradeConfig;
     private PlayerStatsSaveData saveData = new PlayerStatsSaveData();
 
+    // 배울 수 있는 스킬 전부(스킬 표). 학습 조건과 "배울 스킬 있음"이 이것을 본다.
+    private IReadOnlyList<SkillEntry> skills = Array.Empty<SkillEntry>();
+    private readonly Dictionary<int, SkillEntry> skillsById = new Dictionary<int, SkillEntry>();
+
     // 스탯 종류별 동작(IUpgradeStat)을 한 곳에 등록. 새 스탯은 IUpgradeStat 구현 클래스 하나를 만들어 여기에 등록한다.
     private Dictionary<UpgradeStatType, IUpgradeStat> upgradeStats;
 
@@ -81,6 +92,7 @@ public sealed class PlayerStats
     private DerivedProperty<bool> isMaxLevel;
     private DerivedProperty<bool> canLevelUp;
     private DerivedProperty<PlayerCombatStats> combatStats;
+    private DerivedProperty<bool> hasLearnableSkill;
 
     // ── 사건(저장 계기) ─────────────────────────────────────
     private readonly Subject<int> levelReached = new Subject<int>();
@@ -99,6 +111,8 @@ public sealed class PlayerStats
     // 레벨업은 자동이 아니다. 경험치는 쌓이고, 캐릭터 탭의 LEVEL UP 버튼이 TryLevelUp을 부른다.
     public IReadOnlyReactiveProperty<bool> CanLevelUp => canLevelUp;
     public IReadOnlyReactiveProperty<PlayerCombatStats> CombatStats => combatStats;
+    // 지금 레벨로 배울 수 있는데 아직 배우지 않은 스킬이 있다(레드닷 조건, docs/UI_DESIGN.md 5-8).
+    public IReadOnlyReactiveProperty<bool> HasLearnableSkill => hasLearnableSkill;
 
     // 레벨업한 뒤의 레벨(여러 레벨을 한 번에 올리면 끝 레벨로 한 번).
     public Observable<int> LevelReached => levelReached;
@@ -111,11 +125,18 @@ public sealed class PlayerStats
     // ── 초기화 ──────────────────────────────────────────────
 
     // 이동속도처럼 저장되지 않는 캐릭터 속성은 여기(진행도)가 아니라 캐릭터가 갖는다.
-    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig)
+    // skills: 스킬 표(GameInitializer가 GameDatabaseManager에서 넘긴다). 없으면 배울 스킬이 없다.
+    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig, IReadOnlyList<SkillEntry> skills = null)
     {
         if (upgradeStats != null) throw new InvalidOperationException("PlayerStats는 한 번만 초기화한다.");
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
+
+        this.skills = skills ?? Array.Empty<SkillEntry>();
+        foreach (SkillEntry entry in this.skills)
+        {
+            if (entry?.data != null) skillsById[entry.data.Id] = entry;
+        }
 
         IUpgradeStat[] stats =
         {
@@ -139,17 +160,19 @@ public sealed class PlayerStats
         var sources = new List<IChangeSignal> { level };
         sources.AddRange(upgradeLevels.Values);
         combatStats = new DerivedProperty<PlayerCombatStats>(ComputeCombatStats, sources.ToArray());
+        hasLearnableSkill = new DerivedProperty<bool>(ComputeHasLearnableSkill, level, learnedSkills);
 
         LoadSave(null); // 기본값
     }
 
-    // 에디터의 튜닝 덮어쓰기처럼 데이터(레벨 표, 업그레이드 설정)가 바뀌면 파생 상태를 다시 계산한다.
+    // 에디터의 튜닝 덮어쓰기처럼 데이터(레벨 표, 업그레이드 설정, 스킬 표)가 바뀌면 파생 상태를 다시 계산한다.
     public void RecomputeFromData()
     {
         requiredExp.Recompute();
         isMaxLevel.Recompute();
         canLevelUp.Recompute();
         combatStats.Recompute();
+        hasLearnableSkill.Recompute();
     }
 
     // GameSession.Apply()가 호출한다. 객체를 새로 만들지 않고 값만 덮어쓴다(참조하는 쪽이 다시 연결할 필요가 없다).
@@ -182,9 +205,11 @@ public sealed class PlayerStats
     }
 
     // 밀린 경험치가 여러 레벨 분량이면 한 번에 다 올린다. 상태와 사건은 끝에서 한 번씩 알린다.
-    public bool TryLevelUp()
+    // 실패하면 이유를 돌려준다(UI가 이유별로 안내한다, docs/UI_DESIGN.md 10-1).
+    public LevelUpResult TryLevelUp()
     {
-        if (!canLevelUp.Value) return false;
+        if (saveData.level >= MaxLevel) return LevelUpResult.MaxLevel;
+        if (!canLevelUp.Value) return LevelUpResult.NotEnoughExp;
 
         while (saveData.level < MaxLevel && saveData.currentExp >= RequiredExpOf(saveData.level))
         {
@@ -196,7 +221,7 @@ public sealed class PlayerStats
         exp.Value = saveData.currentExp;
         Debug.Log($"[PlayerStats] 레벨업 → Lv.{saveData.level} | {combatStats.Value}");
         levelReached.OnNext(saveData.level);
-        return true;
+        return LevelUpResult.Success;
     }
 
     // ── 업그레이드 (돈은 GameSession.TryUpgrade가 검사) ─────
@@ -296,11 +321,21 @@ public sealed class PlayerStats
     private LearnSkillResult CheckLearnSkill(int skillId)
     {
         if (IsSkillLearned(skillId)) return LearnSkillResult.AlreadyLearned;
-
-        SkillEntry entry = GameDatabaseManager.Instance?.GetSkill(skillId);
-        if (entry?.data == null) return LearnSkillResult.UnknownSkill;
+        if (!skillsById.TryGetValue(skillId, out SkillEntry entry)) return LearnSkillResult.UnknownSkill;
 
         return saveData.level >= entry.data.RequiredLevel ? LearnSkillResult.Success : LearnSkillResult.LevelTooLow;
+    }
+
+    // 학습 조건(CheckLearnSkill)과 같은 규칙을 저장 데이터에서 계산한다(진행도 교체 도중의 조합이 보이지 않게).
+    private bool ComputeHasLearnableSkill()
+    {
+        List<int> learned = saveData.learnedSkillIds; // LoadSave 전(기본값)에는 null일 수 있다
+        foreach (SkillEntry entry in skills)
+        {
+            if (entry?.data == null) continue;
+            if (saveData.level >= entry.data.RequiredLevel && (learned == null || !learned.Contains(entry.data.Id))) return true;
+        }
+        return false;
     }
 
     private bool IsValidSlot(int slotIndex) => slotIndex >= 0 && slotIndex < equippedSlots.Value.Count;

@@ -12,7 +12,7 @@ public class UpgradeListItem : MonoBehaviour
     [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private TextMeshProUGUI valueText;
     [SerializeField] private TextMeshProUGUI costText;
-    [SerializeField] private Button upgradeButton;
+    [SerializeField] private UIButton upgradeButton;
 
     public UpgradeStatType StatType { get; private set; }
 
@@ -35,6 +35,6 @@ public class UpgradeListItem : MonoBehaviour
         if (levelText != null) levelText.text = row.Level;
         if (valueText != null) valueText.text = row.Value;
         if (costText != null) costText.text = row.Cost;
-        if (upgradeButton != null) upgradeButton.interactable = row.CanUpgrade;
+        if (upgradeButton != null) upgradeButton.Available = row.CanUpgrade; // 모양만 불가: 누르면 실패 이유가 나온다
     }
 }

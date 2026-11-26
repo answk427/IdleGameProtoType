@@ -33,8 +33,19 @@ public class GameDatabaseManager : MonoBehaviour
     [SerializeField] private SkillDatabase skillDatabase;
     [SerializeField] private CharacterDatabase characterDatabase;
     [SerializeField] private BalanceConfig balanceConfig;
+    [SerializeField] private ContentUnlockDatabase contentUnlockDatabase;
 
     private bool isInitialized;
+
+    // 콘텐츠 해금 조건 표. 게임은 GameSession.Unlocks로 읽는다(GameInitializer가 넘긴다). 연결이 빠지면 null.
+    public ContentUnlockDatabase ContentUnlocks
+    {
+        get
+        {
+            EnsureInitialized();
+            return contentUnlockDatabase;
+        }
+    }
 
     // GameInitializer가 게임을 시작하기 전에 검사한다.
     public bool HasBalanceConfig => balanceConfig != null;
@@ -77,7 +88,9 @@ public class GameDatabaseManager : MonoBehaviour
         stageDatabase = DataTuning.Prepare(stageDatabase);
         skillDatabase = DataTuning.Prepare(skillDatabase);
         characterDatabase = DataTuning.Prepare(characterDatabase);
+        contentUnlockDatabase = DataTuning.Prepare(contentUnlockDatabase);
 
+        if (contentUnlockDatabase != null) contentUnlockDatabase.EnsureLookup();
         if (characterDatabase != null) characterDatabase.EnsureLookup();
         if (monsterDatabase != null) monsterDatabase.EnsureLookup();
         if (stageDatabase != null) stageDatabase.EnsureLookup();

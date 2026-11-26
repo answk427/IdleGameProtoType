@@ -87,7 +87,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 7948201932061440760}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Script: {fileID: 11500000, guid: 42f510eaf7809c947913d125d2e42ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
@@ -134,6 +134,7 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+  sound: 1
 --- !u!114 &103827207206487007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -146,8 +147,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4e0218812fdaf54bbd321b181641f8f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossChallengeButton
-  Layer: 0
-  TabType: 0
 --- !u!1 &8706027189109041437
 GameObject:
   m_ObjectHideFlags: 0

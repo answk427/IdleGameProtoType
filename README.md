@@ -198,16 +198,19 @@ flowchart LR
     WM --> W1["캐릭터 탭 / 스킬 탭<br/>Exclusive"]
     WM --> W2["스킬 관리 창<br/>Overlay, 모달"]
     WM --> W3["세이브 오류 창<br/>System, 닫히지 않음"]
+    WM --> W4["확인창 (DialogService)<br/>bool ok = await Confirm(...)"]
+    UR --> T["토스트 층 (ToastService)<br/>스택 밖, 터치를 받지 않음"]
     W1 --- P["View(MonoBehaviour) ↔ Presenter(순수 C#)<br/>→ 모델 명령 / ← 상태 구독"]
 ```
 
-- **그리는 순서는 코드의 정렬 구분**(`UISortBand`: Fx 0 · Hud 1000 · Window 2000 · Popup 3000 · System 9000)이고, 창의 sortingOrder = 구분 + 깊이 × 10입니다. 데미지 숫자는 HUD 아래, 탭 내용은 HUD 위, 모달 딤은 맨 위 모달 바로 아래에 놓입니다.
+- **그리는 순서는 코드의 정렬 구분**(`UISortBand`: Fx 0 · Hud 1000 · Window 2000 · Popup 3000 · Toast 4000 · System 9000)이고, 창의 sortingOrder = 구분 + 깊이 × 10입니다. 데미지 숫자는 HUD 아래, 탭 내용은 HUD 위, 모달 딤은 맨 위 모달 바로 아래에 놓입니다.
 - **스택은 [로드된 창: 구분 순] + [로드 중인 창]**이라 스택 맨 위가 화면 맨 위이고, 뒤로가기는 화면 맨 위 창부터 닫습니다. 탭(Exclusive)은 열릴 때 System 구분 밑의 창을 닫는데, 스택 방식도 프리팹을 로드해야 알기 때문에 **자기보다 먼저 열기를 요청한 창에만** 적용합니다(나중에 요청한 팝업은 새 탭 위에 남고, 로드가 실패하면 이전 탭이 그대로).
 - **창의 구조는 코드**(`WindowOptions`: 구분, 스택 방식, 모달, 바깥 터치, 뒤로가기), 연출(딤 색 등)만 프리팹입니다. 인자 타입이 자기 창을 가리켜서(`IWindowArgs<TWindow>`) 다른 창의 인자를 넘기면 컴파일되지 않고, 닫힘과 결과는 `await handle.Closed`로 기다립니다.
-- **Presenter는 uGUI·싱글턴을 모릅니다.** 서비스를 생성자로 받고, 구독은 창 수명에 묶어 닫힐 때 한 번에 해제합니다. 탭 잠금은 "UIRoot가 창을 연결한 탭만 열림"이라 다른 코드가 잠금을 우회할 길이 없습니다.
-- 입력 차단(`InputBlocker`)은 참조 카운트와 스코프 해제로, 창을 여는 동안과 화면 전환 중에 걸립니다. 모달이 떠 있으면 키보드 이동도 막습니다.
+- **Presenter는 uGUI·싱글턴을 모릅니다.** 서비스(토스트, 확인창 포함)를 생성자로 받고, 구독은 창 수명에 묶어 닫힐 때 한 번에 해제합니다. 명령이 실패하면 결과의 이유("골드가 부족합니다", "Lv.3부터 배울 수 있습니다")를 토스트로 알립니다. 버튼은 꺼 두지 않고 모양만 불가로 보여서(`UIButton.Available`) 눌렀을 때 이유가 나옵니다.
+- **해금과 레드닷은 게임 규칙이라 게임 쪽 파생 상태입니다.** 탭은 "창이 연결되고 게임 쪽에서 해금된 탭만" 열립니다(조건은 엑셀 `ContentUnlockDatabase` 시트). 해금은 저장하지 않고 레벨·스테이지에서 계산해서 세이브 형식이 바뀌지 않습니다. 레드닷 조건(레벨업 가능, 살 수 있는 업그레이드, 배울 스킬)도 진행도의 파생 상태이고, 어느 버튼에 묶을지만 UI가 정합니다.
+- 입력 차단(`InputBlocker`)은 참조 카운트와 스코프 해제로, 창을 여는 동안과 화면 전환 중에 걸립니다. 모달이 떠 있으면 키보드 이동도 막습니다. 차단막이 켜진 그 프레임의 틈(새 그래픽은 그려지기 전 레이캐스트에 안 잡힘)은 "UI 버튼 클릭은 한 프레임에 하나"(`UIButton`) 규칙이 막습니다. 창이 하나도 없을 때 뒤로가기는 종료 확인창입니다.
 
-([UIRoot.cs](Assets/Scripts/UI/Core/UIRoot.cs), [WindowManager.cs](Assets/Scripts/UI/Core/WindowManager.cs), [WindowOptions.cs](Assets/Scripts/UI/Core/WindowOptions.cs), [TabBarPresenter.cs](Assets/Scripts/UI/Tabs/TabBarPresenter.cs), [SkillManagePresenter.cs](Assets/Scripts/UI/SkillManage/SkillManagePresenter.cs))
+([UIRoot.cs](Assets/Scripts/UI/Core/UIRoot.cs), [WindowManager.cs](Assets/Scripts/UI/Core/WindowManager.cs), [WindowOptions.cs](Assets/Scripts/UI/Core/WindowOptions.cs), [UIButton.cs](Assets/Scripts/UI/Core/UIButton.cs), [ToastService.cs](Assets/Scripts/UI/Toast/ToastService.cs), [DialogService.cs](Assets/Scripts/UI/Dialog/DialogService.cs), [TabBarPresenter.cs](Assets/Scripts/UI/Tabs/TabBarPresenter.cs), [ContentUnlocks.cs](Assets/Scripts/Player/ContentUnlocks.cs))
 
 ---
 

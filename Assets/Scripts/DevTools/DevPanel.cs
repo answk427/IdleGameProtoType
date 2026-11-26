@@ -14,6 +14,7 @@ public sealed class DevPanel
 
     private readonly DevCommands commands;
     private readonly HitboxOverlay overlay;
+    private readonly UIStateOverlay uiOverlay;
 
     private GUIStyle panelLabel, lineLabel, rowLabel, rowLabelLeft, button, warnButton, selectedButton, title, section;
     private int stylesForSize = -1;
@@ -25,10 +26,11 @@ public sealed class DevPanel
     private float pendingUntil;
     private IReadOnlyList<string> backupList = new List<string>();
 
-    public DevPanel(DevCommands commands, HitboxOverlay overlay)
+    public DevPanel(DevCommands commands, HitboxOverlay overlay, UIStateOverlay uiOverlay)
     {
         this.commands = commands;
         this.overlay = overlay;
+        this.uiOverlay = uiOverlay;
     }
 
     // 화면 짧은 변 360 기준의 1dp(화면 픽셀).
@@ -162,6 +164,9 @@ public sealed class DevPanel
 
         if (GUILayout.Button(overlay.Enabled ? "판정 몸 표시: 켬" : "판정 몸 표시: 끔", overlay.Enabled ? selectedButton : button))
             overlay.Enabled = !overlay.Enabled;
+
+        if (GUILayout.Button(uiOverlay.Enabled ? "UI 상태 표시: 켬" : "UI 상태 표시: 끔", uiOverlay.Enabled ? selectedButton : button))
+            uiOverlay.Enabled = !uiOverlay.Enabled;
     }
 
     // ── 도우미 ──

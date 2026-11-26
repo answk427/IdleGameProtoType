@@ -8,7 +8,7 @@ public static class TestSkills
         return new Skill(CreateEntry(id, cooldown, actionKey, effectType, castTime));
     }
 
-    public static SkillEntry CreateEntry(int id = 1, float cooldown = 5f, string actionKey = "Skill", SkillEffectType effectType = SkillEffectType.Damage, float castTime = 0.5f)
+    public static SkillEntry CreateEntry(int id = 1, float cooldown = 5f, string actionKey = "Skill", SkillEffectType effectType = SkillEffectType.Damage, float castTime = 0.5f, int requiredLevel = 1)
     {
         string json = "{" +
             $"\"id\":{id}," +
@@ -19,7 +19,7 @@ public static class TestSkills
             $"\"effectType\":{(int)effectType}," +
             "\"value1\":1.0," +
             "\"value2\":0.0," +
-            "\"requiredLevel\":1" +
+            $"\"requiredLevel\":{requiredLevel}" +
             "}";
         SkillData data = JsonConvert.DeserializeObject<SkillData>(json);
         return new SkillEntry { data = data };

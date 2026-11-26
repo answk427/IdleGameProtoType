@@ -11,7 +11,9 @@ public class SkillTabWindow : UIWindow<SkillTabArgs>, ISkillTabView
 {
     [SerializeField] private Transform slotContainer;
     [SerializeField] private SkillSlotWidget slotWidgetPrefab;
-    [SerializeField] private Button settingsButton;
+    [SerializeField] private UIButton settingsButton;
+    [Tooltip("스킬 설정 버튼의 레드닷")]
+    [SerializeField] private GameObject settingsBadge;
 
     private readonly List<SkillSlotWidget> slotWidgets = new List<SkillSlotWidget>();
 
@@ -42,4 +44,9 @@ public class SkillTabWindow : UIWindow<SkillTabArgs>, ISkillTabView
     public void ClearSlot(int slot) => slotWidgets[slot].SetEmpty();
 
     public void SetSlotCooldown(int slot, float ratio) => slotWidgets[slot].SetCooldown(ratio);
+
+    public void SetManageBadge(bool visible)
+    {
+        if (settingsBadge != null) settingsBadge.SetActive(visible);
+    }
 }

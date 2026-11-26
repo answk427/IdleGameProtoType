@@ -16,7 +16,9 @@ internal sealed class WindowDim
         raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
         image = UILayerFactory.CreateFullScreenImage("DimImage", canvas.transform, Color.clear);
 
-        Button button = image.gameObject.AddComponent<Button>();
+        // 바깥 터치도 UI 클릭이라 같은 규칙(한 프레임 하나)을 지난다. 닫기라 소리는 내지 않는다.
+        UIButton button = image.gameObject.AddComponent<UIButton>();
+        button.Sound = UIButtonSound.None;
         button.transition = Selectable.Transition.None;
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.onClick.AddListener(() => onClicked());

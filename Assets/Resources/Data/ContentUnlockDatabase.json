@@ -1,0 +1,14 @@
+[
+  {
+    "Key": 1,
+    "content": 1,
+    "conditionType": 0,
+    "conditionValue": 0
+  },
+  {
+    "Key": 2,
+    "content": 2,
+    "conditionType": 1,
+    "conditionValue": 2
+  }
+]

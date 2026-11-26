@@ -37,6 +37,7 @@ public sealed class SkillTabPresenter : IWindowPresenter
 
         view.SetSlotCount(stats.EquippedSlots.Value.Count);
         stats.EquippedSlots.Subscribe(RenderSlots).AddTo(disposables);
+        stats.HasLearnableSkill.Subscribe(view.SetManageBadge).AddTo(disposables); // 레드닷: 관리 창에 배울 스킬이 있다
 
         view.SlotTapped += HandleSlotTapped;
         view.ManageTapped += HandleManageTapped;

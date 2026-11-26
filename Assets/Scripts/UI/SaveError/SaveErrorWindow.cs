@@ -13,7 +13,7 @@ public class SaveErrorWindow : UIWindow<SaveErrorArgs>, ISaveErrorView
     [SerializeField] private TMP_Text titleText;
     [SerializeField] private TMP_Text bodyText;
     [SerializeField] private TMP_Text reasonText;
-    [SerializeField] private Button quitButton;
+    [SerializeField] private UIButton quitButton;
     [SerializeField] private TMP_Text quitLabel;
 
     public override WindowOptions Options => new WindowOptions

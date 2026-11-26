@@ -17,7 +17,7 @@ public class SkillManageWindow : UIWindow<SkillManageArgs>, ISkillManageView
     [SerializeField] private SkillSlotWidget slotWidgetPrefab;
     [SerializeField] private Transform listContent;       // ScrollView Content
     [SerializeField] private SkillListItem listItemPrefab;
-    [SerializeField] private Button closeButton;
+    [SerializeField] private UIButton closeButton;
 
     private readonly List<SkillSlotWidget> slotWidgets = new List<SkillSlotWidget>();
     private readonly List<SkillListItem> items = new List<SkillListItem>();
@@ -67,6 +67,14 @@ public class SkillManageWindow : UIWindow<SkillManageArgs>, ISkillManageView
         for (int i = 0; i < visibleItemCount; i++)
         {
             if (items[i].SkillId == skillId) items[i].SetLearned(learned);
+        }
+    }
+
+    public void SetSkillLearnable(int skillId, bool learnable)
+    {
+        for (int i = 0; i < visibleItemCount; i++)
+        {
+            if (items[i].SkillId == skillId) items[i].SetLearnable(learnable);
         }
     }
 

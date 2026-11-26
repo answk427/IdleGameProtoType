@@ -18,6 +18,7 @@ public sealed class DevTools : MonoBehaviour
     private GameInitializer initializer;
     private DevPanel panel;
     private HitboxOverlay overlay;
+    private UIStateOverlay uiOverlay;
     private IDisposable inputLease;
     private bool isOpen;
 
@@ -47,7 +48,8 @@ public sealed class DevTools : MonoBehaviour
 
         Commands = new DevCommands(target.Session, target.GameManager, target.CombatSimulation.Director, new DevBackupStore(SaveProfile.SaveDirectory));
         overlay = new HitboxOverlay(target.CombatSimulation.World);
-        panel = new DevPanel(Commands, overlay);
+        uiOverlay = new UIStateOverlay(target.UIRoot);
+        panel = new DevPanel(Commands, overlay, uiOverlay);
     }
 
     private void Update()
@@ -66,6 +68,7 @@ public sealed class DevTools : MonoBehaviour
         if (panel == null) return;
 
         overlay.Draw(Camera.main, DevPanel.Unit);
+        uiOverlay.Draw(DevPanel.Unit);
 
         if (!isOpen)
         {

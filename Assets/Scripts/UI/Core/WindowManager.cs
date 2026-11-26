@@ -120,6 +120,24 @@ public sealed class WindowManager : IDisposable
         }
     }
 
+    // 디버그 표시용 읽기 전용 사본(UIRoot.Describe → 개발자 도구).
+    public void Describe(UIDebugSnapshot into)
+    {
+        foreach (Entry entry in windows)
+        {
+            bool loaded = entry.IsLoaded;
+            into.Windows.Add(new UIDebugSnapshot.WindowInfo(
+                entry.WindowType.Name,
+                loaded,
+                loaded ? entry.Options.Band : default,
+                loaded && entry.Host.IsAlive ? entry.Host.Order : 0,
+                entry.State == WindowState.Open,
+                loaded && entry.Options.Modal));
+        }
+
+        into.DimOrder = topModal != null && topModal.Host != null && topModal.Host.IsAlive ? UISort.DimOrder(topModal.Host.Order) : (int?)null;
+    }
+
     public void Tick()
     {
         for (int i = windows.Count - 1; i >= 0; i--)

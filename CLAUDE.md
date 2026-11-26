@@ -18,9 +18,10 @@ Excel(DataTables/GameData.xlsx) → ExcelToJsonConverter(Editor, 메뉴 Tools/Ex
             → *DatabaseSyncer.cs → ScriptableObject(.asset)로 동기화 (게임이 읽는 것은 .asset뿐)
 ```
 
-- **원본은 `DataTables/GameData.xlsx`**(프로젝트 루트, Assets 밖이라 엑셀이 여는 임시 파일을 Unity가 가져오지 않는다). 데이터 시트 5개(`MonsterDatabase`, `StageDatabase`, `SkillDatabase`, `PlayerStatDatabase`, `CharacterDatabase`. 시트 이름 = JSON 파일 이름 = 데이터베이스 에셋 이름)와 `설명` 시트가 있다. 예전 원본 엑셀을 찾지 못해 2026-11-24에 당시 `.asset` 값으로 새로 만들었다(변환을 한 바퀴 돌려 `.asset` 값이 바뀌지 않음을 확인). **데이터를 고칠 때는 엑셀을 고치고 변환한다.** `.asset`의 데이터 값을 직접 고치면 다음 변환에서 엑셀 값으로 덮어써진다.
+- **원본은 `DataTables/GameData.xlsx`**(프로젝트 루트, Assets 밖이라 엑셀이 여는 임시 파일을 Unity가 가져오지 않는다). 데이터 시트 6개(`MonsterDatabase`, `StageDatabase`, `SkillDatabase`, `PlayerStatDatabase`, `CharacterDatabase`, `ContentUnlockDatabase`. 시트 이름 = JSON 파일 이름 = 데이터베이스 에셋 이름)와 `설명` 시트가 있다. 예전 원본 엑셀을 찾지 못해 2026-11-24에 당시 `.asset` 값으로 새로 만들었다(변환을 한 바퀴 돌려 `.asset` 값이 바뀌지 않음을 확인). **데이터를 고칠 때는 엑셀을 고치고 변환한다.** `.asset`의 데이터 값을 직접 고치면 다음 변환에서 엑셀 값으로 덮어써진다.
 
-- `IData` 인터페이스(`int Key { get; }`)를 구현하는 데이터 클래스: `MonsterData`, `StageData`, `SkillData`, `PlayerStatData`, `CharacterData` (전부 `Assets/Scripts/Data/`). 데이터베이스 SO는 공통 접점 `IDataTable`을 구현한다.
+- `IData` 인터페이스(`int Key { get; }`)를 구현하는 데이터 클래스: `MonsterData`, `StageData`, `SkillData`, `PlayerStatData`, `CharacterData`, `ContentUnlockData` (전부 `Assets/Scripts/Data/`). 데이터베이스 SO는 공통 접점 `IDataTable`을 구현한다.
+- **콘텐츠 해금 표(`ContentUnlockData`, UI_DESIGN 10-6):** 콘텐츠(`GameContent`: 게임에 있는 것만, 지금 Character·Skill)마다 조건 하나(None / `PlayerLevel` ≥ 값 / `StageReached` 저장된 스테이지 ≥ 값). 키 = 콘텐츠. **모든 콘텐츠에 행이 있어야 한다**(없으면 잠기고 에러, `CombatDataValidator`가 에디터 열 때·빌드 직전에 잡는다). 콘텐츠를 더하면 엑셀에 행도 더한다. enum 번호는 `.asset`에 정수로 저장되므로 바꾸지 않는다.
 - **캐릭터 표(`CharacterData`, D12):** 플레이어 캐릭터(직업)의 사거리와 이동 속도. 레벨에 따라 변하는 HP·공격력·공격 간격은 `PlayerStatData`다. 플레이어는 이 표의 캐릭터(`PlayerSpawner.characterId`, 지금은 1 = 전사)로 스폰하고, 프리팹은 `characterName`으로 자동 연결된다.
 - 각 데이터 클래스는 `[SerializeField] private`필드 + PascalCase 프로퍼티 + `[JsonProperty("camelCase이름")]` 패턴. **엑셀 열 이름은 C# 필드 이름**(변환기가 필드 → 프로퍼티 이름 순으로 대소문자 무시 매칭), **JSON 키는 `JsonProperty` 문자열**이다. 지금은 셋이 같다. 필드 이름을 바꾸면 엑셀 열 이름도 같이 바꿔야 한다(안 바꾸면 변환기가 거부한다. 아래 "직렬화 함정"도 같이 볼 것).
 - **변환기는 검사를 모두 통과해야만 JSON과 `.asset`을 바꾼다**(`ExcelToJsonConverter.TryReadSheet`, 대화상자 없는 핵심 함수). 거부하는 것: 클래스에 없는 열, 같은 열 이름 두 번, **클래스의 직렬화 필드에 해당하는 열이 없음**(새 필드를 추가하고 엑셀에 열을 안 넣은 경우. 예전에는 조용히 0이 됐다), 형식이 틀린 값(정수 칸의 소수, 없는 enum 값, 숫자 칸의 글자), 같은 키. 빈 칸은 기본값. 리플렉션 기반이라 새 데이터 타입을 추가해도 변환기는 고칠 필요 없음.
@@ -62,7 +63,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 매니저/유틸리티
 
-- `GameDatabaseManager` — `MonsterDatabase`/`StageDatabase`/`SkillDatabase`/`CharacterDatabase`/`BalanceConfig`(SO)를 들고 있는 조회 파사드(에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본). `GetMonster(id)`/`GetStage(stageNumber)`/`GetSkill(id)`/`GetCharacter(id)`/`Balance`(스테이지 성장 곡선)로 다른 코드가 SO를 직접 참조하지 않고 항상 이 매니저를 거치게 함. `Instance` getter가 지연 초기화라 다른 매니저의 `Awake()` 실행 순서에 의존하지 않음.
+- `GameDatabaseManager` — `MonsterDatabase`/`StageDatabase`/`SkillDatabase`/`CharacterDatabase`/`ContentUnlockDatabase`/`BalanceConfig`(SO)를 들고 있는 조회 파사드(에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본). `GetMonster(id)`/`GetStage(stageNumber)`/`GetSkill(id)`/`GetCharacter(id)`/`ContentUnlocks`(해금 조건 표, GameInitializer가 세션에 넘긴다)/`Balance`(스테이지 성장 곡선)로 다른 코드가 SO를 직접 참조하지 않고 항상 이 매니저를 거치게 함. `Instance` getter가 지연 초기화라 다른 매니저의 `Awake()` 실행 순서에 의존하지 않음.
 - `PoolManager` — Unity 내장 `UnityEngine.Pool.ObjectPool<T>` 래퍼. 프리팹별로 풀을 따로 관리(`Dictionary<GameObject, IObjectPool<GameObject>>`). 몬스터/보스 스폰에 사용. 다른 스테이지에 들어갈 때 `MonsterSpawner.ReleaseStage`가 `ClearPool(prefab)`으로 이전 스테이지 몬스터 풀을 정리함.
 - `PlayAreaBounds` — 화면 하단 UI 비율(`bottomUiScreenRatio`)을 기준으로 "캐릭터가 서 있을 수 있는 월드 Y(`GroundY`)"를 계산하는 단일 소스. `MonsterSpawner`/`PlayerController`의 스폰 위치 계산이 전부 여기서 나온 값을 씀 — 하단 UI 비율이 바뀌면 이 한 곳만 고치면 됨.
 
@@ -108,15 +109,19 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## UI 구조
 
-설계는 `docs/UI_DESIGN.md`가 기준. **UI 1차 이관은 끝났다(2026-11-26)**: 창(탭 내용, 팝업, 치명 오류)은 전부 `WindowManager`가 열고 닫고, 씬에 배치된 것은 HUD 위젯(View + Presenter)뿐이다. 옛 `UIManager`/`UIBase`/`UITabPanel`은 지웠다.
+설계는 `docs/UI_DESIGN.md`가 기준. **UI 1차 이관은 끝났다(2026-11-26)**: 창(탭 내용, 팝업, 치명 오류)은 전부 `WindowManager`가 열고 닫고, 씬에 배치된 것은 HUD 위젯(View + Presenter)뿐이다. 옛 `UIManager`/`UIBase`/`UITabPanel`은 지웠다. **2차(서비스)도 끝났다(2026-11-26, UI_DESIGN 10-6)**: 토스트, 확인창, 종료 확인, `UIButton`, 해금, 레드닷, UI 상태 표시.
 
 구조 (`Assets/Scripts/UI/Core/`) — **새 창은 전부 여기로 만든다.** (예외: 개발자 도구 패널은 IMGUI, 아래 "개발자 도구")
-- `UIRoot` — 조립 지점. 창별 Presenter 생성 함수를 `Bind`로 등록하고 HUD 위젯의 Presenter를 만든다. **준비는 두 단계**(UI_DESIGN 3장): `Prepare()`(창 시스템, 세션이 필요 없는 창 = 세이브 오류 창의 Bind)는 `GameInitializer`가 항상 부르고, `BindGame(세션, 스킬, 플레이어, 흐름)`(HUD·탭바 Presenter, 탭 창과 스킬 창의 Bind, 페이드)은 시작에 성공했을 때만, 실패하면 대신 `ShowSaveError`. 세션이 필요 없는 새 창은 `Prepare` 쪽에 Bind한다. 뒤로가기는 `WindowManager.Back()` 하나다(스택이 비면 아무 일도 없다, 종료 확인창은 2차).
+- `UIRoot` — 조립 지점. 창별 Presenter 생성 함수를 `Bind`로 등록하고 HUD 위젯의 Presenter를 만든다. **준비는 두 단계**(UI_DESIGN 3장): `Prepare()`(창 시스템, 세션이 필요 없는 창 = 세이브 오류 창의 Bind)는 `GameInitializer`가 항상 부르고, `BindGame(세션, 스킬, 플레이어, 흐름)`(HUD·탭바 Presenter, 탭 창과 스킬 창의 Bind, 페이드)은 시작에 성공했을 때만, 실패하면 대신 `ShowSaveError`. 세션이 필요 없는 새 창은 `Prepare` 쪽에 Bind한다(세이브 오류 창, 확인창). 뒤로가기는 `BackNavigator` 하나다: 입력 차단 중 무시 → 맨 위 창(`WindowManager.Back()`) → 창이 없으면 종료 확인창, 확인이면 종료(종료 저장은 `OnApplicationQuit`).
 - `WindowManager` — 로드/스택/정렬(`UISortBand`)/뒤로가기/열린 창 Tick. 열기는 `windows.Open<SkillManageWindow>(new SkillManageArgs())`, 닫힘과 결과는 `await handle.Closed`. **스택은 [로드된 창: 구분 순, 같은 구분은 열린 순] + [로드 중인 창]**이라 스택 맨 위 = 화면 맨 위다(UI_DESIGN 6-4). `CloseBelow(UISortBand.System)`은 System 밑만 닫고, 로드 중인 창에는 로드가 끝날 때 적용한다. 테스트는 `WindowManagerTests`(가짜 로더 `FakeWindowLoader`로 로드 완료를 늦추거나 실패시킨다).
 - **스택 방식(`WindowOptions.Stack`)**: `Overlay`(쌓임, 팝업)와 `Exclusive`(탭, 프리셋 `WindowOptions.Tab`). Exclusive 창은 **로드가 끝나 옵션을 아는 순간, 자기보다 먼저 열기를 요청한 창에만** `CloseBelow(System)`을 쓴다(창마다 요청 순번). 그래서 나중에 요청한 팝업은 새 탭 위에 남고, 새 탭의 로드가 실패하면 이전 탭이 그대로다(UI_DESIGN 10-5).
 - 창 추가 순서: ① `UIWindow<TArgs>` View(구조는 `Options`로 코드에) + `TArgs : IWindowArgs<그 창>` ② View 인터페이스 + 순수 C# Presenter(구독은 `CompositeDisposable`) ③ 프리팹(Canvas 넣지 않음)을 `Assets/Data/UI/WindowRegistry.asset`에 등록 ④ `UIRoot`에 `Bind`.
 - 창은 `Update`를 쓰지 않는다(숨겨도 돈다). 매 프레임 값은 Presenter의 `Tick()`.
 - `InputBlocker` — 참조 카운트 입력 차단. **코루틴 지역변수로 `using`하지 말 것**(끊기면 안 풀림, `FadeController` 참고).
+- **토스트**(`Assets/Scripts/UI/Toast/`): `IToastService.Show(문장)`. 창이 아니라 UIRoot의 층 하나(`UISortBand.Toast` 4000, GraphicRaycaster 없음, 스택 밖). 규칙은 `ToastService`(한 번에 하나, 새 글이 바꾼다, 대기열 없음, 화면 시간), 모양과 보이는 시간은 `ToastView` 프리팹(`UIRoot.toastPrefab`). **명령이 실패하면 Presenter가 결과의 이유로 문장을 만들어 토스트로 알린다**(성공은 알리지 않는다). 숫자 뒤 조사가 바뀌지 않게 "Lv.N부터"처럼 쓴다.
+- **확인창**(`Assets/Scripts/UI/Dialog/`): `bool ok = await dialogs.Confirm(new ConfirmArgs(제목, 본문, 확인 글, 취소 글))`. `ConfirmDialogWindow`(ModalPopup) + Presenter. `DialogService`가 창 결과를 bool로 바꾼다(확인만 true). 한 번에 하나(이미 떠 있으면 false + 경고). Presenter는 `IDialogService`를 받는다.
+- **`UIButton`** — 화면 UI의 모든 버튼(그냥 `Button`을 쓰지 않는다, `UIButtonTests`가 UI 프리팹과 씬을 훑는다). `Button` 상속이라 기존 `Button`은 같은 컴포넌트의 스크립트만 바꾸면 설정·참조가 남는다. 규칙: 한 프레임에 UI 클릭 하나(`UIClickGate`), 받아들인 클릭은 `UIButtonEvents.Clicked`(정적 사건) → `UISoundPlayer`가 `UISoundSet`의 클립을 낸다(지금 클립 없음 = 조용), `Available = false`는 모양만 불가(클릭은 전달 → 실패 이유 토스트). 정말 눌리면 안 될 때만 `interactable`을 끈다. 새 버튼(코드로 만드는 것 포함)도 UIButton으로.
+- **UI 상태 표시** — `UIRoot.Describe(UIDebugSnapshot)`(창 스택, 딤, 입력 차단 이유, 토스트의 읽기 전용 사본)를 개발자 도구가 그린다(아래 "개발자 도구").
 - `SkillManageWindow`(View) + `SkillManagePresenter` + `SkillListItem`/`SkillSlotWidget` — 스킬 학습/슬롯 장착. 첫 이관 사례. (프리팹 파일명은 `SkillManagePopup.prefab` 그대로)
 - `SaveErrorWindow` + `SaveErrorPresenter` + `SaveErrorArgs`(`Assets/Scripts/UI/SaveError/`, 프리팹 `Assets/UI/Prefabs/Panels/SaveErrorWindow.prefab`) — 시작을 멈췄다는 안내(UI_DESIGN 10-4). 첫 System 구분 창: 모달, 바깥 터치·뒤로가기·탭 전환으로 닫히지 않고, 버튼은 "게임 종료" 하나. 글은 Presenter가 만들고, 화면에 파일 경로를 내지 않는다(검사기 메시지는 그대로, 다른 예외는 형식 이름만).
 - **씬의 HUD 위젯도 View + Presenter**(창이 아니라 `WindowManager`를 거치지 않는다): `PlayerHud`(HP·경험치·레벨·골드·보스전 남은 시간, Presenter `Assets/Scripts/UI/Hud/PlayerHudPresenter`), `BossChallengeButton`(보이기 = `BossChallengeAvailable`, 누르면 `RequestBossChallenge`), `StageAnnouncement`(스테이지 번호가 바뀌면 "Stage N", Presenter는 `Assets/Scripts/UI/Flow/`). `UIRoot.BindHudWidgets`(`BindGame` 안)가 만들고 수명을 갖는다. 위젯이 스스로 숨거나 게임 쪽을 직접 부르지 않는다. 단 값을 보이는 위젯은 Presenter가 켜기 전에는 `Awake`에서 숨는다(시작에 실패하면 Presenter가 없다). 탭바는 숨지 않고 모든 탭이 잠긴 모양으로 남는다(세이브 오류 창의 딤 밑). 매 프레임 값(보스 남은 시간)은 `UIRoot`가 HUD Presenter의 `Tick`을 부르고, 글자는 보이는 값이 바뀔 때만 만든다.
@@ -125,13 +130,17 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 탭 (`Assets/Scripts/UI/Tabs/`, UI_DESIGN 10-5)
 - **탭 = Exclusive 창.** `TabBar`(씬의 HUD 위젯, View: 버튼과 잠금·선택 표시만) + `TabBarPresenter`. 다른 탭을 누르면 연다(이전 탭은 Exclusive가 닫는다), 같은 탭을 다시 누르면 화면(System 밑)을 비운다, 뒤로가기는 맨 위 창부터. 지금 탭은 연 탭 창의 핸들로 따라온다(뒤로가기·실패도). 바꾸는 도중에 "탭 없음"이 끼지 않는다.
-- **잠금 = 창이 연결되지 않은 탭.** `UIRoot.BindHudWidgets`가 탭 → 여는 함수 표를 탭바 Presenter에만 넘긴다. 탭 창을 여는 길이 그것뿐이라 잠금을 우회할 수 없다. 게임 규칙 해금(스테이지 클리어 등)은 2차 "해금". 잠금 데이터(`isUnlockedByDefault`)는 없앴다.
-- `CharacterTabWindow` + `CharacterTabPresenter`(옛 `StatUpgradePanel`, 프리팹 `CharacterTabWindow.prefab`): 레벨·경험치·레벨업, 업그레이드 목록(`UpgradeListItem`). "현재 → 다음"은 `PlayerStats.PreviewUpgrade(종류)`(실제 능력치와 같은 계산)로, 표시 문자열(HP·공격력 `NumberFormatUtility`, 공격 간격은 초당 횟수)은 Presenter가 만든다.
+- **열림 = 창이 연결됨 그리고 게임 쪽에서 해금됨**(UI_DESIGN 10-6). `UIRoot.BindHudWidgets`가 탭 → `TabEntry`(여는 함수, 해금 상태와 조건, 레드닷) 표를 탭바 Presenter에만 넘긴다. 탭 창을 여는 길이 그것뿐이라 잠금을 우회할 수 없다. 표에 없는 탭(장비·동료·모험·상점)은 "준비 중". 탭 → 게임 콘텐츠(`GameContent`)의 짝은 UIRoot가 맺는다. 잠긴 탭을 누르면 조건을 토스트로 알리고, 열려 있던 탭이 잠기면 화면을 비운다.
+- **해금은 게임 쪽 파생 상태 `GameSession.Unlocks`**(`ContentUnlocks`: `IsUnlocked(콘텐츠)`, `ConditionOf(콘텐츠)`). 조건은 엑셀 `ContentUnlockDatabase`(위 "데이터 아키텍처"). **저장하지 않는다**: 레벨·저장된 스테이지 번호에서 계산해서 세이브 형식이 그대로이고 교체·롤백에 저절로 맞는다(진행도가 내려가면 다시 잠긴다). "한 번 열리면 계속"인 조건이 생기면 저장된 사실로 더한다(세이브 버전이 먼저).
+- **레드닷**: 조건은 게임 쪽 파생 상태(`PlayerStats.CanLevelUp`, `GameSession.CanBuyUpgrade` = `CheckUpgrade`와 같은 규칙, `PlayerStats.HasLearnableSkill`), 어느 버튼에 어느 조건을 묶을지는 `UIRoot`(캐릭터 탭 = 레벨업 또는 살 수 있는 업그레이드, 스킬 탭 = 배울 스킬). View는 점을 켜고 끄기만 한다(`SetBadge`, 프리팹의 `RedDot` 자식). 잠긴 탭에는 그리지 않는다. 따라가면 닿게: 스킬 탭 → "스킬 설정" 버튼 → 관리 창의 배울 수 있는 줄. 경로 문자열 트리는 쓰지 않는다.
+- `CharacterTabWindow` + `CharacterTabPresenter`(옛 `StatUpgradePanel`, 프리팹 `CharacterTabWindow.prefab`): 레벨·경험치·레벨업, 업그레이드 목록(`UpgradeListItem`). "현재 → 다음"은 `PlayerStats.PreviewUpgrade(종류)`(실제 능력치와 같은 계산)로, 표시 문자열(HP·공격력 `NumberFormatUtility`, 공격 간격은 초당 횟수)은 Presenter가 만든다. 줄의 "살 수 있음"은 `GameSession.CheckUpgrade`(판정은 진행도 하나), 업그레이드·레벨업 버튼은 `Available`(모양만 불가)이라 눌렀을 때 실패 이유(`UpgradeResult`, `LevelUpResult`)가 토스트로 나온다.
 - `SkillTabWindow` + `SkillTabPresenter`(옛 `SkillSlotBar`, 프리팹 `SkillTabWindow.prefab`): 장착 슬롯(`EquippedSlots`로 그림, 쿨다운은 `Tick`), 슬롯 탭 = `RequestSkillSlot`, 관리 버튼 = 스킬 관리 창.
 - **탭 창 프리팹의 루트는 HUD의 탭 내용 영역(화면 아래 10.5~35% = `BottomUIRoot` 0~0.35 × `TabContent` 0.3~1)에 맞춰 놓는다.** 같은 하단 UI 비율이 `BottomUIRoot`, 탭 창 프리팹, `PlayAreaBounds.bottomUiScreenRatio` 세 곳에 있다(`docs/TODO.md` "UI"). 하단 비율을 바꾸면 셋 다 고칠 것.
 - **업그레이드 스탯을 더하려면** `IUpgradeStat` 구현(단계 = 세이브의 어느 칸, 비용 공식)과 `PlayerStats` 등록만으로는 안 된다: 세이브 필드(형식 변경, 아래 "저장 시스템" ⚠️), `PlayerStats.ComputeCombatStats`(효과), 필요하면 `PlayerCombatStats` 필드, `CharacterTabPresenter.FormatStat`(표시), 캐릭터 탭 프리팹의 `upgrades` 목록까지 같이 고친다.
 
 ## 이벤트 버스
+
+버튼 클릭 → 소리의 `UIButtonEvents`(`Assets/Scripts/UI/Core/`)도 같은 예외의 정적 사건이다(버튼은 프리팹·View가 만들어 재생기를 넘길 길이 없다). 밖으로 내는 사건만 정적으로 두고, 정적으로 서비스를 찾는 길은 만들지 않는다.
 
 `GlobalCombatEvents`(`Assets/Scripts/Event/`) — 전투 → 연출·보상 방향의 정적 이벤트 버스로 매니저 간 직접 참조를 끊음. 예: `Monster`는 죽었다는 사실만 `GlobalCombatEvents.RaiseMonsterDied`로 알리고, 골드/경험치 지급은 `GameManager`가 `MonsterDied`를 구독해서 처리 — `Monster`는 보상 지급 방법을 모름. 사건은 `Subject`(`TargetDamaged`, `MonsterDied`, `Healed`, 내용은 구조체라 발행에 할당 없음)이고 구독은 `IDisposable`로 해제한다. 플레이를 시작할 때 구독자를 비운다(`ResetSubscribers`, UI_DESIGN 5-3).
 흐름의 상태와 사건(스테이지, 보스 도전 가능, 입장)은 정적 버스가 아니라 `EncounterDirector`의 반응형 값이다. 예전의 `GlobalGameEvents`(보스 처치 → 클리어 → 전환으로 이어지던 정적 사건 사슬, `OnGameStarted`)는 4-A에서 지웠다.
@@ -139,7 +148,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 ## 저장 시스템
 
 - **`PlayerSaveData`(최상위, `Assets/Scripts/Player/PlayerSaveData.cs`)와 `PlayerStatsSaveData`(`PlayerStats` 전용 슬라이스)로 분리돼 있음.** `PlayerSaveData`는 `{ stats: PlayerStatsSaveData, gold, currentStageNumber }` 형태 — 저장 파일 전체에 대응. `PlayerStatsSaveData`는 레벨/경험치/업그레이드 횟수/학습 스킬/장착 슬롯처럼 `PlayerStats`가 실제로 읽고 쓰는 것만 담음. 골드/스테이지 번호는 `PlayerStats`가 전혀 쓰지 않는 데이터라(`GameManager`만 씀) 같은 클래스에 두면 안 된다고 판단해서 분리함.
-- **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호를 한 객체가 갖는다. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, 전투 단계)는 전투원(`Combatant`, 호스트 `PlayerController`)이 갖는다.
+- **진행도의 단일 소유자는 `GameSession`(`Assets/Scripts/Player/GameSession.cs`).** 스탯(`PlayerStats`), 골드(`GoldWallet`), 저장된 스테이지 번호(상태 `CurrentStageNumber`)를 한 객체가 갖는다. 진행도에서 계산되는 규칙도 여기 있다: 업그레이드 판정 `CheckUpgrade`/`TryUpgrade`, 레드닷 조건 `CanBuyUpgrade`, 해금 `Unlocks`(저장하지 않는 파생 상태). 생성자는 스킬 표와 해금 조건 표도 받는다(학습 조건이 `GameDatabaseManager`를 찾지 않는다). 데이터가 바뀌면(튜닝 덮어쓰기) `RecomputeFromData`. 저장되는 것은 세션, 저장되지 않는 전투 상태(현재 HP, 쿨다운, 전투 단계)는 전투원(`Combatant`, 호스트 `PlayerController`)이 갖는다.
 - **생성 순서는 `GameInitializer.Start()`(`Assets/Scripts/Manager/GameInitializer.cs`, `[DefaultExecutionOrder(-1000)]`) 한 곳.** `UIRoot.Prepare()`(창 시스템, 항상) → `ISaveStorage.Load()`(예외면 세이브 오류 창, 중단) → `new GameSession(밸런스 데이터)` → `session.Apply(saveData)` → (저장된 스테이지가 데이터에 없으면 세이브 오류 창, 중단. 캐릭터를 만들기 전에 판정) → `PlayerSpawner.EnsurePlayer()` → `player.Initialize(session.Stats)` → `CombatSimulation.Initialize`(월드 + `EncounterDirector`) → `GameManager.Initialize(session, player, director)` → 배경 → `UIRoot.BindGame(session, 스킬 목록, player, director)` → `director.Begin(스테이지)`. `GameInitializer.Session`은 시작에 성공해야 생긴다. 참조 누락·플레이어 생성 실패는 개발 오류라 창 없이 콘솔 에러만. 모든 구독이 연결된 뒤에 흐름을 시작하므로 처음 값이 반응형으로 전달된다(예전의 `OnGameStarted`가 필요 없다). 밸런스 데이터(`PlayerStatDatabase`/`PlayerUpgradeConfig`) 참조도 플레이어 프리팹이 아니라 씬의 `GameInitializer`에 있다. Awake가 아니라 Start인 이유: 다른 객체들의 Awake(이벤트 구독, 싱글턴 등록, `PlayAreaBounds` 계산)가 끝난 뒤 연결해야 하기 때문 — "Awake = 자기 자신, Start = 다른 객체와 연결".
 - **저장 데이터 변환은 `GameSession.Apply(PlayerSaveData)` / `GameSession.ToSaveData()` 두 곳뿐.** `Apply`는 객체를 새로 만들지 않고 값만 덮어쓴다(세션/Stats/Wallet을 참조하는 쪽이 옛 객체를 붙잡지 않게). 세이브 로드와 이후 서버 롤백(`docs/SERVER_DESIGN.md`)이 같은 경로를 쓴다.
 - **실행 중 진행도 교체는 `GameManager.LoadSnapshot(스냅샷)`** — 저장과 같은 검사 → 그 스테이지의 재시작을 디렉터에 받아 둔 뒤(받지 못하면 바꾸지 않음) JSON 복사본을 `Apply` → 다음 고정 단계에 전환, 가운데에서 입장(저장). `Apply`는 넘겨받은 객체를 그대로 붙잡으므로 직접 부를 때는 복사본을 넘긴다. 진행도는 반응형이라 `Apply`가 값만 덮어쓰면 구독하는 쪽(캐릭터 능력치·장착 스킬, HUD, 캐릭터 탭, 스킬 슬롯 바)이 따라온다(예전의 "다시 읽어라" 사건 `OnReloaded`는 4-B에서 없앴다). **진행도에서 읽은 값을 쓰는 새 코드는 상태를 구독할 것**(`.Value`를 복사해 두면 교체 뒤 옛 값이 남는다).
@@ -161,7 +170,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 - **에디터와 개발 빌드에만 있다.** 어셈블리 `IdleGameProtoType.DevTools`(`Assets/Scripts/DevTools/`)의 define constraint가 `UNITY_EDITOR || DEVELOPMENT_BUILD`라 릴리스 빌드에서는 컴파일되지 않는다. 게임 코드는 도구를 모른다(도구가 `GameInitializer.Initialized`에 붙는다). **게임 어셈블리에서 DevTools를 참조하지 말 것**(릴리스 빌드가 깨진다).
 - 화면 오른쪽 위(골드 아래)의 `DEV` 버튼 또는 에디터의 `` ` `` 키로 연다. 패널은 IMGUI다(에셋을 가질 수 없어서 "새 팝업은 UIWindow" 규칙의 예외). 열려 있는 동안 게임 UI 입력은 `InputBlocker`로 막는다.
-- 명령: 스테이지 이동·처음부터·보스 도전(버튼과 같은 명령이라 도전 가능할 때만, D27), 골드 x10·경험치 +1레벨분, 레벨 지정, 백업·복원·새로 시작, 배속 x1~x10, 판정 몸 표시. 스테이지 명령은 흐름(`EncounterDirector`)의 명령을 그대로 부른다. 코드에서는 `DevTools.Commands`(Claude가 플레이 중 `script eval`로 쓸 수 있다).
+- 명령: 스테이지 이동·처음부터·보스 도전(버튼과 같은 명령이라 도전 가능할 때만, D27), 골드 x10·경험치 +1레벨분, 레벨 지정, 백업·복원·새로 시작, 배속 x1~x10, 판정 몸 표시, UI 상태 표시(창 스택·딤·입력 차단 이유·토스트, `UIStateOverlay`가 `UIRoot.Describe`의 사본을 그린다, DEV_TOOLS T8). 스테이지 명령은 흐름(`EncounterDirector`)의 명령을 그대로 부른다. 코드에서는 `DevTools.Commands`(Claude가 플레이 중 `script eval`로 쓸 수 있다).
 - **개발 도구 전용 게임 API를 만들지 않는다.** 더하는 명령은 보상 경로(`Wallet.AddGold`, `PlayerStats.AddExp`), 통째로 바꾸는 명령은 `GameManager.LoadSnapshot` 하나를 지난다. 덮어쓰기 전에는 `<세이브 폴더>/dev_backups/`에 자동 백업하고, 백업이 실패하면 덮어쓰지 않는다.
 
 ## 작업 시 주의사항

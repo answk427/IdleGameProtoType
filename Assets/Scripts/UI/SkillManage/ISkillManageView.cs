@@ -12,6 +12,7 @@ public interface ISkillManageView
 
     void SetSkills(IReadOnlyList<SkillRowModel> rows);
     void SetSkillLearned(int skillId, bool learned);
+    void SetSkillLearnable(int skillId, bool learnable); // 레드닷: 지금 배울 수 있다
     void SetSelectedSkill(int skillId);
 
     void SetSlotCount(int count);

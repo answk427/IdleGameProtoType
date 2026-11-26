@@ -24,7 +24,7 @@ public class CharacterTabWindow : UIWindow<CharacterTabArgs>, ICharacterTabView
     [SerializeField] private Image expFillImage;
     [SerializeField] private TextMeshProUGUI expText;
     [SerializeField] private TextMeshProUGUI expPercentText;
-    [SerializeField] private Button levelUpButton;
+    [SerializeField] private UIButton levelUpButton;
     [SerializeField] private GameObject levelUpNotification; // 레벨업 가능할 때만 표시되는 알림 점
 
     [Header("업그레이드 목록")]
@@ -75,7 +75,7 @@ public class CharacterTabWindow : UIWindow<CharacterTabArgs>, ICharacterTabView
 
     public void SetLevelUpAvailable(bool available)
     {
-        if (levelUpButton != null) levelUpButton.interactable = available;
+        if (levelUpButton != null) levelUpButton.Available = available; // 모양만 불가: 누르면 실패 이유가 나온다
         if (levelUpNotification != null) levelUpNotification.SetActive(available);
     }
 

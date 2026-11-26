@@ -11,4 +11,7 @@ public interface ISkillTabView
     void ShowSlotSkill(int slot, Sprite icon);
     void ClearSlot(int slot);
     void SetSlotCooldown(int slot, float ratio);
+
+    // "스킬 설정" 버튼의 레드닷(배울 스킬이 있음).
+    void SetManageBadge(bool visible);
 }

@@ -105,7 +105,7 @@ public class PlayerStatsTests
         Assert.AreEqual(1, stats.Level.Value, "레벨업은 자동이 아니다");
         Assert.IsTrue(stats.CanLevelUp.Value);
 
-        Assert.IsTrue(stats.TryLevelUp());
+        Assert.AreEqual(LevelUpResult.Success, stats.TryLevelUp());
 
         Assert.AreEqual(2, stats.Level.Value);
         Assert.AreEqual(0, stats.Exp.Value);
@@ -121,7 +121,7 @@ public class PlayerStatsTests
         stats.AddExp(350);
         Assert.AreEqual(1, stats.Level.Value);
 
-        Assert.IsTrue(stats.TryLevelUp());
+        Assert.AreEqual(LevelUpResult.Success, stats.TryLevelUp());
 
         Assert.AreEqual(3, stats.Level.Value);
         Assert.AreEqual(50, stats.Exp.Value);
@@ -149,12 +149,12 @@ public class PlayerStatsTests
     }
 
     [Test]
-    public void TryLevelUp_WhenNotAllowed_ReturnsFalse_AndRaisesNothing()
+    public void TryLevelUp_WhenNotEnoughExp_ReturnsReason_AndRaisesNothing()
     {
         List<int> reached = Record(stats.LevelReached);
         stats.AddExp(99);
 
-        Assert.IsFalse(stats.TryLevelUp());
+        Assert.AreEqual(LevelUpResult.NotEnoughExp, stats.TryLevelUp());
         Assert.IsEmpty(reached);
         Assert.AreEqual(1, stats.Level.Value);
     }
@@ -169,6 +169,7 @@ public class PlayerStatsTests
         stats.AddExp(300);
         stats.TryLevelUp();
         Assert.IsTrue(stats.IsMaxLevel.Value);
+        Assert.AreEqual(LevelUpResult.MaxLevel, stats.TryLevelUp());
         int atMax = stats.Exp.Value;
 
         stats.AddExp(1000);
@@ -189,7 +190,7 @@ public class PlayerStatsTests
             s.Initialize(zero, upgradeConfig);
 
             Assert.IsTrue(s.CanLevelUp.Value);
-            Assert.IsTrue(s.TryLevelUp());
+            Assert.AreEqual(LevelUpResult.Success, s.TryLevelUp());
             Assert.AreEqual(3, s.Level.Value);
             Assert.IsFalse(s.CanLevelUp.Value);
         }

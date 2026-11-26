@@ -11,20 +11,28 @@ public sealed class CharacterTabPresenter : IWindowPresenter
     private readonly ICharacterTabView view;
     private readonly PlayerStats stats;
     private readonly IReadOnlyReactiveProperty<GameNumber> gold;
+    private readonly Func<UpgradeStatType, UpgradeResult> checkUpgrade;
     private readonly Func<UpgradeStatType, UpgradeResult> tryUpgrade;
+    private readonly IToastService toasts;
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
+    // checkUpgrade: 지금 살 수 있는가(GameSession.CheckUpgrade, 바꾸지 않음). 줄의 "가능" 모양과 탭의 레드닷이 같은 규칙을 쓴다.
     // tryUpgrade: 골드 차감 + 업그레이드(GameSession.TryUpgrade). 진행도의 규칙이라 Presenter는 결과만 받는다.
+    // toasts: 명령이 실패한 이유를 알린다.
     public CharacterTabPresenter(
         ICharacterTabView view,
         PlayerStats stats,
         IReadOnlyReactiveProperty<GameNumber> gold,
-        Func<UpgradeStatType, UpgradeResult> tryUpgrade)
+        Func<UpgradeStatType, UpgradeResult> checkUpgrade,
+        Func<UpgradeStatType, UpgradeResult> tryUpgrade,
+        IToastService toasts)
     {
         this.view = view;
         this.stats = stats;
         this.gold = gold;
+        this.checkUpgrade = checkUpgrade ?? throw new ArgumentNullException(nameof(checkUpgrade));
         this.tryUpgrade = tryUpgrade;
+        this.toasts = toasts ?? throw new ArgumentNullException(nameof(toasts));
 
         stats.Level.Subscribe(_ => RenderHeader()).AddTo(disposables);
         stats.Exp.Subscribe(_ => RenderHeader()).AddTo(disposables);
@@ -95,7 +103,6 @@ public sealed class CharacterTabPresenter : IWindowPresenter
     private void RenderRows()
     {
         PlayerCombatStats now = stats.CombatStats.Value;
-        GameNumber money = gold.Value;
 
         foreach (UpgradeStatType type in view.UpgradeRows)
         {
@@ -110,15 +117,42 @@ public sealed class CharacterTabPresenter : IWindowPresenter
                 FormatUpgradeLevel(stats.UpgradeLevel(type).Value),
                 value,
                 isMaxed ? "MAX" : NumberFormatUtility.Format(cost),
-                !isMaxed && money >= cost));
+                checkUpgrade(type) == UpgradeResult.Success));
+        }
+    }
+
+    // 명령이 실패한 이유. 성공이면 null(화면은 바뀐 상태를 구독해 따라오므로 따로 알리지 않는다).
+    public static string FormatUpgradeFailure(UpgradeResult result)
+    {
+        switch (result)
+        {
+            case UpgradeResult.Success: return null;
+            case UpgradeResult.NotEnoughGold: return "골드가 부족합니다";
+            case UpgradeResult.MaxLevel: return "최대 단계입니다";
+            default: return result.ToString();
+        }
+    }
+
+    public static string FormatLevelUpFailure(LevelUpResult result)
+    {
+        switch (result)
+        {
+            case LevelUpResult.Success: return null;
+            case LevelUpResult.NotEnoughExp: return "경험치가 부족합니다";
+            case LevelUpResult.MaxLevel: return "최대 레벨입니다";
+            default: return result.ToString();
         }
     }
 
     // ── 입력 ────────────────────────────────────────────────
-    // 결과별 안내(골드 부족, 최대 단계)는 ToastService(2차)가 생기면 붙인다. 지금은 버튼 활성화로 이미 걸러진다.
-    // 화면은 바뀐 상태를 구독해 따라온다.
+    // 판정은 진행도가 하고(10-1), 실패하면 이유를 토스트로 알린다. 화면은 바뀐 상태를 구독해 따라온다.
 
-    private void HandleLevelUpTapped() => stats.TryLevelUp();
+    private void HandleLevelUpTapped() => ShowFailure(FormatLevelUpFailure(stats.TryLevelUp()));
 
-    private void HandleUpgradeTapped(UpgradeStatType type) => tryUpgrade(type);
+    private void HandleUpgradeTapped(UpgradeStatType type) => ShowFailure(FormatUpgradeFailure(tryUpgrade(type)));
+
+    private void ShowFailure(string reason)
+    {
+        if (reason != null) toasts.Show(reason);
+    }
 }

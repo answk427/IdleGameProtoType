@@ -6,7 +6,7 @@ using UnityEngine.UI;
 // 전투 탭의 SkillSlotBar와 SkillManageWindow 상단 영역에서 공통으로 재사용한다.
 public class SkillSlotWidget : MonoBehaviour
 {
-    [SerializeField] private Button button;
+    [SerializeField] private UIButton button;
     [SerializeField] private Image iconImage;
     [SerializeField] private Image cooldownOverlay; // fillAmount로 쿨다운 비율 표시
 

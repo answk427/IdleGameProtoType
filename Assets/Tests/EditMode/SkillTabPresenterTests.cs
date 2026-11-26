@@ -24,6 +24,8 @@ public class SkillTabPresenterTests
         public void ShowSlotSkill(int slot, Sprite icon) => Icons[slot] = icon;
         public void ClearSlot(int slot) => Icons.Remove(slot);
         public void SetSlotCooldown(int slot, float ratio) => Cooldowns[slot] = ratio;
+        public readonly List<bool> ManageBadge = new List<bool>();
+        public void SetManageBadge(bool visible) => ManageBadge.Add(visible);
 
         public void TapSlot(int slot) => SlotTapped?.Invoke(slot);
         public void TapManage() => ManageTapped?.Invoke();

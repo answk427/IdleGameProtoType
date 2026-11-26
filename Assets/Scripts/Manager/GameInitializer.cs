@@ -73,16 +73,18 @@ public class GameInitializer : MonoBehaviour
         }
 
         // 에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본을 쓴다(빌드에서는 원본 그대로, docs/COMBAT_ARCHITECTURE.md 8-7).
-        var session = new GameSession(DataTuning.Prepare(statData), upgradeConfig);
+        // 스킬 표와 해금 조건 표는 진행도의 규칙(학습 조건, 배울 스킬 있음, 해금)이 읽는다.
+        GameDatabaseManager database = GameDatabaseManager.Instance;
+        var session = new GameSession(DataTuning.Prepare(statData), upgradeConfig, database.GetAllSkills(), database.ContentUnlocks);
         session.Apply(saveData);
 
         // 저장된 스테이지가 데이터에 없으면 시작하지 않는다(세이브는 그대로 남는다). 캐릭터를 만들기 전에 판정한다.
-        GameDatabaseManager database = GameDatabaseManager.Instance;
         StageData FindStage(int stageNumber) => database.GetStage(stageNumber)?.data;
-        if (FindStage(session.CurrentStageNumber) == null)
+        int savedStage = session.CurrentStageNumber.Value;
+        if (FindStage(savedStage) == null)
         {
-            Debug.LogError($"[GameInitializer] 저장된 스테이지 {session.CurrentStageNumber}가 StageDatabase에 없어 게임을 시작하지 않습니다(세이브 보존).");
-            uiRoot.ShowSaveError(SaveErrorArgs.StageMissing(session.CurrentStageNumber));
+            Debug.LogError($"[GameInitializer] 저장된 스테이지 {savedStage}가 StageDatabase에 없어 게임을 시작하지 않습니다(세이브 보존).");
+            uiRoot.ShowSaveError(SaveErrorArgs.StageMissing(savedStage));
             return;
         }
 
@@ -95,8 +97,8 @@ public class GameInitializer : MonoBehaviour
 
         Session = session;
 #if UNITY_EDITOR
-        // 플레이 중에 튜닝 덮어쓰기가 바뀌면 진행도의 파생 상태(전투 능력치, 필요 경험치)를 다시 계산한다.
-        DataTuning.Changed += Session.Stats.RecomputeFromData;
+        // 플레이 중에 튜닝 덮어쓰기가 바뀌면 진행도의 파생 상태(전투 능력치, 필요 경험치, 레드닷 조건, 해금)를 다시 계산한다.
+        DataTuning.Changed += Session.RecomputeFromData;
 #endif
 
         player.Initialize(Session.Stats, playerSpawner.Character);
@@ -108,7 +110,7 @@ public class GameInitializer : MonoBehaviour
         background.Bind(director.CurrentStageNumber);
         uiRoot.BindGame(Session, database.GetAllSkills(), player, director);
 
-        director.Begin(Session.CurrentStageNumber);
+        director.Begin(Session.CurrentStageNumber.Value);
 
         Player = player;
         IsInitialized = true;
@@ -118,7 +120,7 @@ public class GameInitializer : MonoBehaviour
     private void OnDestroy()
     {
 #if UNITY_EDITOR
-        if (Session != null) DataTuning.Changed -= Session.Stats.RecomputeFromData;
+        if (Session != null) DataTuning.Changed -= Session.RecomputeFromData;
 #endif
     }
 
@@ -137,7 +139,11 @@ public class GameInitializer : MonoBehaviour
         // BalanceConfig(흐름 시간, 성장 곡선)가 없으면 흐름을 만들 수 없다. 여기서 막아 원인을 바로 보이게 한다.
         GameDatabaseManager database = GameDatabaseManager.Instance;
         if (database == null) { Debug.LogError("[GameInitializer] 씬에 GameDatabaseManager가 없습니다."); ok = false; }
-        else if (!database.HasBalanceConfig) { Debug.LogError("[GameInitializer] GameDatabaseManager에 balanceConfig(BalanceConfig)가 연결되지 않았습니다."); ok = false; }
+        else
+        {
+            if (!database.HasBalanceConfig) { Debug.LogError("[GameInitializer] GameDatabaseManager에 balanceConfig(BalanceConfig)가 연결되지 않았습니다."); ok = false; }
+            if (database.ContentUnlocks == null) { Debug.LogError("[GameInitializer] GameDatabaseManager에 contentUnlockDatabase(ContentUnlockDatabase)가 연결되지 않았습니다."); ok = false; }
+        }
 
         return ok;
     }

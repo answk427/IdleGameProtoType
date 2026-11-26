@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public enum UpgradeResult
@@ -18,15 +20,44 @@ public enum UpgradeResult
 // 기준은 "저장되는가"이다.
 public class GameSession
 {
+    private static readonly UpgradeStatType[] UpgradeTypes = (UpgradeStatType[])Enum.GetValues(typeof(UpgradeStatType));
+
+    private readonly ReactiveProperty<int> currentStageNumber = new ReactiveProperty<int>(1);
+    private readonly DerivedProperty<bool> canBuyUpgrade;
+
     public PlayerStats Stats { get; } = new PlayerStats();
     public GoldWallet Wallet { get; } = new GoldWallet();
 
     // 저장된 스테이지 번호. 스테이지 안의 인카운터 진행도는 의도적으로 저장하지 않는다.
-    public int CurrentStageNumber { get; private set; } = 1;
+    // 상태라서 해금(StageReached)이 구독한다. 흐름의 지금 스테이지(EncounterDirector.CurrentStageNumber)와 같은 이름이지만,
+    // 이것은 진행도(저장되는 값)이고 저것은 흐름의 상태(시작 전 0)다.
+    public IReadOnlyReactiveProperty<int> CurrentStageNumber => currentStageNumber;
 
-    public GameSession(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig)
+    // 콘텐츠 해금(파생 상태, 저장하지 않는다).
+    public ContentUnlocks Unlocks { get; }
+
+    // 지금 골드로 살 수 있는 업그레이드가 있다(레드닷 조건). 판정은 TryUpgrade와 같은 CheckUpgrade다.
+    public IReadOnlyReactiveProperty<bool> CanBuyUpgrade => canBuyUpgrade;
+
+    // skills: 스킬 표, unlockRules: 콘텐츠 해금 조건 표. 시험에서 쓰지 않으면 비워도 된다
+    // (스킬이 없으면 배울 스킬도 없고, 해금 표가 없으면 묻는 콘텐츠가 잠기며 에러를 남긴다).
+    public GameSession(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig,
+        IReadOnlyList<SkillEntry> skills = null, ContentUnlockDatabase unlockRules = null)
     {
-        Stats.Initialize(statData, upgradeConfig);
+        Stats.Initialize(statData, upgradeConfig, skills);
+        Unlocks = new ContentUnlocks(unlockRules, Stats.Level, currentStageNumber);
+
+        var sources = new List<IChangeSignal> { Wallet.Gold };
+        foreach (UpgradeStatType type in UpgradeTypes) sources.Add(Stats.UpgradeLevel(type));
+        canBuyUpgrade = new DerivedProperty<bool>(ComputeCanBuyUpgrade, sources.ToArray());
+    }
+
+    // 에디터의 튜닝 덮어쓰기로 데이터가 바뀌면 파생 상태를 다시 계산한다.
+    public void RecomputeFromData()
+    {
+        Stats.RecomputeFromData();
+        canBuyUpgrade.Recompute();
+        Unlocks.Recompute();
     }
 
     // 저장 데이터(또는 이후 서버가 돌려준 스냅샷)를 현재 세션에 적용한다.
@@ -38,7 +69,7 @@ public class GameSession
 
         Stats.LoadSave(data.stats);
         Wallet.LoadGold(GameNumber.FromDouble(data.gold));
-        CurrentStageNumber = Mathf.Max(1, data.currentStageNumber);
+        currentStageNumber.Value = Mathf.Max(1, data.currentStageNumber);
     }
 
     // 저장 데이터 조립은 이 한 곳에서만 한다.
@@ -48,23 +79,41 @@ public class GameSession
         {
             stats = Stats.GetSaveData(),
             gold = Wallet.Gold.Value.ToDouble(),
-            currentStageNumber = CurrentStageNumber,
+            currentStageNumber = currentStageNumber.Value,
         };
     }
 
     public void SetCurrentStageNumber(int stageNumber)
     {
-        CurrentStageNumber = Mathf.Max(1, stageNumber);
+        currentStageNumber.Value = Mathf.Max(1, stageNumber);
     }
 
     // 업그레이드 규칙(골드 차감 + 스탯 증가)은 게임 규칙이라 캐릭터가 아니라 진행도의 주인이 판정한다.
     // 결과에 실패 이유를 담아 UI가 "최대 단계"와 "골드 부족"을 구분해서 안내할 수 있게 한다.
     public UpgradeResult TryUpgrade(UpgradeStatType type)
     {
-        if (Stats.IsUpgradeMaxed(type)) return UpgradeResult.MaxLevel;
+        UpgradeResult check = CheckUpgrade(type);
+        if (check != UpgradeResult.Success) return check;
         if (!Wallet.TrySpendGold(Stats.GetNextUpgradeCost(type))) return UpgradeResult.NotEnoughGold;
 
         Stats.Upgrade(type);
         return UpgradeResult.Success;
+    }
+
+    // 지금 이 업그레이드를 살 수 있는가(바꾸지 않고 판정만). TryUpgrade와 레드닷(CanBuyUpgrade)이 같은 규칙을 쓴다.
+    public UpgradeResult CheckUpgrade(UpgradeStatType type)
+    {
+        if (Stats.IsUpgradeMaxed(type)) return UpgradeResult.MaxLevel;
+        if (Wallet.Gold.Value < Stats.GetNextUpgradeCost(type)) return UpgradeResult.NotEnoughGold;
+        return UpgradeResult.Success;
+    }
+
+    private bool ComputeCanBuyUpgrade()
+    {
+        foreach (UpgradeStatType type in UpgradeTypes)
+        {
+            if (CheckUpgrade(type) == UpgradeResult.Success) return true;
+        }
+        return false;
     }
 }

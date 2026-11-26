@@ -8,6 +8,7 @@ public enum UISortBand
     Hud = 1000,
     Window = 2000,
     Popup = 3000,
+    Toast = 4000, // 창이 아니다(스택 밖, 터치를 받지 않음). UIRoot의 토스트 층 하나
     System = 9000,
 }
 

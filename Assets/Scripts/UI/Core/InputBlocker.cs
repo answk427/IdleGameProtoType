@@ -88,6 +88,13 @@ public sealed class InputBlocker
         if (showSpinner) spinner.rectTransform.Rotate(0f, 0f, -SpinnerDegreesPerSecond * Time.unscaledDeltaTime);
     }
 
+    // 디버그 표시용: 지금 차단을 쥔 이유와 지난 시간(영구 잠금을 찾을 때 본다).
+    public void Describe(UIDebugSnapshot into)
+    {
+        float now = Time.unscaledTime;
+        foreach (Lease lease in leases) into.Blocks.Add(new UIDebugSnapshot.BlockInfo(lease.Reason, now - lease.StartedAt));
+    }
+
     private void Release(Lease lease)
     {
         if (!leases.Remove(lease) || leases.Count > 0) return;

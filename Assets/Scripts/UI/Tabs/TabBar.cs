@@ -24,6 +24,7 @@ public class TabBar : MonoBehaviour, ITabBarView
         public Image Background;
         public Color NormalColor;
         public GameObject LockOverlay;
+        public GameObject Badge; // 탭 버튼 프리팹의 "RedDot"
     }
 
     [SerializeField] private GameObject tabButtonPrefab;
@@ -65,12 +66,14 @@ public class TabBar : MonoBehaviour, ITabBarView
                 Type = def.tabType,
                 Background = instance.GetComponent<Image>(),
                 LockOverlay = instance.transform.Find("LockOverlay")?.gameObject,
+                Badge = instance.transform.Find("RedDot")?.gameObject,
             };
             slot.NormalColor = slot.Background != null ? slot.Background.color : Color.white;
             if (slot.LockOverlay != null) slot.LockOverlay.SetActive(true);
+            if (slot.Badge != null) slot.Badge.SetActive(false);
 
             UITabType type = def.tabType;
-            instance.GetComponent<Button>().onClick.AddListener(() => TabTapped?.Invoke(type));
+            instance.GetComponent<UIButton>().onClick.AddListener(() => TabTapped?.Invoke(type));
 
             slots.Add(slot);
             tabTypes.Add(type);
@@ -81,6 +84,12 @@ public class TabBar : MonoBehaviour, ITabBarView
     {
         Slot slot = Find(tab);
         if (slot?.LockOverlay != null) slot.LockOverlay.SetActive(locked);
+    }
+
+    public void SetBadge(UITabType tab, bool visible)
+    {
+        Slot slot = Find(tab);
+        if (slot?.Badge != null) slot.Badge.SetActive(visible);
     }
 
     public void SetSelected(UITabType tab)
