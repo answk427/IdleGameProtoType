@@ -55,7 +55,7 @@
 | ~~2~~ | ~~전투 2단계: 전투원 통합~~ | | **완료 2026-11-24** (위 "완료된 것") |
 | ~~3~~ | ~~전투 3단계: 공간 모델~~ | | **완료 2026-11-25** (위 "완료된 것") |
 | ~~3.5~~ | ~~개발자 도구~~ | | **완료 2026-11-25** (위 "완료된 것") |
-| 4 | 전투 4단계: 흐름(EncounterDirector) + HUD·보스 버튼·StageAnnouncement 이관 | 설계 승인(2026-11-25, [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10절, D22~D28). **4-A(흐름) 완료**(위 "완료된 것"), **4-B(진행도 표시) 남음**: `PlayerStats`·`GoldWallet` 반응형, `PlayerHud` Presenter(보스 남은 시간 포함), HUD 정렬, `GlobalCombatEvents`의 `Subject`화, `OnReloaded` 제거(10-5, 10-8) | 5절 검증 통과, 모델(레벨, 경험치, 골드, 보스 가능)과 이벤트 버스가 반응형, `UIManager`의 HUD 역할 제거 |
+| 4 | 전투 4단계: 흐름(EncounterDirector) + HUD·보스 버튼·StageAnnouncement 이관 | 설계 승인(2026-11-25, [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10절, D22~D28). **4-A(흐름) 완료**(위 "완료된 것"), **4-B(진행도 표시)**: 설계 승인(2026-11-26, 10-10, D29~D36). B-1(모델·버스) 완료(10-11), B-2(HUD·정렬·보스 시간) 남음 | 5절 검증 통과, 모델(레벨, 경험치, 골드, 보스 가능)과 이벤트 버스가 반응형, `UIManager`의 HUD 역할 제거 |
 | 5 | 세이브 오류 창 | [보완안](UI_REDESIGN_PROPOSAL.md)의 B8(스택 삽입 순서), B9(로드 실패 시 UIRoot 준비) 승인 | 닫히지 않고 탭바를 막으며, 종료해도 세이브 바이트 동일 |
 | 6 | 탭 2개 이관(여기서 UI 1차 끝) | - | `WindowOptions`에 Exclusive 추가, `UIRoot`의 탭 연결 제거, 기존과 동작 동일, `UIManager` 삭제 |
 | 7 | UI 2차(서비스) | UI_DESIGN 9장 | |
@@ -73,7 +73,6 @@
 - **슬라임(1001) 처치 보상 골드 10000, 경험치 100**이 테스트용으로 남은 값인지(예전 JSON은 111, 0. 지금 원본 엑셀은 `.asset` 값을 따랐다).
 - **BossUndead(2002) HP 1000 → 10000**을 반영할지. `origin/UIManager_improvement`의 `3c15d5e`에 섞여 있어 일부러 가져오지 않았다.
 - **(WebGL 데모를 낼 때) 웹에서 체크포인트 사이 진행 유실**을 어떻게 막을지. "주기적 자동저장은 두지 않는다"는 기존 결정(CLAUDE.md)과 부딪힐 수 있다.
-- **실패 중인 EditMode 테스트 2개**를 고칠지 지울지(아래 "테스트").
 - **보스전 제한 시간 값(D25).** 구조는 들어가 있고(엑셀 `StageDatabase.bossTimeLimit`, 0 = 없음) 지금 모든 스테이지가 0이다. 몇 초로 할지, 넘겼을 때 지금처럼 스테이지를 처음부터 할지는 게임 디자인 결정이다. 0이면 보스전이 끝난다는 보장이 없다(보스 회복이 플레이어 피해를 넘으면 계속된다).
 - **Android 렌더 프레임률을 올릴지.** 코드에 `Application.targetFrameRate` 설정이 없어 Unity 모바일 기본값(30fps로 알고 있음, 기기에서 미측정)으로 그린다. 이 상태에서 S24 화면의 움직임은 매끄럽다(사용자 확인, 2026-11-23). 60/120으로 올릴지는 배터리와의 선택.
 - **에디터에서 직접 플레이한 눈 확인.** 업그레이드 비용, 골드 HUD, 스킬 창은 Claude가 WebGL 화면으로만 봤다(Android에서는 첫 빌드가 실행돼 전투, HUD, 탭바가 도는 것까지만 확인).
@@ -215,7 +214,7 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 2026-09 코드리뷰에서 미해결이던 항목 중 2026-11-22에 현재 코드에서 다시 확인한 것.
 
 - **개발용 로그가 상시 출력됨**
-  `PlayerHud.UpdateExpBar`는 경험치가 바뀔 때마다 2줄을 찍는다. `PlayerStats`(레벨업, 업그레이드, 학습), `GameManager`(스테이지 입장)도 릴리스에 그대로 남는다.
+  `PlayerStats`(레벨업, 업그레이드, 학습), `GameManager`(스테이지 입장)의 로그가 릴리스에 그대로 남는다. (`PlayerHud`가 경험치가 바뀔 때마다 찍던 2줄은 4-B에서 지웠다.)
 
 - **`CombatEffectManager` 책임 과다**
   데미지 텍스트, 파티클, 보상 드랍, VFX, 임시 스프라이트 생성을 한 클래스가 한다. 임시 스프라이트는 지금 실제로 쓰이는 경로라, 아트를 연결하기 전에는 지우면 안 된다.
@@ -250,7 +249,6 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 
 ## 테스트
 
-- **`PlayerStatsTests`의 경험치 테스트 2개가 실패한 채로 남아 있음**
-  `AddExp_ExactlyRequiredExp_LevelsUpAndCarriesRemainderZero`, `AddExp_LargeAmount_ChainLevelsUpAndKeepsRemainder`.
-  레벨업이 자동에서 수동(`TryLevelUp()`, 캐릭터 탭의 "LEVEL UP!" 버튼)으로 바뀐 뒤 테스트가 갱신되지 않았다.
-  0단계 작업 전부터 실패하던 것이며(0단계는 `AddExp`/`TryLevelUp`을 건드리지 않음), 테스트를 새 규칙에 맞게 고칠지 지울지는 따로 정한다.
+- **(해결, 2026-11-26) `PlayerStatsTests`의 경험치 테스트 2개가 실패한 채로 남아 있었음.**
+  레벨업이 자동에서 수동(`TryLevelUp()`, 캐릭터 탭의 "LEVEL UP!" 버튼)으로 바뀐 뒤 갱신되지 않은 기대값이었다.
+  전투 4-B(D34)에서 지금 규칙으로 고쳐 썼다: `AddExp`는 쌓기만 하고 `CanLevelUp`이 켜진다, `TryLevelUp`이 여러 레벨을 올리고 나머지를 남기며 최대 레벨에서 멈춘다.

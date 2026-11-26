@@ -11,6 +11,7 @@ public class SkillSlotBar : UITabPanel
 
     private readonly List<SkillSlotWidget> slotWidgets = new List<SkillSlotWidget>();
     private PlayerController player;
+    private IDisposable equipSubscription;
 
     // 어떤 창을 어떻게 열지는 모른다. 요청만 내고 UIRoot가 연다.
     public event Action SkillManageRequested;
@@ -51,19 +52,16 @@ public class SkillSlotBar : UITabPanel
             return;
         }
 
-        player.Stats.OnSkillEquipChanged += RefreshAll;
-        player.Stats.OnReloaded += RefreshAll;
-
-        RefreshAll();
+        // 장착 슬롯 상태를 구독한다(구독하는 순간 지금 값으로 그린다). 캐릭터가 먼저 구독돼 있어서
+        // 알림을 받을 때 캐릭터의 장착 스킬은 이미 새 값이다. 창 이관(다음 작업 6)에서 Presenter로 옮긴다.
+        equipSubscription?.Dispose();
+        equipSubscription = player.Stats.EquippedSlots.Subscribe(_ => RefreshAll());
     }
 
     protected override void OnHidden()
     {
-        if (player != null)
-        {
-            player.Stats.OnSkillEquipChanged -= RefreshAll;
-            player.Stats.OnReloaded -= RefreshAll;
-        }
+        equipSubscription?.Dispose();
+        equipSubscription = null;
     }
 
     private void Update()

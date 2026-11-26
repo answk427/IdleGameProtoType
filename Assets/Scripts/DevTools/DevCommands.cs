@@ -73,7 +73,7 @@ public sealed class DevCommands
     // 지금 골드의 10배가 되게 더한다(최소 1만). 방치형 경제는 지수적으로 커져서 고정량보다 쓸모 있다.
     public void MultiplyGold()
     {
-        double gold = session.Wallet.Gold.ToDouble();
+        double gold = session.Wallet.Gold.Value.ToDouble();
         double amount = Math.Max(gold * 9d, 10000d);
         session.Wallet.AddGold(GameNumber.FromDouble(amount));
         Report(true, $"골드 +{NumberFormatUtility.Format(GameNumber.FromDouble(amount))}", "");
@@ -83,9 +83,9 @@ public sealed class DevCommands
     public bool AddExpForOneLevel()
     {
         PlayerStats stats = session.Stats;
-        if (stats.IsMaxLevel) return Report(false, "", "최대 레벨입니다.");
+        if (stats.IsMaxLevel.Value) return Report(false, "", "최대 레벨입니다.");
 
-        int amount = stats.RequiredExp;
+        int amount = stats.RequiredExp.Value;
         stats.AddExp(amount);
         return Report(true, $"경험치 +{amount} (LEVEL UP 버튼으로 레벨업)", "");
     }

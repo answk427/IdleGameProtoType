@@ -12,7 +12,7 @@ public class GameManager : MonoBehaviour
     private PlayerController player;
     private GameSession session;
     private EncounterDirector director;
-    private IDisposable stageEnteredSubscription;
+    private readonly CompositeDisposable subscriptions = new CompositeDisposable();
 
     // 진행도(골드 포함)의 주인은 GameSession이다. UI가 아직 GameManager를 거쳐 접근하므로
     // 1차 UI 이관(Presenter 주입) 전까지만 통로로 남겨 둔다.
@@ -22,7 +22,6 @@ public class GameManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        GlobalCombatEvents.OnMonsterDied += HandleMonsterDied;
     }
 
     // GameInitializer가 세션, 캐릭터, 시뮬레이션(디렉터)을 만든 뒤, 흐름을 시작하기(Begin) 전에 호출한다.
@@ -32,30 +31,23 @@ public class GameManager : MonoBehaviour
         this.player = player != null ? player : throw new ArgumentNullException(nameof(player));
         this.director = director ?? throw new ArgumentNullException(nameof(director));
 
-        // 저장 계기: 업그레이드, 스킬 학습·장착, 스테이지 입장(게임 시작 제외)
-        session.Stats.OnUpgraded += SaveGame;
-        session.Stats.OnSkillLearned += SaveGame;
-        session.Stats.OnSkillEquipChanged += SaveGame;
-        stageEnteredSubscription = director.StageEntered.Subscribe(HandleStageEntered);
+        // 처치 보상
+        GlobalCombatEvents.MonsterDied.Subscribe(HandleMonsterDied).AddTo(subscriptions);
+
+        // 저장 계기: 레벨업, 업그레이드, 스킬 학습·장착(플레이어가 직접 한 명령), 스테이지 입장(게임 시작 제외)
+        session.Stats.LevelReached.Subscribe(_ => SaveGame()).AddTo(subscriptions);
+        session.Stats.Upgraded.Subscribe(_ => SaveGame()).AddTo(subscriptions);
+        session.Stats.SkillLearned.Subscribe(_ => SaveGame()).AddTo(subscriptions);
+        session.Stats.SkillEquipChanged.Subscribe(_ => SaveGame()).AddTo(subscriptions);
+        director.StageEntered.Subscribe(HandleStageEntered).AddTo(subscriptions);
     }
 
-    private void OnDestroy()
-    {
-        GlobalCombatEvents.OnMonsterDied -= HandleMonsterDied;
-        stageEnteredSubscription?.Dispose();
+    private void OnDestroy() => subscriptions.Dispose();
 
-        if (session != null)
-        {
-            session.Stats.OnUpgraded -= SaveGame;
-            session.Stats.OnSkillLearned -= SaveGame;
-            session.Stats.OnSkillEquipChanged -= SaveGame;
-        }
-    }
-
-    private void HandleMonsterDied(Monster monster, GameNumber goldReward, Vector3 position)
+    private void HandleMonsterDied(GlobalCombatEvents.MonsterDeath death)
     {
-        session?.Wallet.AddGold(goldReward);
-        player?.AddExp(monster.ExpReward);
+        session.Wallet.AddGold(death.GoldReward);
+        player.AddExp(death.Monster.ExpReward);
     }
 
     // 스테이지에 들어갈 때마다 세션의 스테이지 번호에 반영하고 저장한다. 게임 시작은 읽은 세이브 그대로라 저장하지 않는다.

@@ -64,6 +64,10 @@ public class GameInitializer : MonoBehaviour
         // 에디터 플레이에서는 튜닝 덮어쓰기를 적용한 사본을 쓴다(빌드에서는 원본 그대로, docs/COMBAT_ARCHITECTURE.md 8-7).
         Session = new GameSession(DataTuning.Prepare(statData), upgradeConfig);
         Session.Apply(saveData);
+#if UNITY_EDITOR
+        // 플레이 중에 튜닝 덮어쓰기가 바뀌면 진행도의 파생 상태(전투 능력치, 필요 경험치)를 다시 계산한다.
+        DataTuning.Changed += Session.Stats.RecomputeFromData;
+#endif
 
         PlayerController player = playerSpawner.EnsurePlayer();
         if (player == null)
@@ -95,6 +99,13 @@ public class GameInitializer : MonoBehaviour
         Player = player;
         IsInitialized = true;
         Initialized?.Invoke(this);
+    }
+
+    private void OnDestroy()
+    {
+#if UNITY_EDITOR
+        if (Session != null) DataTuning.Changed -= Session.Stats.RecomputeFromData;
+#endif
     }
 
     private bool ValidateReferences()

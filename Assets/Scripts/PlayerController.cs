@@ -18,14 +18,12 @@ public class PlayerController : CombatantHost
     private PlayerStats stats;
     private CharacterData character;
     private SkillLoadout loadout;
+    private CompositeDisposable subscriptions = new CompositeDisposable();
 
     protected override Team Team => Team.Ally;
 
     public PlayerStats Stats => stats;
     public CharacterData Character => character;
-    public float AttackInterval => stats != null ? stats.AttackInterval : 0f;
-    public GameNumber CurrentHp => Combatant.Hp;
-    public GameNumber MaxHp => Combatant.MaxHp;
 
     // 시뮬레이션 시계. 월드에 등록되기 전에는 null(UI 쿨다운 표시는 시각 0 기준).
     public SimClock Clock => Combatant.World?.Clock;
@@ -41,66 +39,36 @@ public class PlayerController : CombatantHost
     }
 
     // 다른 객체(진행도, 데이터)에 의존하는 초기화는 Awake가 아니라 GameInitializer가 부르는 여기서 한다.
+    // 진행도의 상태를 구독하므로 레벨업, 업그레이드, 진행도 교체(Apply)가 모두 같은 길로 들어온다.
     public void Initialize(PlayerStats stats, CharacterData character)
     {
-        Unsubscribe();
+        subscriptions.Dispose();
+        subscriptions = new CompositeDisposable();
 
         this.stats = stats;
         this.character = character;
 
         loadout.SetSlots(stats.EquippedSlots.Value);
-        Combatant.Spawn(BuildStats(), BodyCenterX(transform.position.x), hitboxProfile.HalfWidth, timelines, loadout);
+        Combatant.Spawn(BuildStats(stats.CombatStats.Value), BodyCenterX(transform.position.x), hitboxProfile.HalfWidth, timelines, loadout);
 
-        stats.OnSkillEquipChanged += RefreshEquippedSkills;
-        stats.OnUpgraded += RefreshStats;
-        stats.OnLevelUp += HandleLevelUp;
-        stats.OnReloaded += HandleReloaded;
-#if UNITY_EDITOR
-        DataTuning.Changed += RefreshStats;
-#endif
+        // 능력치가 바뀌면 다시 넣는다(현재 HP는 유지). 구독하는 순간 한 번 오지만 값이 같아 그대로다.
+        stats.CombatStats.Subscribe(s => Combatant.UpdateStats(BuildStats(s))).AddTo(subscriptions);
+        // 장착이 바뀌면 다시 맞춘다. 스킬 슬롯 바는 캐릭터의 장착 스킬을 읽으므로 캐릭터가 먼저 구독한다(Initialize가 UI보다 먼저,
+        // 같은 상태의 구독자는 구독한 순서로 알림을 받는다).
+        stats.EquippedSlots.Subscribe(_ => RefreshEquippedSkills()).AddTo(subscriptions);
     }
 
-    private void OnDestroy() => Unsubscribe();
+    private void OnDestroy() => subscriptions.Dispose();
 
-    private void Unsubscribe()
+    private CombatantStats BuildStats(PlayerCombatStats s) => new CombatantStats
     {
-        if (stats != null)
-        {
-            stats.OnSkillEquipChanged -= RefreshEquippedSkills;
-            stats.OnUpgraded -= RefreshStats;
-            stats.OnLevelUp -= HandleLevelUp;
-            stats.OnReloaded -= HandleReloaded;
-        }
-#if UNITY_EDITOR
-        DataTuning.Changed -= RefreshStats;
-#endif
-    }
-
-    private CombatantStats BuildStats() => new CombatantStats
-    {
-        MaxHp = stats.MaxHp,
-        AttackDamage = stats.AttackDamage,
-        AttackInterval = stats.AttackInterval,
+        MaxHp = s.MaxHp,
+        AttackDamage = s.AttackDamage,
+        AttackInterval = s.AttackInterval,
         AttackRange = character != null ? character.AttackRange : 0f,
         MoveSpeed = character != null ? character.MoveSpeed : 0f,
         MovePolicy = MovePolicy.Advance,
     };
-
-    // 업그레이드·레벨업·튜닝으로 능력치가 바뀌면 다시 넣는다(현재 HP는 유지).
-    private void RefreshStats()
-    {
-        if (stats != null) Combatant.UpdateStats(BuildStats());
-    }
-
-    private void HandleLevelUp(int level) => RefreshStats();
-
-    // 진행도가 통째로 바뀌면(GameManager.LoadSnapshot) 진행도에서 온 것을 모두 다시 넣는다.
-    // 스킬 슬롯 바도 이 사건에서 캐릭터의 장착 스킬을 읽으므로, 캐릭터가 먼저 구독돼 있어야 한다(Initialize가 UI보다 먼저).
-    private void HandleReloaded()
-    {
-        RefreshStats();
-        RefreshEquippedSkills();
-    }
 
     // ── 연출 ──
 

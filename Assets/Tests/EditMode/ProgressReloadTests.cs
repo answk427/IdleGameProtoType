@@ -3,9 +3,10 @@ using NUnit.Framework;
 using Newtonsoft.Json;
 using UnityEngine;
 
-// 실행 중 진행도 교체(GameSession.Apply → PlayerStats.LoadSave)의 불변식(docs/DEV_TOOLS.md T6).
+// 실행 중 진행도 교체(GameSession.Apply → PlayerStats.LoadSave)의 불변식(docs/DEV_TOOLS.md T6, docs/COMBAT_ARCHITECTURE.md 10-10).
 //   진행도 A로 돌던 세션에 B를 적용한 뒤의 상태 = B로 새로 시작한 세션의 상태
-// 그리고 교체는 "다시 읽어라"(OnReloaded)만 알리고, 저장을 일으키는 사건은 내지 않는다.
+// 교체는 값만 덮어쓴다. 상태가 바뀌므로 구독하는 쪽이 따라오고("전부 다시 읽기" 사건 OnReloaded는 없어졌다),
+// 저장을 일으키는 사건은 내지 않는다. 파생 상태에는 중간 조합(새 레벨 + 옛 업그레이드)이 보이지 않는다.
 [TestFixture]
 public class ProgressReloadTests
 {
@@ -85,15 +86,16 @@ public class ProgressReloadTests
         },
     };
 
-    // 저장되는 값 전부와, 그 값에서 계산되는 값(캐릭터 능력치·HUD가 읽는 값)을 한 줄로.
+    // 저장되는 값 전부와, 상태·파생 상태(캐릭터·HUD·탭이 구독하는 값)를 한 줄로.
     private static string Fingerprint(GameSession s)
     {
         PlayerStats st = s.Stats;
         return JsonUtility.ToJson(s.ToSaveData()) +
-               $"|lv {st.Level} exp {st.CurrentExp}/{st.RequiredExp} canLv {st.CanLevelUp}" +
-               $"|hp {st.MaxHp} atk {st.AttackDamage} int {st.AttackInterval:R}" +
+               $"|lv {st.Level.Value} exp {st.Exp.Value}/{st.RequiredExp.Value} canLv {st.CanLevelUp.Value} max {st.IsMaxLevel.Value}" +
+               $"|up {st.UpgradeLevel(UpgradeStatType.Hp).Value},{st.UpgradeLevel(UpgradeStatType.Attack).Value},{st.UpgradeLevel(UpgradeStatType.AttackSpeed).Value}" +
+               $"|{st.CombatStats.Value}" +
                $"|learned {string.Join(",", st.LearnedSkills.Value)} slots {string.Join(",", st.EquippedSlots.Value)}" +
-               $"|gold {s.Wallet.Gold}";
+               $"|gold {s.Wallet.Gold.Value}";
     }
 
     [Test]
@@ -121,43 +123,45 @@ public class ProgressReloadTests
     }
 
     [Test]
-    public void Apply_RaisesReloadOnly_NotSavingEvents()
+    public void Apply_StatesFollow_AndRaisesNoSavingEvents()
     {
         GameSession session = NewSession(ProgressA());
-        int reloaded = 0, saving = 0, goldChanged = 0;
-        session.Stats.OnReloaded += () => reloaded++;
-        session.Stats.OnUpgraded += () => saving++;
-        session.Stats.OnSkillLearned += () => saving++;
-        session.Stats.OnSkillEquipChanged += () => saving++;
-        session.Wallet.OnGoldChanged += _ => goldChanged++;
+        int saving = 0;
+        session.Stats.LevelReached.Subscribe(_ => saving++);
+        session.Stats.Upgraded.Subscribe(_ => saving++);
+        session.Stats.SkillLearned.Subscribe(_ => saving++);
+        session.Stats.SkillEquipChanged.Subscribe(_ => saving++);
+        int levelSeen = -1;
+        GameNumber goldSeen = GameNumber.Zero;
+        IReadOnlyList<int> slotsSeen = null;
+        session.Stats.Level.Subscribe(v => levelSeen = v);
+        session.Wallet.Gold.Subscribe(v => goldSeen = v);
+        session.Stats.EquippedSlots.Subscribe(v => slotsSeen = v);
 
         session.Apply(ProgressB());
 
-        Assert.AreEqual(1, reloaded, "다시 읽으라는 알림은 한 번");
         Assert.AreEqual(0, saving, "저장을 일으키는 사건은 내지 않는다");
-        Assert.AreEqual(1, goldChanged, "골드는 지갑이 알린다");
+        Assert.AreEqual(3, levelSeen);
+        Assert.AreEqual(GameNumber.FromDouble(9.5e12), goldSeen);
+        CollectionAssert.AreEqual(new[] { -1, 5, -1, 2, 1 }, slotsSeen);
     }
 
-    // 받는 쪽이 OnReloaded 안에서 읽는 값은 이미 새 값이어야 한다(알림이 데이터보다 먼저 나가면 HUD가 옛 값을 그린다).
+    // 파생 상태는 저장 데이터에서 계산하므로 교체 도중의 조합(새 레벨 + 옛 업그레이드)이 보이지 않는다.
+    // 보이면 최대 HP가 잠깐 줄어 캐릭터의 현재 HP가 깎인 채 남을 수 있다.
     [Test]
-    public void ReloadNotification_SeesNewValues()
+    public void Apply_CombatStatsSubscriber_SeesOnlyTheFinalValue()
     {
         GameSession session = NewSession(ProgressA());
-        int levelSeen = -1;
-        GameNumber hpSeen = GameNumber.Zero;
-        IReadOnlyList<int> slotsSeen = null;
-        session.Stats.OnReloaded += () =>
-        {
-            levelSeen = session.Stats.Level;
-            hpSeen = session.Stats.MaxHp;
-            slotsSeen = session.Stats.EquippedSlots.Value;
-        };
+        var seen = new List<PlayerCombatStats>();
+        bool initial = true;
+        session.Stats.CombatStats.Subscribe(v => { if (!initial) seen.Add(v); });
+        initial = false;
 
         session.Apply(ProgressB());
 
-        Assert.AreEqual(3, levelSeen);
-        Assert.AreEqual(GameNumber.FromDouble(90 + 7 * 20), hpSeen);
-        CollectionAssert.AreEqual(new[] { -1, 5, -1, 2, 1 }, slotsSeen);
+        Assert.AreEqual(1, seen.Count, "중간 조합 없이 한 번");
+        Assert.AreEqual(NewSession(ProgressB()).Stats.CombatStats.Value, seen[0]);
+        Assert.AreEqual(GameNumber.FromDouble(90 + 7 * 20), seen[0].MaxHp);
     }
 
     // 세션은 넘겨받은 객체를 그대로 붙잡는다(값만 덮어쓰기). 그래서 GameManager.LoadSnapshot은 JSON으로 한 번 복사해서 넘긴다.
@@ -169,8 +173,6 @@ public class ProgressReloadTests
         GameSession session = NewSession(ProgressA());
         session.Apply(given);
 
-        given.stats.level = 1;
-
-        Assert.AreEqual(1, session.Stats.Level);
+        Assert.AreSame(given.stats, session.Stats.GetSaveData());
     }
 }

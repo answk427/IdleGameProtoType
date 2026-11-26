@@ -32,6 +32,8 @@ public class CombatEffectManager : MonoBehaviour
     private readonly List<RewardDropEffect> liveDrops = new List<RewardDropEffect>();
     private readonly List<Transform> liveEffects = new List<Transform>();
 
+    private CompositeDisposable busSubscriptions;
+
     private Sprite defaultCoinSprite;
     private Sprite defaultChestSprite;
     private GameObject runtimeRewardDropPrefab;
@@ -49,30 +51,32 @@ public class CombatEffectManager : MonoBehaviour
 
     private void OnEnable()
     {
-        GlobalCombatEvents.OnAnyTargetDamaged += HandleAnyTargetDamaged;
-        GlobalCombatEvents.OnMonsterDied += SpawnRewardDrop;
-        GlobalCombatEvents.OnHealed += HandleHealed;
+        busSubscriptions = new CompositeDisposable();
+        GlobalCombatEvents.TargetDamaged.Subscribe(HandleTargetDamaged).AddTo(busSubscriptions);
+        GlobalCombatEvents.MonsterDied.Subscribe(HandleMonsterDied).AddTo(busSubscriptions);
+        GlobalCombatEvents.Healed.Subscribe(HandleHealed).AddTo(busSubscriptions);
     }
 
     private void OnDisable()
     {
-        GlobalCombatEvents.OnAnyTargetDamaged -= HandleAnyTargetDamaged;
-        GlobalCombatEvents.OnMonsterDied -= SpawnRewardDrop;
-        GlobalCombatEvents.OnHealed -= HandleHealed;
+        busSubscriptions?.Dispose();
+        busSubscriptions = null;
     }
 
     // 데미지 숫자는 출처와 무관하게 항상 표시하되, 맞은 대상이 플레이어인지에 따라
     // 색만 다르게 한다 (플레이어가 맞으면 빨강, 몬스터가 맞으면 기존 흰색 유지).
-    private void HandleAnyTargetDamaged(Combatant target, GameNumber damage, Vector3 position)
+    private void HandleTargetDamaged(GlobalCombatEvents.Damage e)
     {
-        Color color = target.Team == Team.Ally ? playerDamageColor : monsterDamageColor;
-        SpawnDamageText(damage, position, color);
+        Color color = e.Target.Team == Team.Ally ? playerDamageColor : monsterDamageColor;
+        SpawnDamageText(e.Amount, e.Position, color);
     }
 
-    private void HandleHealed(GameNumber amount, Vector3 position)
+    private void HandleHealed(GlobalCombatEvents.Heal e)
     {
-        SpawnDamageText(amount, position, healColor, "+");
+        SpawnDamageText(e.Amount, e.Position, healColor, "+");
     }
+
+    private void HandleMonsterDied(GlobalCombatEvents.MonsterDeath e) => SpawnRewardDrop(e.Monster, e.GoldReward, e.Position);
 
     public void SpawnDamageText(GameNumber amount, Vector3 worldPos, Color color, string prefix = "")
     {

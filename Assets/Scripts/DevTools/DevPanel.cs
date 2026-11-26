@@ -37,7 +37,7 @@ public sealed class DevPanel
     public void OnOpened()
     {
         targetStage = commands.CurrentStage;
-        targetLevel = commands.Session.Stats.Level;
+        targetLevel = commands.Session.Stats.Level.Value;
         pendingConfirm = null;
         RefreshBackups();
     }
@@ -170,7 +170,7 @@ public sealed class DevPanel
     {
         PlayerStats stats = commands.Session.Stats;
         string busy = commands.IsBusy ? " · 전환 중" : "";
-        return $"스테이지 {commands.CurrentStage} · Lv {stats.Level} · 골드 {NumberFormatUtility.Format(commands.Session.Wallet.Gold)} · x{Time.timeScale:0.#}{busy}";
+        return $"스테이지 {commands.CurrentStage} · Lv {stats.Level.Value} · 골드 {NumberFormatUtility.Format(commands.Session.Wallet.Gold.Value)} · x{Time.timeScale:0.#}{busy}";
     }
 
     // 첫 번째로 누르면 확인 표시만 하고, ConfirmSeconds 안에 한 번 더 누르면 true.

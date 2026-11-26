@@ -68,8 +68,8 @@ public class Monster : CombatantHost
         // 시체는 인카운터가 끝날 때까지 화면에 남으므로 빈 체력바를 숨긴다.
         if (hpBar != null) hpBar.gameObject.SetActive(false);
 
-        // 골드/경험치 지급은 GlobalCombatEvents.OnMonsterDied 구독자(GameManager)가 처리한다.
+        // 골드/경험치 지급은 GlobalCombatEvents.MonsterDied 구독자(GameManager)가 처리한다.
         // 보스 처치(스테이지 클리어)는 알리지 않는다: 흐름(EncounterDirector)이 다음 단계 ①에서 월드에 묻는다.
-        GlobalCombatEvents.TriggerMonsterDied(this, goldReward, transform.position);
+        GlobalCombatEvents.RaiseMonsterDied(this, goldReward, transform.position);
     }
 }

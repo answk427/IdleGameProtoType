@@ -47,7 +47,7 @@ public class GameSession
         return new PlayerSaveData
         {
             stats = Stats.GetSaveData(),
-            gold = Wallet.Gold.ToDouble(),
+            gold = Wallet.Gold.Value.ToDouble(),
             currentStageNumber = CurrentStageNumber,
         };
     }

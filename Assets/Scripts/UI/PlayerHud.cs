@@ -17,7 +17,9 @@ public class PlayerHud : UIHud
     [SerializeField] private TextMeshProUGUI goldText;
 
     private PlayerController player;
+    private CompositeDisposable subscriptions;
 
+    // 4-B의 B-2에서 View + Presenter로 바뀐다(docs/COMBAT_ARCHITECTURE.md 10-10). 지금은 구독만 반응형이다.
     protected override void OnShown()
     {
         if (player == null && GameManager.Instance != null)
@@ -31,63 +33,34 @@ public class PlayerHud : UIHud
             return;
         }
 
-        player.OnHpChanged += UpdateHpBar;
-        player.Stats.OnExpChanged += UpdateExpBar;
-        player.Stats.OnLevelUp += UpdateLevelText;
-        player.Stats.OnUpgraded += RefreshHpBar;
-        player.Stats.OnReloaded += RefreshProgress;
-
+        subscriptions?.Dispose();
+        subscriptions = new CompositeDisposable();
+        player.Hp.Subscribe(UpdateHpBar).AddTo(subscriptions);
+        player.Stats.Exp.Subscribe(_ => UpdateExpBar()).AddTo(subscriptions);
+        player.Stats.RequiredExp.Subscribe(_ => UpdateExpBar()).AddTo(subscriptions);
+        player.Stats.Level.Subscribe(UpdateLevelText).AddTo(subscriptions);
         if (GameManager.Instance != null)
-        {
-            GameManager.Instance.Wallet.OnGoldChanged += UpdateGoldText;
-        }
-
-        RefreshProgress();
-        UpdateGoldText(GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : GameNumber.Zero);
-    }
-
-    // 처음 보일 때와 진행도가 통째로 바뀌었을 때(PlayerStats.OnReloaded). 골드는 지갑이 따로 알린다.
-    private void RefreshProgress()
-    {
-        UpdateHpBar(player.CurrentHp, player.MaxHp);
-        UpdateExpBar(player.Stats.CurrentExp, player.Stats.RequiredExp);
-        UpdateLevelText(player.Stats.Level);
+            GameManager.Instance.Wallet.Gold.Subscribe(UpdateGoldText).AddTo(subscriptions);
     }
 
     protected override void OnHidden()
     {
-        if (player != null)
-        {
-            player.OnHpChanged -= UpdateHpBar;
-            player.Stats.OnExpChanged -= UpdateExpBar;
-            player.Stats.OnLevelUp -= UpdateLevelText;
-            player.Stats.OnUpgraded -= RefreshHpBar;
-            player.Stats.OnReloaded -= RefreshProgress;
-        }
-
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.Wallet.OnGoldChanged -= UpdateGoldText;
-        }
+        subscriptions?.Dispose();
+        subscriptions = null;
     }
 
-    private void RefreshHpBar() => UpdateHpBar(player.CurrentHp, player.MaxHp);
-
-    private void UpdateHpBar(GameNumber currentHp, GameNumber maxHp)
+    private void UpdateHpBar(HpState hp)
     {
-        if (hpFillImage != null && maxHp > GameNumber.Zero) hpFillImage.fillAmount = (float)(currentHp.ToDouble() / maxHp.ToDouble());
-        if (hpText != null) hpText.text = $"{NumberFormatUtility.Format(currentHp)} / {NumberFormatUtility.Format(maxHp)}";
+        if (hpFillImage != null) hpFillImage.fillAmount = hp.Ratio;
+        if (hpText != null) hpText.text = $"{NumberFormatUtility.Format(hp.Current)} / {NumberFormatUtility.Format(hp.Max)}";
     }
 
-    private void UpdateExpBar(int currentExp, int requiredExp)
+    private void UpdateExpBar()
     {
-        // 레벨업이 버튼으로 수동 처리되면서 currentExp가 requiredExp를 넘어선 채로 머무를 수 있어 클램프.
-        Debug.Log($"UpdateExpBar, currentExp:{currentExp}, requiredExp:{requiredExp}");
-        if (expFillImage != null && requiredExp > 0)
-        {
-            expFillImage.fillAmount = Mathf.Min(1f, (float)currentExp / requiredExp);
-            Debug.Log("UpdateExpBar in if");
-        }
+        // 레벨업이 버튼으로 수동 처리되면서 경험치가 필요량을 넘어선 채로 머무를 수 있어 클램프.
+        int required = player.Stats.RequiredExp.Value;
+        if (expFillImage != null && required > 0)
+            expFillImage.fillAmount = Mathf.Min(1f, (float)player.Stats.Exp.Value / required);
     }
 
     private void UpdateLevelText(int level)

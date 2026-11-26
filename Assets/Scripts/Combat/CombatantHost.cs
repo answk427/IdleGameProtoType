@@ -5,18 +5,20 @@ using UnityEngine;
 // 전투원의 호스트(docs/COMBAT_ARCHITECTURE.md 8-3). 전투 규칙은 Combatant(순수 C#)가 갖고,
 // 이 MonoBehaviour는 그리기(애니메이션, 위치 보간, HP바)와 Unity 연결(풀, 이벤트 버스)만 맡는다.
 // PlayerController와 Monster(보스 포함)가 이것을 상속한다.
-public abstract class CombatantHost : MonoBehaviour, ICombatantHost, IHasHp
+public abstract class CombatantHost : MonoBehaviour, ICombatantHost
 {
     [Header("전투원")]
     [SerializeField] protected CharacterAnimationView view;
     [SerializeField] protected ActionTimelineSet timelines;
     [SerializeField] protected HitboxProfile hitboxProfile = new HitboxProfile();
 
+    private readonly ReactiveProperty<HpState> hp = new ReactiveProperty<HpState>();
+
     public Combatant Combatant { get; private set; }
 
-    // UI(체력바, HUD)가 구독한다.
-    public event Action<GameNumber, GameNumber> OnHpChanged;
-    // 피격 연출(HitEffect)이 구독한다.
+    // HP(현재, 최대)는 상태다. 머리 위 HP 바와 HUD가 같이 구독한다(docs/COMBAT_ARCHITECTURE.md 10-10 D29).
+    public IReadOnlyReactiveProperty<HpState> Hp => hp;
+    // 피격 깜빡임(HitEffect)은 사건이고 같은 오브젝트 안이라 C# 이벤트로 둔다(docs/UI_DESIGN.md 5-3 적용 경계).
     public event Action OnDamaged;
 
     protected abstract Team Team { get; }
@@ -55,20 +57,22 @@ public abstract class CombatantHost : MonoBehaviour, ICombatantHost, IHasHp
 
     // ── ICombatantHost: 공통 연출 ──
 
-    public virtual void HandleHpChanged(Combatant self) => OnHpChanged?.Invoke(self.Hp, self.MaxHp);
+    public virtual void HandleHpChanged(Combatant self) => PublishHp(self);
 
     public virtual void HandleDamaged(Combatant self, GameNumber amount)
     {
-        OnHpChanged?.Invoke(self.Hp, self.MaxHp);
+        PublishHp(self);
         OnDamaged?.Invoke();
-        GlobalCombatEvents.TriggerAnyTargetDamaged(self, amount, transform.position);
+        GlobalCombatEvents.RaiseTargetDamaged(self, amount, transform.position);
     }
 
     public virtual void HandleHealed(Combatant self, GameNumber amount)
     {
-        OnHpChanged?.Invoke(self.Hp, self.MaxHp);
-        GlobalCombatEvents.TriggerHealed(amount, transform.position);
+        PublishHp(self);
+        GlobalCombatEvents.RaiseHealed(self, amount, transform.position);
     }
+
+    private void PublishHp(Combatant self) => hp.Value = new HpState(self.Hp, self.MaxHp);
 
     // 기본: 달리기 동작이 없는 캐릭터(몬스터)는 이동 중에도 대기 동작이다. 플레이어가 덮어쓴다.
     public virtual void HandleLocomotion(Combatant self, bool moving)
@@ -99,7 +103,7 @@ public abstract class CombatantHost : MonoBehaviour, ICombatantHost, IHasHp
 
     public virtual void HandleRevived(Combatant self)
     {
-        OnHpChanged?.Invoke(self.Hp, self.MaxHp);
+        PublishHp(self);
         if (view != null) view.PlayLocomotion(false);
     }
 }

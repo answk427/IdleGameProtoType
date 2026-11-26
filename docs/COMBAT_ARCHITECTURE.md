@@ -1,6 +1,6 @@
 # 전투·애니메이션 구조 설계 (백지 기준)
 
-상태: **초안 (2026-11-23).** 결정 D2·D3·D5·D6·D7은 추천안으로 확정했다(5-D). D4(공격속도 수식)는 별도 결정 대기. 전체 계획 안의 시기(6절)는 2026-11-24 승인. **1단계 구현·검증 완료(2026-11-24, 7절). 시간 처리는 7-11 구조로 다시 만들었다(결과 7-12).** **2단계(전투원 통합) 구현·검증 완료(2026-11-24, 8절, 결과 8-11).** **3단계(공간 모델) 구현·검증 완료(2026-11-25, 9절, 결과 9-7).** **4단계(흐름) 상세 설계 승인(2026-11-25, 10절, D22~D28 추천안대로). 4-A(흐름) 구현·검증 완료(결과 10-9), 4-B(진행도 표시) 남음.**
+상태: **초안 (2026-11-23).** 결정 D2·D3·D5·D6·D7은 추천안으로 확정했다(5-D). D4(공격속도 수식)는 별도 결정 대기. 전체 계획 안의 시기(6절)는 2026-11-24 승인. **1단계 구현·검증 완료(2026-11-24, 7절). 시간 처리는 7-11 구조로 다시 만들었다(결과 7-12).** **2단계(전투원 통합) 구현·검증 완료(2026-11-24, 8절, 결과 8-11).** **3단계(공간 모델) 구현·검증 완료(2026-11-25, 9절, 결과 9-7).** **4단계(흐름) 상세 설계 승인(2026-11-25, 10절, D22~D28 추천안대로). 4-A(흐름) 구현·검증 완료(결과 10-9). 4-B(진행도 표시) 상세 설계 승인(2026-11-26, 10-10, D29~D36 추천안대로). B-1(모델·버스) 구현·검증 완료(10-11), B-2(HUD·정렬·보스 시간) 남음.**
 
 이 문서는 전투와 애니메이션을 처음 설계한다고 보고 다시 짠 목표 구조다. 지금 코드는 참고만 했다.
 - 문제는 "지금 수치에서 괜찮은가"가 아니라 **"어떤 데이터와 설정에서도 성립하는가"**로 판단한다.
@@ -1183,3 +1183,189 @@ S24 눈 확인: 보스 도전 버튼, 스테이지 안내, 페이드, 전환 중
 - 보스전 제한 시간 값(D25)은 사용자 결정. 지금 모든 스테이지 0.
 - 보스 도전 버튼은 플레이어의 사망 동작(약 1초) 동안 보이고, 그때 누르면 받지 않는다(`Busy`). 사망 동작이 끝나 전환이 시작되는 순간 사라진다. 사망과 동시에 숨기려면 "도전 가능"에 "아군이 살아 있음"을 더한 파생 상태를 버튼이 구독하면 된다(파생 상태 타입은 4-B에서 만든다).
 - 레벨 1 세이브는 스테이지 1 보스를 이기지 못해 계속 다시 시작한다. 밸런스 문제이고 구조와는 무관하다(지금 밸런스 값은 기준이 아니다).
+
+### 10-10. 4-B 상세 설계: 진행도 표시 (2026-11-26 승인, 결과 10-11)
+
+10-5의 4-B 항목을 지금 코드에 맞춰 구체화한다. 4-A가 끝나 흐름 쪽 상태(스테이지, 보스 도전 가능)는 이미 반응형이다. 남은 것은 진행도(레벨, 경험치, 업그레이드, 골드)와 그것을 보여 주는 HUD, 그리고 정렬과 정적 버스다.
+
+#### 지금 코드 점검
+
+| | 지금 | 문제 |
+|---|---|---|
+| 진행도 모델 | `PlayerStats`의 레벨·경험치·업그레이드는 C# 이벤트 5개(`OnLevelUp`, `OnExpChanged`, `OnUpgraded`, `OnSkillLearned`, `OnSkillEquipChanged`)로 알린다. 반응형은 배운 스킬과 장착 슬롯뿐이다. 골드는 `GoldWallet.OnGoldChanged` | 구독하는 쪽이 "구독 + 지금 값 직접 그리기 + 해제"의 짝을 맞춰야 한다(UI_DESIGN 5-1). 진행도를 통째로 바꾸면 값이 바뀌었다는 알림이 없어서 과도기 장치 `OnReloaded`("전부 다시 읽어라")를 쓴다([DEV_TOOLS.md](DEV_TOOLS.md) T6) |
+| 레벨업 저장 | 저장 계기는 업그레이드, 스킬 학습·장착, 스테이지 입장, 앱 내리기·종료다. 레벨업은 아니다 | 플레이어가 직접 누른 명령인데 다음 계기까지 저장되지 않는다. 그 사이 앱이 죽으면(내리기 없이) 레벨업이 사라진다. 세이브 원칙("진행도를 유실하지 않는다")에 어긋난다 |
+| `PlayerHud` | `UIHud`(`UIBase`)이고 `GameManager.Instance`로 플레이어를 찾는다. 구독 6쌍 + 직접 그리기, 표시 문자열을 View가 만든다. 경험치가 바뀔 때마다 로그 2줄(`TODO.md` "코드 품질") | UI_DESIGN 5-7(Passive View)이 아니다. `UIManager`가 HUD를 켜는 역할이 남아 있다 |
+| 보스전 남은 시간 | 표시가 없다(4-A에서 미룸) | 엑셀에 `bossTimeLimit`을 넣어도 화면에 안 보인다. 데이터만으로 기능을 켤 수 없다 |
+| HP 알림 | 호스트의 C# 이벤트 `OnHpChanged`(`IHasHp`)를 머리 위 HP 바와 HUD가 같이 쓴다 | HUD는 시스템 경계를 넘는 구독인데 C# 이벤트다(5-3) |
+| 캐릭터 탭·스킬 슬롯 바 | `UITabPanel`이고 위의 C# 이벤트와 `OnReloaded`를 구독한다 | 이벤트를 지우면 같이 바뀌어야 한다. 구조 이관(창으로)은 다음 작업 6이다 |
+| 정렬 | `UIManager` 아래 중첩 Canvas `StaticCanvas`(HUD, 탭, 보스 버튼, 스테이지 안내)와 `DynamicCanvas`(데미지 숫자)가 둘 다 order 0이라 하이어라키 순서로 그려진다 | 데미지 숫자가 HUD와 탭바 위에 그려진다(`TODO.md` "UI") |
+| 정적 버스 | `GlobalCombatEvents`는 C# `static event` 3개(피격, 몬스터 사망, 회복) | 5-3: `Subject`(과거형 이름) + 플레이 시작 때 구독자 비우기 |
+| 잔재 | `UIHud`(이제 `PlayerHud`뿐), `UITransient`(0개), `UILayer`(쓰는 곳 없음) | |
+| 테스트 | `PlayerStatsTests`의 `AddExp` 2개가 자동 레벨업 시절 기대값으로 실패 중 | `PlayerStats`를 고치는 이번이 정리할 때다 |
+
+#### 범위
+
+| 넣는 것 | 빼는 것 |
+|---|---|
+| `PlayerStats`·`GoldWallet`을 반응형 상태로, 저장 계기는 `Subject`로. `OnReloaded`와 C# 이벤트 삭제 | 탭 2개의 창 이관, `UIManager` 삭제(다음 작업 6) |
+| 파생 상태 타입(`DerivedProperty<T>`) | 업그레이드 표시 API(`IUpgradeStat`)의 `GameNumber`화(탭 이관 때, D14) |
+| 전투원 HP 상태(D29) | 경험치의 `GameNumber`화(UI_DESIGN 10-3에서 미룬 그대로) |
+| `PlayerHud` View + Presenter, 보스전 남은 시간 표시(D33) | 레벨업·골드 획득 연출(쓰는 곳이 생길 때, D32) |
+| HUD/데미지 숫자 정렬(Hud/Fx) | 세이브 오류 창(다음 작업 5) |
+| `GlobalCombatEvents`를 `Subject`로, 플레이 시작 때 비우기 | |
+| `UIHud`, `UITransient`, `UILayer` 삭제. `UIManager`에는 탭만 남는다 | |
+| 레벨업 저장(D30), 실패 테스트 2개 정리(D34) | |
+
+#### 구조
+
+**1. 진행도 모델: 상태, 파생 상태, 사건**
+
+| 주인 | 이름 | 종류 | 쓰는 곳 |
+|---|---|---|---|
+| `PlayerStats` | `Level`, `Exp` | 상태 | HUD, 캐릭터 탭 |
+| | `UpgradeLevel(종류)` | 상태(종류마다 하나) | 캐릭터 탭 |
+| | `LearnedSkills`, `EquippedSlots` | 상태(지금 그대로) | 스킬 창, 스킬 슬롯 바, 캐릭터 |
+| | `RequiredExp`, `CanLevelUp`, `IsMaxLevel` | 파생 상태(레벨·경험치와 데이터에서) | HUD, 캐릭터 탭 |
+| | `CombatStats`(최대 HP, 공격력, 공격 간격) | 파생 상태(레벨·업그레이드와 데이터에서) | 캐릭터(`PlayerController` → `Combatant.UpdateStats`) |
+| | `LevelReached`, `Upgraded`, `SkillLearned`, `SkillEquipChanged` | 사건 | `GameManager`(저장) |
+| `GoldWallet` | `Gold` | 상태 | HUD, 캐릭터 탭 |
+| 호스트(`CombatantHost`) | `Hp`(현재, 최대) | 상태 | HUD, 머리 위 HP 바(D29) |
+
+- **명령은 그대로 동기 + 결과**(UI_DESIGN 10-1): `AddExp`, `TryLevelUp`, `GameSession.TryUpgrade`, `LearnSkill`, `EquipSkill`. 명령은 DTO를 바꾸고 상태를 알린 뒤, 저장 계기 사건을 마지막에 낸다.
+- **`Apply`(`LoadSave`)는 값만 덮어쓰고 사건은 내지 않는다.** 상태가 바뀌므로 구독하는 쪽(HUD, 탭, 캐릭터)은 저절로 따라온다. `OnReloaded`가 없어진다(UI_DESIGN 10-2가 처음 뜻한 모양).
+- **`TryLevelUp`은 여러 레벨을 한 번에 올려도 상태를 한 번만 알린다**(끝 레벨, 남은 경험치). `LevelReached`도 끝 레벨로 한 번이다.
+- 레벨·업그레이드 같은 개수는 `int`, 골드는 `GameNumber`(지금 그대로).
+
+**2. 파생 상태 타입(D31)**
+
+- `DerivedProperty<T>`: 원천 상태들의 "바뀌었다" 신호를 받아 다시 계산하고, 값이 달라졌을 때만 알린다. 구독하는 순간 지금 값을 준다(상태와 같은 모양, `IReadOnlyReactiveProperty<T>`).
+- **계산은 주인이 가진 지금 값에서 한다.** 원천은 다시 계산하라는 신호일 뿐이다. 그래서 `Apply`처럼 여러 값을 한꺼번에 바꿀 때, 주인이 DTO를 먼저 다 바꾸고 상태를 알리면 파생 상태는 처음 신호에서 이미 최종 값이 되고 나머지 신호는 같은 값이라 무시된다. 중간 조합(새 레벨 + 옛 업그레이드)이 바깥에 보이지 않는다. 예: 중간 조합으로 최대 HP가 잠깐 줄면 현재 HP가 깎인 채 남는 문제가 생기지 않는다.
+- 발행에 할당이 없다(반응형 타입 규약 그대로). R3로 옮기면 `CombineLatest(...).ToReadOnlyReactiveProperty()`에 해당한다(5-5).
+- 데이터가 바뀌면(에디터의 튜닝 덮어쓰기) 주인이 파생 상태에 다시 계산하라고 한다. 지금 `PlayerController`가 `DataTuning.Changed`를 받던 것을 `PlayerStats`가 받는다.
+
+**3. HP 상태(D29)**
+
+- `CombatantHost.Hp`(`HpState`: 현재, 최대, `IEquatable`)를 HUD와 머리 위 HP 바가 같이 구독한다. `OnHpChanged` 이벤트와 `IHasHp`를 지운다. 피격 깜빡임(`OnDamaged`)은 사건이고 같은 오브젝트 안이라 C# 이벤트 그대로 둔다(5-3 적용 경계).
+- 머리 위 HP 바는 `Awake`에서 한 번 구독하고 `OnDestroy`에서 해제한다. 몬스터가 풀에서 다시 나와도 구독을 새로 만들지 않아 할당이 없다.
+
+**4. HUD: `PlayerHud` View + Presenter**
+
+- View(`IPlayerHudView`): HP 바(비율, 글자), 경험치 바(비율), 레벨 글자, 골드 글자, 보스 남은 시간(보임, 글자, 강조). uGUI 타입을 Presenter에 내보내지 않는다.
+- Presenter(`PlayerHudPresenter`): `PlayerStats`, `GoldWallet`, 플레이어 호스트의 `Hp`, `EncounterDirector`를 주입받는다. 표시 문자열("Lv.12", "1.2K", "보스 0:27")은 여기서만 만든다(현지화 자리, UI_DESIGN 9장). 경험치 비율은 0~1로 자른다(수동 레벨업이라 경험치가 필요량을 넘어 머문다), 최대 레벨이면 1.
+- 보스 남은 시간은 매 프레임 값이다(원인은 `BossDeadline`, 상태). `UIRoot`가 Presenter의 `Tick`을 부른다. 글자는 표시되는 초가 바뀔 때만 만든다(매 프레임 문자열 할당 없음). 보스전이고 제한이 있을 때만 보이고, 10초 이하면 강조한다.
+- `UIRoot.BindHudWidgets`가 만든다(보스 버튼, 스테이지 안내와 같은 자리). `GameManager.Instance`를 찾지 않는다. `UIManager`가 HUD를 켜는 연결(`ShowUI<PlayerHud>`)이 없어진다.
+
+**5. 탭 2개(D35)**
+
+- 캐릭터 탭(`StatUpgradePanel`)과 스킬 슬롯 바(`SkillSlotBar`)는 `UITabPanel` 그대로 두고, 구독만 반응형으로 바꾼다(보일 때 구독, 숨길 때 `CompositeDisposable` 해제). `OnReloaded` 구독이 없어진다.
+- Presenter로 옮기는 것과 `GameManager.Instance` 제거는 다음 작업 6(탭 이관)에서 한다.
+
+**6. 정렬(Hud/Fx)**
+
+- `UIRoot`(두 시스템을 아는 유일한 곳)가 시작할 때 `StaticCanvas`에 Hud(1000), `DynamicCanvas`에 Fx(0)를 넣는다(`UISort.Apply`, 활성 상태에서). 데미지 숫자가 HUD와 탭바 아래로 간다. 창(2000), 페이드(9980)는 그대로 위다.
+- 스테이지 안내도 Hud 구분이 된다(예전 `UITransient`의 Top 레이어는 실제로 쓰이지 않았다). 창이 열려 있으면 그 아래에 보인다.
+- `DynamicCanvas`에는 GraphicRaycaster가 없다(확인함, 4-1 규칙 그대로).
+
+**7. 정적 버스**
+
+- `GlobalCombatEvents`: `TargetDamaged`, `MonsterDied`, `Healed`를 `Subject`(구조체 내용)로. 발행에 할당이 없다.
+- `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`로 플레이 시작 때 새로 만든다. 도메인 리로드를 꺼도 지난 플레이의 구독자가 남지 않는다(5-3).
+- 받는 쪽: `GameManager`(보상), `CombatEffectManager`(데미지 숫자, 동전). 구독 손잡이를 갖고 해제한다.
+
+**8. 지우는 것**
+
+`PlayerStats`의 C# 이벤트 5개와 `OnReloaded`, `GoldWallet.OnGoldChanged`, `IHasHp`와 `OnHpChanged`, `UIHud`, `UITransient`, `UILayer`, `UIRoot`의 `ShowUI<PlayerHud>`, `PlayerHud`의 로그 2줄.
+
+#### 규칙
+
+- **주인은 DTO를 먼저 다 바꾸고 상태를 알린다.** 알림을 받은 쪽이 바로 저장해도 새 값이 나가고, 파생 상태에 중간 조합이 보이지 않는다(지금 `SetLearnedSkills`의 규칙을 전체로).
+- **`Apply`는 저장 계기 사건을 내지 않는다**(지금 그대로, 테스트로 지킨다).
+- **표시 문자열은 Presenter에서만 만든다.** View는 받은 값을 그린다.
+- **매 프레임 값은 폴링하되 문자열은 값이 바뀔 때만 만든다.**
+
+#### 바뀌는 것
+
+| 대상 | 변화 |
+|---|---|
+| `Assets/Scripts/Reactive/` | `DerivedProperty<T>`(+ 원천 신호 접점), 정적 버스 초기화를 위한 수단 |
+| `PlayerStats`, `GoldWallet`, `GameSession` | 상태·파생 상태·사건, 이벤트 삭제 |
+| `CombatantHost`, `PlayerController`, `FloatingHpBar` | `Hp` 상태(머리 위 바는 한 번만 구독), 캐릭터는 `CombatStats`와 `EquippedSlots`를 구독 |
+| `GameManager` | 저장 계기 구독(레벨업 추가), 보상은 `MonsterDied` 구독 |
+| `PlayerHud`(View), `IPlayerHudView`, `PlayerHudPresenter`(새로) | HUD 이관, 보스 남은 시간 |
+| `StatUpgradePanel`, `SkillSlotBar` | 반응형 구독 |
+| `UIRoot` | HUD Presenter, `Tick`, Hud/Fx 정렬, `ShowUI<PlayerHud>` 삭제 |
+| `UIBase`, `UIManager` | `UIHud`, `UITransient`, `UILayer` 삭제 |
+| `GlobalCombatEvents`, `CombatEffectManager` | `Subject`, 구독 손잡이 |
+| 씬 | `PlayerHud`의 보스 시간 글자(새 오브젝트), `UIRoot`의 HUD·정렬 참조(`SerializedObject`) |
+| 테스트 | 아래 "검증" |
+| 문서 | CLAUDE.md(저장 체크포인트, UI 구조, 이벤트 버스), UI_DESIGN(5-1의 `PlayerHud` 예, 5-3 버스, 10-2의 `OnReloaded`), DEV_TOOLS(T6 과도기 장치 제거), TODO(데미지 숫자 순서, 로그, 실패 테스트) |
+
+#### 결정 (2026-11-26 추천안대로 승인)
+
+| | 질문 | 추천 | 대안과 이유 |
+|---|---|---|---|
+| D29 | HP 알림 | **호스트의 반응형 상태 하나(`Hp`)를 HUD와 머리 위 바가 같이 쓴다.** `OnHpChanged`·`IHasHp` 삭제 | 10-5의 승인안은 "HUD용 상태를 더하고 머리 위 바는 C# 이벤트 그대로"였다. 그러면 같은 정보가 두 길로 나가 한쪽만 고치는 실수가 생길 수 있다. 머리 위 바는 한 번만 구독해서 풀 재사용에도 할당이 없다 |
+| D30 | 레벨업 저장 | **레벨업을 저장 계기에 넣는다**(`LevelReached` → 저장) | 지금은 다음 계기까지 저장되지 않아 강제 종료 때 사라진다. 플레이어가 직접 누른 명령은 업그레이드와 같이 바로 저장하는 것이 일관된다. 경험치 획득은 지금처럼 저장하지 않는다(처치마다 저장하면 잦다, 내리기·종료 때 저장) |
+| D31 | 파생 상태 | **`DerivedProperty<T>`: 주인의 지금 값에서 계산, 원천은 신호만** | 원천 값으로 계산하면(CombineLatest 그대로) `Apply` 중간에 새 레벨 + 옛 업그레이드 같은 조합이 바깥에 보이고, 최대 HP가 잠깐 줄어 현재 HP가 깎인 채 남을 수 있다. Presenter마다 계산하면 게임 규칙(`CanLevelUp`)이 UI로 샌다(5-8) |
+| D32 | 사건의 범위 | **쓰는 곳이 있는 것만 만든다:** `LevelReached`, `Upgraded`, `SkillLearned`, `SkillEquipChanged`(모두 저장이 쓴다) | `GoldGained` 같은 연출용 사건은 그 연출과 함께 만든다(D13과 같은 원칙: 쓰이지 않는 코드를 만들지 않는다) |
+| D33 | 보스전 남은 시간 표시 | **지금 만든다.** 화면 위 가운데, "보스 0:27", 10초 이하면 빨간색. 제한이 없거나 보스전이 아니면 숨긴다 | 값이 정해질 때 만들 수도 있지만, 그러면 디자이너가 엑셀에 값을 넣어도 화면에 안 보여 "데이터만으로 바꿀 수 있는가" 기준에 어긋난다. 모양(자리, 형식, 색)은 바꿔도 구조와 무관하다 |
+| D34 | 실패 중인 `AddExp` 테스트 2개 | **지금 규칙으로 고쳐 쓴다:** `AddExp`는 쌓기만 하고 `CanLevelUp`이 켜진다, `TryLevelUp`이 여러 레벨을 올리고 나머지를 남긴다, 최대 레벨에서 멈춘다 | 지우면 연쇄 레벨업과 나머지 계산을 지키는 테스트가 없어진다. 자동 레벨업으로 돌아갈 계획은 없다 |
+| D35 | 탭 2개 | **구독만 반응형으로 바꾸고 구조는 다음 작업 6에서** | 지금 같이 옮기면 4-B가 HUD와 탭 둘을 다 바꿔 커지고, 작업 6(탭 이관, `UIManager` 삭제)과 겹친다 |
+| D36 | 나누기 | **B-1(모델·버스: 화면 변화 없음) → B-2(HUD·정렬·보스 시간: 화면 변화)로 나눠 검증하고 커밋** | 모델을 바꾸는 쪽은 전투 결과가 4-A 기록과 같은지로 검증할 수 있고, 화면 쪽은 기기 확인이 필요하다. 섞으면 문제가 어디서 났는지 가르기 어렵다(D28과 같은 이유) |
+
+#### 순서와 검증
+
+**B-1 모델·버스**
+1. `DerivedProperty<T>`와 테스트.
+2. `PlayerStats`·`GoldWallet`·`GameSession` 반응형, 저장 계기 `Subject`, 레벨업 저장(D30). `CombatantHost.Hp`(D29).
+3. 받는 쪽: `PlayerController`, `GameManager`, 탭 2개, 지금의 `PlayerHud`(이 단계에서는 구독만 바꾼다), 머리 위 바.
+4. `GlobalCombatEvents` `Subject`화.
+
+새 테스트·고칠 테스트:
+- `DerivedProperty`: 구독 때 지금 값, 같은 값 무시, 여러 원천, 해제 뒤 원천 구독 없음, 발행 할당 0.
+- `PlayerStats`: 상태가 명령마다 정확히 한 번 알림, `AddExp`는 쌓기만(필요량을 넘어도), `TryLevelUp`의 연쇄와 나머지, 최대 레벨에서 멈춤과 경험치, 업그레이드 단계, 파생 상태(`RequiredExp`, `CanLevelUp`, `CombatStats`)가 극단값(레벨 1, 최대 레벨, 필요량 0)에서 맞음. `AddExp` 실패 테스트 2개를 이 규칙으로(D34).
+- `ProgressReloadTests`를 `OnReloaded` 없이: 실행 중 `Apply` 뒤 상태 = 새로 시작한 상태, 구독자가 받은 `CombatStats`는 최종 값 하나뿐(중간 조합 없음), 저장 계기 사건 0, 왕복 안정.
+- `GoldWallet`: 반응형 상태로.
+- 정적 버스: 초기화 뒤 옛 구독자가 불리지 않음.
+- 기존 할당 0 테스트(전투, 흐름)는 그대로 통과.
+
+측정(검증용 사본): 4-A의 결정성 측정(레벨 25, 30fps, 300초)을 다시 돌려 **사건 기록이 4-A와 줄 단위로 같다**(모델을 바꿔도 전투가 그대로). 진행도 교체(개발자 도구 레벨 지정·복원) 뒤 캐릭터 능력치, 장착 스킬, 세이브가 맞고 레벨업 직후 세이브가 바뀐다.
+
+**B-2 HUD·정렬·보스 시간**
+1. `PlayerHud` View + Presenter, `UIRoot` 연결과 `Tick`, 보스 시간 글자(씬).
+2. Hud/Fx 정렬, `UIHud`·`UITransient`·`UILayer` 삭제.
+
+새 테스트: `PlayerHudPresenter`(가짜 View): 경험치 비율 자르기(넘침, 최대 레벨, 필요량 0), HP 비율(최대 0 보호), 숫자 형식, 진행도 교체 뒤 값, 보스 시간은 보스전이고 제한이 있을 때만 보이고 초가 바뀔 때만 글자를 만듦, `Dispose` 뒤 갱신 없음.
+
+측정: 업그레이드·레벨업·진행도 교체 뒤 HUD 값(플레이 중 View에서 읽기). 보스 시간은 튜닝 덮어쓰기(`StageDatabase` / 1 / `bossTimeLimit` / 20)로 사용자 에디터에서 플레이해 화면을 캡처하고, 끝나면 지운다(에디터 화면이 필요한 확인이라 1의 세이브 보호 규칙으로).
+
+S24 눈 확인: HUD 값, 데미지 숫자가 HUD·탭바 아래로 그려짐, 스테이지 안내와 보스 버튼 그대로.
+
+**이 단계가 끝나면:** 진행도 모델과 이벤트 버스가 반응형이고(`TODO.md` 다음 작업 4의 끝 기준), `UIManager`에는 탭만 남는다. `OnReloaded` 같은 "전부 다시 읽기" 장치가 없어도 진행도 교체 뒤 화면과 캐릭터가 맞다. 레벨업이 바로 저장되고, 보스전 제한 시간은 엑셀 값만으로 화면에 나온다.
+
+### 10-11. 4-B 결과
+
+#### B-1 모델·버스 (2026-11-26)
+
+**바뀐 것**
+- 반응형 코어: 파생 상태 `DerivedProperty<T>`와 원천 신호 접점 `IChangeSignal`(`Observable<T>.SubscribeChange`).
+- `PlayerStats`: 상태 `Level`, `Exp`, `UpgradeLevel(종류)`, 파생 상태 `RequiredExp`, `IsMaxLevel`, `CanLevelUp`, `CombatStats`, 사건 `LevelReached`, `Upgraded`, `SkillLearned`, `SkillEquipChanged`. C# 이벤트 5개와 `OnReloaded`를 지웠다. 전투 능력치는 `PlayerCombatStats` 하나로 묶였다(예전 `MaxHp`/`AttackDamage`/`AttackInterval` 읽기 전용 값은 없어졌다).
+- `GoldWallet.Gold` 상태(`OnGoldChanged` 삭제). `CombatantHost.Hp`(`HpState`) 상태(`OnHpChanged`, `IHasHp` 삭제). 머리 위 HP 바는 `Awake`에서 한 번 구독한다.
+- 받는 쪽: `PlayerController`(`CombatStats`, `EquippedSlots` 구독), `GameManager`(레벨업 포함 저장 계기 4개, 보상은 `MonsterDied`), 캐릭터 탭·스킬 슬롯 바(구독만 반응형), 지금의 `PlayerHud`(구독만 반응형, 로그 2줄 삭제. B-2에서 Presenter로).
+- `GlobalCombatEvents`: `Subject`(`TargetDamaged`, `MonsterDied`, `Healed`, 구조체 내용), 플레이 시작 때 `ResetSubscribers`. `CombatEffectManager`는 구독 손잡이로 해제한다.
+
+**설계와 달라진 점**
+- 튜닝 덮어쓰기가 바뀌었을 때의 다시 계산(`PlayerStats.RecomputeFromData`)은 `PlayerStats`가 스스로 구독하지 않고 `GameInitializer`가 연결·해제한다. `PlayerStats`는 수명(해제 시점)이 없는 순수 클래스라 정적 사건을 직접 붙잡지 않게 했다.
+- `AddExp`는 0 이하를 무시한다(예전에는 음수도 더했다. 부르는 곳은 처치 보상과 개발자 도구뿐이라 동작 차이는 없다).
+- `SkillEquipChanged`의 내용은 명령이 바꾼 슬롯 번호다. `LevelReached`는 `TryLevelUp` 한 번에 끝 레벨로 한 번이다.
+- 한 상태의 구독 콜백에서 다른 상태의 `.Value`를 읽으면 `Apply` 도중에는 아직 옛 값일 수 있다(파생 상태가 아닌 상태끼리는 차례로 알린다). 화면은 같은 프레임 안이라 마지막 값이 그려진다. 계산에 쓰려면 파생 상태로 만든다는 규칙을 CLAUDE.md에 적었다.
+- 사용자 에디터가 꺼져 있어 컴파일·테스트는 검증용 사본 에디터에서 했다(CLAUDE.md "외부 도구"). 새 스크립트 5개의 `.meta`는 사본 에디터가 만든 것을 원본에 복사했다(양쪽 GUID가 같다).
+
+**검증** (검증용 사본, `claude` 프로필, 지문 `aab4822a1c2c`)
+
+| 확인 | 결과 |
+|---|---|
+| EditMode 테스트 | 184개 모두 통과(처음으로 실패 0). 새 `DerivedPropertyTests` 7개(구독 때 지금 값, 같은 값 무시, 한꺼번에 바꿀 때 최종 값만, 사건 원천, 바깥 데이터 다시 계산, 해제, 할당 0), `GlobalCombatEventsTests` 2개(초기화 뒤 옛 구독자 없음, 할당 0). `PlayerStatsTests` 13개(실패하던 `AddExp` 2개를 D34대로 고쳐 씀, 명령마다 한 번 알림과 저장 계기, 필요 경험치 0의 극단값). `ProgressReloadTests`를 `OnReloaded` 없이(교체 뒤 = 새로 시작, 왕복 안정, 저장 계기 0, 전투 능력치는 최종 값 하나만) |
+| 전투 그대로 | 4-A의 측정을 다시 돌렸다: 레벨 25 30fps 300초(사건 114개), 레벨 1 렉 300초(137개), 정지 시드 1 1500초(683개). 셋 다 4-A 기록과 줄 단위로 같다(골드 합계 포함) |
+| 레벨업 저장(D30) | 플레이 중 경험치가 쌓인 뒤 `TryLevelUp`: 레벨 25 → 29(최대 레벨에서 멈춤), 세이브 파일이 그 자리에서 29가 됐다. 경험치 획득만으로는 세이브가 바뀌지 않는다 |
+| 상태가 따라옴 | 레벨업 직후 캐릭터의 최대 HP 2900 → 3300(현재 HP 유지), HUD `Lv.29`, `2.9K / 3.3K`. 개발자 도구로 레벨 10을 지정하면 전환 뒤 진행도·캐릭터(1400/1400)·HUD(`Lv.10`, `1.4K / 1.4K`)·입장 때 저장한 세이브(레벨 10)가 모두 맞다 |

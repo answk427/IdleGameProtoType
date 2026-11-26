@@ -33,6 +33,7 @@ public class StatUpgradePanel : UITabPanel
 
     private readonly List<UpgradeListItem> spawnedItems = new List<UpgradeListItem>();
     private PlayerController player;
+    private CompositeDisposable subscriptions;
 
     private void Awake()
     {
@@ -57,38 +58,25 @@ public class StatUpgradePanel : UITabPanel
             return;
         }
 
-        player.Stats.OnUpgraded += RefreshAll;
-        player.Stats.OnExpChanged += OnExpChanged;
-        player.Stats.OnLevelUp += OnLevelUp;
-        player.Stats.OnReloaded += RefreshAll;
-
+        // 진행도의 상태를 구독한다. 구독하는 순간 지금 값으로 한 번씩 그리고, 진행도 교체(Apply) 뒤에도 따라온다.
+        // 창 이관(다음 작업 6)에서 Presenter로 옮긴다.
+        subscriptions?.Dispose();
+        subscriptions = new CompositeDisposable();
+        PlayerStats stats = player.Stats;
+        stats.Level.Subscribe(_ => RefreshAll()).AddTo(subscriptions);
+        stats.Exp.Subscribe(_ => RefreshHeader()).AddTo(subscriptions);
+        stats.CanLevelUp.Subscribe(_ => RefreshHeader()).AddTo(subscriptions);
+        foreach (UpgradeListItem item in spawnedItems)
+            stats.UpgradeLevel(item.StatType).Subscribe(_ => RefreshAll()).AddTo(subscriptions);
         if (GameManager.Instance != null)
-        {
-            GameManager.Instance.Wallet.OnGoldChanged += OnGoldChanged;
-        }
-
-        RefreshAll();
+            GameManager.Instance.Wallet.Gold.Subscribe(_ => RefreshAll()).AddTo(subscriptions);
     }
 
     protected override void OnHidden()
     {
-        if (player != null)
-        {
-            player.Stats.OnUpgraded -= RefreshAll;
-            player.Stats.OnExpChanged -= OnExpChanged;
-            player.Stats.OnLevelUp -= OnLevelUp;
-            player.Stats.OnReloaded -= RefreshAll;
-        }
-
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.Wallet.OnGoldChanged -= OnGoldChanged;
-        }
+        subscriptions?.Dispose();
+        subscriptions = null;
     }
-
-    private void OnGoldChanged(GameNumber _) => RefreshAll();
-    private void OnExpChanged(int current, int required) => RefreshHeader();
-    private void OnLevelUp(int newLevel) => RefreshAll();
 
     private void BuildList()
     {
@@ -109,14 +97,14 @@ public class StatUpgradePanel : UITabPanel
         RefreshHeader();
 
         var stats = player.Stats;
-        GameNumber gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold : GameNumber.Zero;
+        GameNumber gold = GameManager.Instance != null ? GameManager.Instance.Wallet.Gold.Value : GameNumber.Zero;
 
         foreach (var item in spawnedItems)
         {
             UpgradeStatType type = item.StatType;
             bool isMaxed = stats.IsUpgradeMaxed(type);
             GameNumber cost = stats.GetNextUpgradeCost(type);
-            int upgradeLevel = stats.GetCurrentUpgradeLevel(type);
+            int upgradeLevel = stats.UpgradeLevel(type).Value;
             float currentValue = stats.GetCurrentStatValue(type);
             float nextValue = isMaxed ? currentValue : stats.GetNextStatValue(type);
 
@@ -129,22 +117,25 @@ public class StatUpgradePanel : UITabPanel
         if (player == null) return;
 
         var stats = player.Stats;
+        int exp = stats.Exp.Value;
+        int required = stats.RequiredExp.Value;
+        bool canLevelUp = stats.CanLevelUp.Value;
 
-        if (levelText != null) levelText.text = $"Lv. {stats.Level}";
+        if (levelText != null) levelText.text = $"Lv. {stats.Level.Value}";
 
         if (expFillImage != null)
-            expFillImage.fillAmount = stats.RequiredExp > 0 ? Mathf.Min(1f, (float)stats.CurrentExp / stats.RequiredExp) : 0f;
+            expFillImage.fillAmount = required > 0 ? Mathf.Min(1f, (float)exp / required) : 0f;
 
-        if (expText != null) expText.text = $"EXP {NumberFormatUtility.Format(stats.CurrentExp)} / {NumberFormatUtility.Format(stats.RequiredExp)}";
+        if (expText != null) expText.text = $"EXP {NumberFormatUtility.Format(exp)} / {NumberFormatUtility.Format(required)}";
 
         if (expPercentText != null)
         {
-            float percent = stats.RequiredExp > 0 ? (float)stats.CurrentExp / stats.RequiredExp * 100f : 0f;
+            float percent = required > 0 ? (float)exp / required * 100f : 0f;
             expPercentText.text = $"{percent:0.00}%";
         }
 
-        if (levelUpButton != null) levelUpButton.interactable = stats.CanLevelUp;
-        if (levelUpNotification != null) levelUpNotification.SetActive(stats.CanLevelUp);
+        if (levelUpButton != null) levelUpButton.interactable = canLevelUp;
+        if (levelUpNotification != null) levelUpNotification.SetActive(canLevelUp);
     }
 
     private void OnClickUpgrade(UpgradeStatType type)
@@ -152,13 +143,13 @@ public class StatUpgradePanel : UITabPanel
         if (player == null || GameManager.Instance == null) return;
         // 결과(UpgradeResult)별 안내는 1차 UI 이관 때 붙인다. 지금은 버튼 활성화로 이미 걸러진다.
         GameManager.Instance.Session.TryUpgrade(type);
-        // RefreshAll()은 OnUpgraded/OnGoldChanged 이벤트로 자동 호출됨
+        // 화면은 업그레이드 단계·골드 상태를 구독해 따라온다
     }
 
     private void OnClickLevelUp()
     {
         if (player == null) return;
         player.Stats.TryLevelUp();
-        // RefreshAll()은 OnLevelUp 이벤트로 자동 호출됨
+        // 화면은 레벨·경험치 상태를 구독해 따라온다
     }
 }

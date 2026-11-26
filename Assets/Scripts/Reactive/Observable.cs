@@ -12,7 +12,7 @@ using UnityEngine;
 // - 한 구독자의 예외가 다른 구독자의 알림을 막지 않는다.
 //
 // 메인 스레드 전용이다.
-public abstract class Observable<T>
+public abstract class Observable<T> : IChangeSignal
 {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     private const int MaxFollowUpDeliveries = 1000;
@@ -44,6 +44,14 @@ public abstract class Observable<T>
         }
 
         return subscription;
+    }
+
+    // 값은 보지 않고 "바뀌었다(일어났다)"만 받는다. 파생 상태의 원천 신호로 쓴다(DerivedProperty).
+    // 상태는 구독하는 순간 한 번 신호가 온다(지금 값 전달과 같다).
+    public IDisposable SubscribeChange(Action onChange)
+    {
+        if (onChange == null) throw new ArgumentNullException(nameof(onChange));
+        return Subscribe(_ => onChange());
     }
 
     // 구독하는 순간 건네줄 현재 값. 사건에는 현재 값이라는 개념이 없다.

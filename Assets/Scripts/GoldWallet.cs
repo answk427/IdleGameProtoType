@@ -1,35 +1,29 @@
-using System;
-
-// 골드(재화) 보유량과 증감 로직만 담당하는 순수 클래스.
-// GameManager에서 분리됨 - MonoBehaviour가 아니라 PlayerStats와 같은 패턴으로,
-// 단위 테스트와 재사용이 쉽도록 의도적으로 Unity 라이프사이클에 묶지 않았다.
-// 골드는 상한 없이 지수적으로 커지므로 GameNumber로 다룬다.
-public class GoldWallet
+// 골드(재화) 보유량과 증감 규칙만 담당하는 순수 클래스(GameSession이 갖는다).
+// 골드는 상한 없이 지수적으로 커지므로 GameNumber로 다룬다. 보유량은 반응형 상태라 구독하는 순간 지금 값을 받고,
+// 바뀌면 따라온다(docs/UI_DESIGN.md 5-3). 골드 획득 같은 연출용 사건은 쓰는 곳이 생길 때 만든다(D32).
+public sealed class GoldWallet
 {
-    public event Action<GameNumber> OnGoldChanged;
+    private readonly ReactiveProperty<GameNumber> gold = new ReactiveProperty<GameNumber>(GameNumber.Zero);
 
-    public GameNumber Gold { get; private set; } = GameNumber.Zero;
+    public IReadOnlyReactiveProperty<GameNumber> Gold => gold;
 
     public void AddGold(GameNumber amount)
     {
-        Gold += amount;
-        OnGoldChanged?.Invoke(Gold);
+        gold.Value = gold.Value + amount;
     }
 
     public bool TrySpendGold(GameNumber amount)
     {
         if (amount <= GameNumber.Zero) return true;
-        if (Gold < amount) return false;
+        if (gold.Value < amount) return false;
 
-        Gold -= amount;
-        OnGoldChanged?.Invoke(Gold);
+        gold.Value = gold.Value - amount;
         return true;
     }
 
-    // 저장 데이터를 적용할 때 사용(GameSession.Apply). UI가 OnGoldChanged를 구독 중이면 같이 갱신된다.
+    // 저장 데이터를 적용할 때 사용(GameSession.Apply). 구독하는 쪽은 그대로 따라온다.
     public void LoadGold(GameNumber amount)
     {
-        Gold = amount;
-        OnGoldChanged?.Invoke(Gold);
+        gold.Value = amount;
     }
 }
