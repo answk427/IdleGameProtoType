@@ -64,15 +64,7 @@ public class PlayerController : CombatantHost
         subscriptions.Dispose();
     }
 
-    private CombatantStats BuildStats(PlayerCombatStats s) => new CombatantStats
-    {
-        MaxHp = s.MaxHp,
-        AttackDamage = s.AttackDamage,
-        AttackInterval = s.AttackInterval,
-        AttackRange = character != null ? character.AttackRange : 0f,
-        MoveSpeed = character != null ? character.MoveSpeed : 0f,
-        MovePolicy = MovePolicy.Advance,
-    };
+    private CombatantStats BuildStats(PlayerCombatStats s) => CombatantSetup.ForPlayer(s, character);
 
     // ── 연출 ──
 

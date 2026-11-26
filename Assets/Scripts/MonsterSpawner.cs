@@ -42,7 +42,7 @@ public class MonsterSpawner : MonoBehaviour, IEncounterHost
         // 보스와 일반 몬스터는 같은 Monster다. 차이는 데이터(스킬, 이동 정책, 공격)뿐이고, 보스인지는 흐름이 안다.
         monster.OriginPrefab = prefab;
         views?.Register(monster); // 풀에서 다시 꺼낸 것이면 이미 있다
-        CalcStageMultiplier(stage, out double hpMult, out double dmgMult, out double goldMult);
+        CombatantSetup.StageMultipliers(stage.StageNumber, GameDatabaseManager.Instance.Balance, out double hpMult, out double dmgMult, out double goldMult);
         monster.Spawn(entry.data, hpMult, dmgMult, goldMult);
         return monster.Combatant;
     }
@@ -70,12 +70,4 @@ public class MonsterSpawner : MonoBehaviour, IEncounterHost
         return PlayAreaBounds.Instance != null ? PlayAreaBounds.Instance.GroundY : fallbackY;
     }
 
-    // 스테이지 성장 배율. double로 계산한다(float 지수는 큰 스테이지에서 정밀도를 잃고, 결과는 GameNumber로 간다).
-    private static void CalcStageMultiplier(StageData stageData, out double hpMult, out double dmgMult, out double goldMult)
-    {
-        BalanceConfig balance = GameDatabaseManager.Instance.Balance;
-        hpMult = Math.Pow(balance.hpGrowthBase, stageData.StageNumber);
-        dmgMult = Math.Pow(balance.damageGrowthBase, stageData.StageNumber);
-        goldMult = Math.Pow(balance.goldGrowthBase, stageData.StageNumber);
-    }
 }

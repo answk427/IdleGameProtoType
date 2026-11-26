@@ -28,6 +28,8 @@ public abstract class CombatantHost : MonoBehaviour
     public bool IsAlive => Combatant != null && Combatant.IsAlive;
     public float HalfWidth => hitboxProfile.HalfWidth;
     public ActionTimelineSet Timelines => timelines;
+    // 판정 몸(읽기 전용). 씬 없이 같은 전투를 만드는 쪽(헤드리스 실행)이 프리팹에서 읽는다.
+    public HitboxProfile Hitbox => hitboxProfile;
 
     // 판정 몸의 중심. x는 시뮬레이션의 위치라 원점 재설정 직후에도 맞는다(그려진 transform은 다음 화면 프레임에 따라온다).
     // 이펙트(타격, 스킬)의 기준점.

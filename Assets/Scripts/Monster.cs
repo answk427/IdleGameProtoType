@@ -30,24 +30,16 @@ public class Monster : CombatantHost
     }
 
     // 스포너가 위치를 정한 뒤에 부른다(풀에서 꺼낸 같은 객체를 다시 쓰므로 이전 상태를 모두 지운다).
-    // 처치 보상 골드는 스테이지 배율로 지수적으로 커지므로 GameNumber.
+    // 능력치와 처치 보상의 계산은 CombatantSetup 한 곳(씬 없는 실행도 같은 계산).
     public void Spawn(MonsterData data, double hpMultiplier, double damageMultiplier, double goldMultiplier)
     {
-        var reward = new CombatReward(GameNumber.Round(data.GoldReward * goldMultiplier), data.ExpReward);
+        CombatReward reward = CombatantSetup.RewardOf(data, goldMultiplier);
 
         skillSlot[0] = data.SkillId > 0 ? data.SkillId : SkillLoadout.EmptySlot;
         skills.SetSlots(skillSlot);
         skills.ResetCooldowns();
 
-        var stats = new CombatantStats
-        {
-            MaxHp = GameNumber.Round(data.MaxHp * hpMultiplier),
-            AttackDamage = GameNumber.Round(data.AttackDamage * damageMultiplier),
-            AttackInterval = data.AttackInterval,
-            AttackRange = data.AttackRange,
-            MoveSpeed = data.MoveSpeed, // 접근 정책이 쓴다(제자리 정책은 움직이지 않는다)
-            MovePolicy = data.MovePolicy,
-        };
+        CombatantStats stats = CombatantSetup.ForMonster(data, hpMultiplier, damageMultiplier);
 
         // 체력바가 먼저 켜져 있어야 등록(Joined) 때 HP 알림을 받는다.
         if (hpBar != null) hpBar.gameObject.SetActive(true);

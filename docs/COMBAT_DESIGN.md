@@ -4,6 +4,8 @@
 
 > 2026-11-24 전투 1단계([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 7장)로 바뀐 것: 3-6(Animator Fixed 모드)은 Normal로 되돌렸고(로직이 애니메이션을 읽지 않게 됨), 3-7(`AttackTimer` 이월)은 행동 시간표로 대체해 지웠으며, 8절 초안은 채택하지 않았다. 고정 단계, 보간, CCD, 스크롤 소유(3-1~3-5)는 그대로다.
 
+> 2026-11-27 전투 5-B([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 11-6)로 바뀐 것: 3-1의 `FixedUpdate`는 없어졌다. 순수 C# `SimulationLoop`가 화면 프레임의 게임 시간을 누산해 고정 단계(0.02초, 상한 1/3초)를 돌리고, `CombatSimulation`은 `Update`에서 그것을 부르고 보간만 한다. 보간 비율도 루프의 남은 시간에서 나온다(`Time.fixedTime`이 아니다). 단계 안의 순서와 결과는 같다(기준선 비트 단위 동일). 6절의 측정(V1, V2)은 이제 EditMode 테스트 `HeadlessGameTests`다.
+
 ## 1. 문제
 
 ### 1-1. 몬스터가 플레이어 몸을 통과한다 (경로 두 개)
