@@ -8,7 +8,8 @@ using UnityEngine.InputSystem;
 // 이관 기간에는 기존 UIManager(HUD, 탭)와 공존한다. 규칙:
 // - 화면 하나의 주인은 하나다. 지금 WindowManager의 창은 SkillManageWindow뿐이다.
 // - 두 시스템을 아는 곳은 여기뿐이다("이관 기간 연결"). 이관이 끝나면 그 부분만 지우면 된다.
-// - 이 Canvas(order 1)가 기존 UIManager Canvas(0)보다 항상 위다.
+// - 그리는 순서는 정렬 구분(UISortBand)이다. 기존 UIManager 쪽 Canvas도 여기서 구분을 넣는다:
+//   HUD·탭(StaticCanvas) = Hud, 데미지 숫자(DynamicCanvas) = Fx. 창(Window), 페이드(System)는 그 위다.
 [RequireComponent(typeof(Canvas))]
 public class UIRoot : MonoBehaviour
 {
@@ -19,8 +20,15 @@ public class UIRoot : MonoBehaviour
     [SerializeField] private FadeController fadeController;
 
     [Header("HUD 위젯 (View, Presenter는 여기서 만든다)")]
+    [SerializeField] private PlayerHud playerHud;
     [SerializeField] private BossChallengeButton bossChallengeButton;
     [SerializeField] private StageAnnouncement stageAnnouncement;
+
+    [Header("정렬 구분 (기존 UIManager 쪽 Canvas)")]
+    [Tooltip("HUD, 보스 버튼, 스테이지 안내, 탭이 있는 Canvas → Hud 구분")]
+    [SerializeField] private Canvas hudCanvas;
+    [Tooltip("데미지 숫자가 있는 Canvas → Fx 구분(HUD 아래, GraphicRaycaster 없음)")]
+    [SerializeField] private Canvas fxCanvas;
 
     [Header("이관 기간 연결 (기존 UIManager 쪽)")]
     [SerializeField] private UIManager uiManager;
@@ -28,6 +36,7 @@ public class UIRoot : MonoBehaviour
 
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
+    private PlayerHudPresenter hudPresenter;
     private WindowManager windows;
     private InputBlocker inputBlocker;
     private InputAction backAction;
@@ -40,13 +49,15 @@ public class UIRoot : MonoBehaviour
         if (windows != null || !ValidateReferences()) return;
 
         UISort.Apply(fadeLayer, UISort.FadeOrder);
+        UISort.Apply(hudCanvas, (int)UISortBand.Hud);
+        UISort.Apply(fxCanvas, (int)UISortBand.Fx);
 
         inputBlocker = new InputBlocker(transform);
         windows = new WindowManager(transform, registry, inputBlocker);
         fadeController.Initialize(inputBlocker, flow);
 
         BindWindows(session, skills, player);
-        BindHudWidgets(flow);
+        BindHudWidgets(session, player, flow);
 
         inputBlocker.IsBlocked.Subscribe(_ => RefreshNavigation()).AddTo(disposables);
         windows.HasModal.Subscribe(_ => RefreshNavigation()).AddTo(disposables);
@@ -70,8 +81,11 @@ public class UIRoot : MonoBehaviour
     }
 
     // 씬에 배치된 HUD 위젯. 창이 아니라 WindowManager를 거치지 않고, Presenter의 수명은 UIRoot와 같다.
-    private void BindHudWidgets(EncounterDirector flow)
+    private void BindHudWidgets(GameSession session, PlayerController player, EncounterDirector flow)
     {
+        // 보스전 남은 시간은 흐름의 제한 시각과 시뮬레이션 시계로 계산한다(매 프레임 값, Tick).
+        hudPresenter = new PlayerHudPresenter(playerHud, session.Stats, session.Wallet, player.Hp,
+            () => flow.BossDeadline, () => flow.Clock.Now).AddTo(disposables);
         new BossChallengePresenter(bossChallengeButton, flow).AddTo(disposables);
         new StageAnnouncementPresenter(stageAnnouncement, flow.CurrentStageNumber).AddTo(disposables);
     }
@@ -82,6 +96,7 @@ public class UIRoot : MonoBehaviour
 
         windows.Tick();
         inputBlocker.Tick();
+        hudPresenter.Tick();
     }
 
     private void OnDestroy()
@@ -119,9 +134,6 @@ public class UIRoot : MonoBehaviour
     {
         skillSlotBar.SkillManageRequested += OpenSkillManage;
         uiManager.OnTabChanged += HandleTabChanged;
-
-        // HUD는 조립이 끝나면 켠다(예전에는 OnGameStarted 사건으로 켜졌다). 4-B에서 PlayerHud가 Presenter로 바뀌면 없어진다.
-        uiManager.ShowUI<PlayerHud>();
     }
 
     private void DisconnectLegacyUI()
@@ -141,6 +153,9 @@ public class UIRoot : MonoBehaviour
         if (registry == null) { Debug.LogError("[UIRoot] registry(WindowRegistry)가 연결되지 않았습니다."); ok = false; }
         if (fadeLayer == null) { Debug.LogError("[UIRoot] fadeLayer가 연결되지 않았습니다."); ok = false; }
         if (fadeController == null) { Debug.LogError("[UIRoot] fadeController가 연결되지 않았습니다."); ok = false; }
+        if (playerHud == null) { Debug.LogError("[UIRoot] playerHud가 연결되지 않았습니다."); ok = false; }
+        if (hudCanvas == null) { Debug.LogError("[UIRoot] hudCanvas(StaticCanvas)가 연결되지 않았습니다."); ok = false; }
+        if (fxCanvas == null) { Debug.LogError("[UIRoot] fxCanvas(DynamicCanvas)가 연결되지 않았습니다."); ok = false; }
         if (bossChallengeButton == null) { Debug.LogError("[UIRoot] bossChallengeButton이 연결되지 않았습니다."); ok = false; }
         if (stageAnnouncement == null) { Debug.LogError("[UIRoot] stageAnnouncement가 연결되지 않았습니다."); ok = false; }
         if (uiManager == null) { Debug.LogError("[UIRoot] uiManager가 연결되지 않았습니다."); ok = false; }

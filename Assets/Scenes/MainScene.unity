@@ -1603,8 +1603,11 @@ MonoBehaviour:
   registry: {fileID: 11400000, guid: 15d75a5fb4f304b4c95a4af7d02ecdcc, type: 2}
   fadeLayer: {fileID: 119688928}
   fadeController: {fileID: 1698183982}
+  playerHud: {fileID: 6414485674498160178}
   bossChallengeButton: {fileID: 8862145974461050685}
   stageAnnouncement: {fileID: 1176470795}
+  hudCanvas: {fileID: 396469532}
+  fxCanvas: {fileID: 1672030644}
   uiManager: {fileID: 1698183983}
   skillSlotBar: {fileID: 503102083}
 --- !u!224 &1625906308
@@ -2680,6 +2683,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: fb234ace4dbf47d44bdb9987cbd95a2d, type: 3}
+--- !u!114 &6414485674498160178 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4640622682888434601, guid: fb234ace4dbf47d44bdb9987cbd95a2d, type: 3}
+  m_PrefabInstance: {fileID: 6414485674498160177}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e920eeea2b9abb44cba5a18cd09e73dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHud
 --- !u!1001 &8862145974461050684
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -117,12 +117,13 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 - 창은 `Update`를 쓰지 않는다(숨겨도 돈다). 매 프레임 값은 Presenter의 `Tick()`.
 - `InputBlocker` — 참조 카운트 입력 차단. **코루틴 지역변수로 `using`하지 말 것**(끊기면 안 풀림, `FadeController` 참고).
 - `SkillManageWindow`(View) + `SkillManagePresenter` + `SkillListItem`/`SkillSlotWidget` — 스킬 학습/슬롯 장착. 첫 이관 사례. (프리팹 파일명은 `SkillManagePopup.prefab` 그대로)
-- **씬의 HUD 위젯도 View + Presenter**(창이 아니라 `WindowManager`를 거치지 않는다): `BossChallengeButton`(보이기 = `BossChallengeAvailable`, 누르면 `RequestBossChallenge`), `StageAnnouncement`(스테이지 번호가 바뀌면 "Stage N"). Presenter는 `Assets/Scripts/UI/Flow/`, `UIRoot.BindHudWidgets`가 만들고 수명을 갖는다. 위젯이 스스로 숨거나 게임 쪽을 직접 부르지 않는다.
+- **씬의 HUD 위젯도 View + Presenter**(창이 아니라 `WindowManager`를 거치지 않는다): `PlayerHud`(HP·경험치·레벨·골드·보스전 남은 시간, Presenter `Assets/Scripts/UI/Hud/PlayerHudPresenter`), `BossChallengeButton`(보이기 = `BossChallengeAvailable`, 누르면 `RequestBossChallenge`), `StageAnnouncement`(스테이지 번호가 바뀌면 "Stage N", Presenter는 `Assets/Scripts/UI/Flow/`). `UIRoot.BindHudWidgets`가 만들고 수명을 갖는다. 위젯이 스스로 숨거나 게임 쪽을 직접 부르지 않는다. 매 프레임 값(보스 남은 시간)은 `UIRoot`가 HUD Presenter의 `Tick`을 부르고, 글자는 보이는 값이 바뀔 때만 만든다.
 - `FadeController` — 흐름의 전환 시각(`EncounterDirector.Transition`)을 그리기만 한다(시작 0 → 가운데 1 → 끝 0). 전환 중에는 입력을 막는다.
+- **그리는 순서:** 기존 `UIManager` 쪽 Canvas에도 `UIRoot`가 시작할 때 정렬 구분을 넣는다: `StaticCanvas`(HUD, 보스 버튼, 스테이지 안내, 탭) = Hud, `DynamicCanvas`(데미지 숫자) = Fx. 데미지 숫자가 HUD·탭바 아래로 그려진다.
 
-기존 구조 (HUD, 탭 — 이관 예정)
-- `UIBase`(`Assets/Scripts/UI/UIBase.cs`) — 기존 패널의 베이스, `UIManager`가 생명주기 관리. 팝업용 서브클래스는 없다. `UIHud`는 이제 `PlayerHud`뿐이고 조립이 끝나면 `UIRoot`가 켠다(4-B에서 Presenter로 바뀌면 없어진다).
-- `UITabPanel : UIBase` — 탭(`TabType`)이 있는 패널 전용 서브클래스(`StatUpgradePanel`, `SkillSlotBar`). `TabType`은 `UIBase`가 아니라 여기로 분리돼 있음 — 탭 없는 UI(`StageAnnouncement` 등)는 `UIBase`를 직접 상속.
+기존 구조 (탭 — 이관 예정, 다음 작업 6)
+- `UIBase`(`Assets/Scripts/UI/UIBase.cs`) — 기존 패널의 베이스, `UIManager`가 생명주기 관리. 남은 것은 탭(`UITabPanel`)뿐이다(`UIHud`, `UITransient`, `UILayer`는 4-B에서 지웠다).
+- `UITabPanel : UIBase` — 탭(`TabType`)이 있는 패널 전용 서브클래스(`StatUpgradePanel`, `SkillSlotBar`). 진행도 구독은 반응형이고(보일 때 구독, 숨길 때 해제), Presenter 이관은 다음 작업 6.
 - `StatUpgradePanel` + `UpgradeListItem` — 데이터 기반 업그레이드 목록(`PlayerStats.upgradeStats : Dictionary<UpgradeStatType, IUpgradeStat>`로 Strategy 패턴). 새 업그레이드 스탯 추가 시 `IUpgradeStat` 구현체 하나 추가 + 등록만 하면 됨 (`HpUpgradeStat`, `AttackUpgradeStat`, `AttackSpeedUpgradeStat` 참고).
 
 ## 이벤트 버스
@@ -160,7 +161,7 @@ Unity ScriptableObject(`.asset`)는 **C# 필드 이름을 YAML 키로 그대로 
 
 ## 작업 시 주의사항
 
-- **테스트는 작성해도 된다**(2026-11-23 합의 변경. 전에는 새 테스트를 만들지 않기로 했다). 반복해서 쓸 검증은 테스트로 `Assets/Tests/EditMode/`에 둔다. 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 확인한다(예: `docs/COMBAT_ARCHITECTURE.md` 5절). 일회성 측정 스크립트는 저장소에 넣지 않고 쓰고 지운다. 실패 중인 기존 테스트 2개(`AddExp`)는 고칠지 지울지 결정 대기(`docs/TODO.md`).
+- **테스트는 작성해도 된다**(2026-11-23 합의 변경. 전에는 새 테스트를 만들지 않기로 했다). 반복해서 쓸 검증은 테스트로 `Assets/Tests/EditMode/`에 둔다. 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 확인한다(예: `docs/COMBAT_ARCHITECTURE.md` 5절). 일회성 측정 스크립트는 저장소에 넣지 않고 쓰고 지운다. 실패하던 `AddExp` 테스트 2개는 4-B에서 지금 규칙(수동 레벨업)으로 고쳐 써서 지금은 모두 통과한다.
 - **`git commit`은 사용자가 그 턴에 명시적으로 지시했을 때만.**
 - 일부 `.cs` 파일은 CP949(EUC-KR) 인코딩 — UTF-8로 Edit/Write하면 한글 주석이 깨질 수 있으니 주의. (직접 새로 작성하는 파일은 UTF-8로 써도 무방, 기존 CP949 파일을 수정할 때만 주의)
 - IData 구현 클래스의 필드/프로퍼티를 리네임하는 작업은 반드시 위 "직렬화 함정" 섹션을 먼저 확인하고, `.asset` 데이터와의 정합성을 같이 맞출 것.

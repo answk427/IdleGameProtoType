@@ -4,7 +4,7 @@ using UnityEngine;
 
 // 패널 등록/조회와 탭 스택을 관리한다. 1차 이관이 끝나면 사라진다 (docs/UI_DESIGN.md 9장).
 // 팝업(창)은 여기가 아니라 UIRoot의 WindowManager가 관리한다. 새 팝업을 여기에 추가하지 말 것.
-// 게임 상태에 따라 HUD를 언제 켤지는 모른다 — 그건 각 패널이 이벤트를 구독해서 스스로 결정한다.
+// 지금 맡은 것은 탭뿐이다. HUD는 전투 4-B에서 View + Presenter(UIRoot가 만든다)가 됐다.
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
