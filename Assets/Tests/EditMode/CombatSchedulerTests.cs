@@ -27,7 +27,7 @@ public class CombatSchedulerTests
     {
         public readonly SimClock Clock;
         public readonly CombatActions Combat;
-        public readonly Dictionary<string, ActionTimeline> Timelines = new Dictionary<string, ActionTimeline>();
+        public readonly Dictionary<string, ActionTiming> Timelines = new Dictionary<string, ActionTiming>();
         public readonly List<Skill> Skills = new List<Skill>();
         public double AttackDuration = 1.0;
         public bool BasicAttack = true;
@@ -51,7 +51,7 @@ public class CombatSchedulerTests
         }
 
         public bool IsAlive => Alive;
-        public bool TryGetTimeline(string key, out ActionTimeline timeline) => Timelines.TryGetValue(key, out timeline);
+        public bool TryGetTiming(string key, out ActionTiming timing) => Timelines.TryGetValue(key, out timing);
         public bool HasBasicAttack => BasicAttack;
         public double BasicAttackDuration => AttackDuration;
         public bool TryAcquireTarget() => Alive && Target && (Opponent == null || Opponent.Alive);
@@ -88,7 +88,7 @@ public class CombatSchedulerTests
             CountHit();
         }
 
-        public void OnActionStarted(ActionTimeline action, double duration, Skill skill) =>
+        public void OnActionStarted(ActionTiming action, double duration, Skill skill) =>
             Starts.Add(new StartRecord { Key = action.Key, Time = Clock.Now, Duration = duration, Skill = skill });
 
         public void OnActionsIdle() => IdleCalls++;
@@ -109,10 +109,10 @@ public class CombatSchedulerTests
     }
 
     // 기본 공격: 1.2초 클립, 타격 0.7초(지금 플레이어 클립과 같은 비율)
-    private static ActionTimeline AttackTimeline() => ActionTimeline.FromValues("Attack", 1.2f, new[] { 0.7f / 1.2f });
+    private static ActionTiming AttackTimeline() => ActionTiming.FromValues("Attack", 1.2f, new[] { 0.7f / 1.2f });
 
     // 스킬: 0.5초 클립, 타격 0.2초(길이는 클립이 아니라 스킬의 castTime이 정한다)
-    private static ActionTimeline SkillTimeline() => ActionTimeline.FromValues("Skill", 0.5f, new[] { 0.4f });
+    private static ActionTiming SkillTimeline() => ActionTiming.FromValues("Skill", 0.5f, new[] { 0.4f });
 
     private static void Run(SimClock clock, CombatScheduler scheduler, int steps, params FakeActor[] actors) =>
         Run(clock, scheduler, steps, null, actors);
@@ -240,8 +240,8 @@ public class CombatSchedulerTests
 
         List<StartRecord> skillStarts = actor.SkillStarts();
         Assert.AreEqual(0.0, skillStarts[0].Time);
-        double readyAt = skillStarts[0].Time + skill.Data.Cooldown;
-        double expectedSecondCast = FirstCompletionAtOrAfter(0.0 + skill.Data.CastTime, 0.33, readyAt);
+        double readyAt = skillStarts[0].Time + skill.Spec.Cooldown;
+        double expectedSecondCast = FirstCompletionAtOrAfter(0.0 + skill.Spec.CastTime, 0.33, readyAt);
         Assert.AreEqual(expectedSecondCast, skillStarts[1].Time, 0.0);
     }
 
@@ -296,7 +296,7 @@ public class CombatSchedulerTests
         Assert.IsTrue(actor.Starts.TrueForAll(s => s.Skill != null), "기본 공격을 시작하지 않는다");
         List<StartRecord> skillStarts = actor.SkillStarts();
         Assert.AreEqual(firstReady, skillStarts[0].Time, 0.0);
-        Assert.AreEqual(skillStarts[0].Time + skill.Data.Cooldown, skillStarts[1].Time, 0.0);
+        Assert.AreEqual(skillStarts[0].Time + skill.Spec.Cooldown, skillStarts[1].Time, 0.0);
     }
 
     [TestCase(1.0, 0.001f, 0.5f)]     // 쿨다운이 거의 없는 스킬을 계속 쓴다
@@ -307,7 +307,7 @@ public class CombatSchedulerTests
     {
         var clock = new SimClock(Step);
         var actor = new FakeActor(clock) { AttackDuration = attack };
-        actor.Timelines["Skill"] = ActionTimeline.FromValues("Skill", 0.5f, new[] { 0.3f, 0.6f, 1f }); // 끝 시각의 타격 포함
+        actor.Timelines["Skill"] = ActionTiming.FromValues("Skill", 0.5f, new[] { 0.3f, 0.6f, 1f }); // 끝 시각의 타격 포함
         Skill a = TestSkills.Create(id: 1, cooldown: cooldown, castTime: castTime);
         Skill b = TestSkills.Create(id: 2, cooldown: cooldown * 3f, castTime: castTime * 2f);
         Skill manual = TestSkills.Create(id: 9, cooldown: cooldown * 5f, castTime: castTime);
@@ -322,7 +322,7 @@ public class CombatSchedulerTests
         {
             StartRecord current = actor.Starts[i];
             StartRecord next = actor.Starts[i + 1];
-            double expectedDuration = current.Skill != null ? current.Skill.Data.CastTime : attack;
+            double expectedDuration = current.Skill != null ? current.Skill.Spec.CastTime : attack;
             int expectedHits = actor.Timelines[current.Key].HitFractions.Count;
 
             Assert.AreEqual(expectedDuration, current.Duration, 0.0, $"{i}번째 행동 길이는 데이터 값");
@@ -335,7 +335,7 @@ public class CombatSchedulerTests
             List<StartRecord> casts = actor.Starts.FindAll(s => s.Skill == skill);
             for (int i = 0; i + 1 < casts.Count; i++)
             {
-                Assert.GreaterOrEqual(casts[i + 1].Time, casts[i].Time + skill.Data.Cooldown, $"스킬 {skill.Data.Id} 쿨다운");
+                Assert.GreaterOrEqual(casts[i + 1].Time, casts[i].Time + skill.Spec.Cooldown, $"스킬 {skill.Spec.Id} 쿨다운");
             }
         }
     }
@@ -363,8 +363,8 @@ public class CombatSchedulerTests
         var clock = new SimClock(Step);
         var a = new FakeActor(clock) { AttackDuration = 0.02 };
         var b = new FakeActor(clock) { AttackDuration = 0.02, KillsOpponentOnHit = true };
-        a.Timelines["Attack"] = ActionTimeline.FromValues("Attack", 1f, new[] { 0.9f });  // 0.018초
-        b.Timelines["Attack"] = ActionTimeline.FromValues("Attack", 1f, new[] { 0.25f }); // 0.005초
+        a.Timelines["Attack"] = ActionTiming.FromValues("Attack", 1f, new[] { 0.9f });  // 0.018초
+        b.Timelines["Attack"] = ActionTiming.FromValues("Attack", 1f, new[] { 0.25f }); // 0.005초
         a.Opponent = b;
         b.Opponent = a;
 
@@ -382,8 +382,8 @@ public class CombatSchedulerTests
         var clock = new SimClock(Step);
         var first = new FakeActor(clock) { AttackDuration = 0.02, KillsOpponentOnHit = true };
         var second = new FakeActor(clock) { AttackDuration = 0.02, KillsOpponentOnHit = true };
-        first.Timelines["Attack"] = ActionTimeline.FromValues("Attack", 1f, new[] { 0.5f });
-        second.Timelines["Attack"] = ActionTimeline.FromValues("Attack", 1f, new[] { 0.5f });
+        first.Timelines["Attack"] = ActionTiming.FromValues("Attack", 1f, new[] { 0.5f });
+        second.Timelines["Attack"] = ActionTiming.FromValues("Attack", 1f, new[] { 0.5f });
         first.Opponent = second;
         second.Opponent = first;
 

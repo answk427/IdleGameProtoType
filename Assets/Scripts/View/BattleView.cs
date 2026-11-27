@@ -59,7 +59,7 @@ public class BattleView : MonoBehaviour
         views?.Dispose();
     }
 
-    private CombatantHost Attach(Combatant combatant)
+    private CombatantHost Attach(IReadOnlyCombatant combatant)
     {
         CombatantArchetype archetype = combatant.Archetype;
         GameObject prefab;
@@ -104,7 +104,7 @@ public class BattleView : MonoBehaviour
         return host;
     }
 
-    private void Detach(Combatant combatant, CombatantHost host)
+    private void Detach(IReadOnlyCombatant combatant, CombatantHost host)
     {
         host.Unbind();
         if (prefabOf.TryGetValue(host, out GameObject prefab)) pools.Despawn(prefab, host.gameObject);

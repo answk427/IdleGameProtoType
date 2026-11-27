@@ -13,7 +13,7 @@ public class Monster : CombatantHost
         if (hpBar == null) hpBar = GetComponentInChildren<FloatingHpBar>();
     }
 
-    public override void Bind(Combatant combatant)
+    public override void Bind(IReadOnlyCombatant combatant)
     {
         base.Bind(combatant);
 

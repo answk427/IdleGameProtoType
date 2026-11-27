@@ -12,7 +12,7 @@ public static class CombatTestKit
         public int Joined, Left, StatsChanged, Damaged, Healed, Died, DeathCompleted, Revived, BasicHits, SkillHits, ActionsStarted;
         public GameNumber LastDamage;
         public CombatReward LastReward;
-        public System.Action<Combatant, CombatEvent> OnDiedCallback;
+        public System.Action<Combatant, CombatEvent> OnDiedCallback; // 시험은 주인이라 구체 형식으로 받는다
 
         public void Record(CombatEvent e)
         {
@@ -26,7 +26,7 @@ public static class CombatTestKit
                 case CombatEventType.ActionStarted: ActionsStarted++; break;
                 case CombatEventType.BasicAttackHit: BasicHits++; break;
                 case CombatEventType.SkillHit: SkillHits++; break; // 맞은 대상 하나마다 하나
-                case CombatEventType.Died: Died++; LastReward = new CombatReward(e.Gold, e.Exp); OnDiedCallback?.Invoke(e.Source, e); break;
+                case CombatEventType.Died: Died++; LastReward = new CombatReward(e.Gold, e.Exp); OnDiedCallback?.Invoke((Combatant)e.Source, e); break;
                 case CombatEventType.DeathCompleted: DeathCompleted++; break;
                 case CombatEventType.Revived: Revived++; break;
             }
@@ -39,21 +39,18 @@ public static class CombatTestKit
 
     public static void Deliver(CombatWorld world) => world.DeliverEvents();
 
-    public sealed class FakeTimelines : IActionTimelineSource
+    public static ActionTimingSet Timings(bool attack = true, bool death = false, bool skill = true)
     {
-        public readonly Dictionary<string, ActionTimeline> Map = new Dictionary<string, ActionTimeline>();
-
-        public bool TryGet(string key, out ActionTimeline timeline) => Map.TryGetValue(key, out timeline);
+        var list = new List<ActionTiming>();
+        if (attack) list.Add(ActionTiming.FromValues("Attack", 1f, new[] { 0.5f }));
+        if (skill) list.Add(ActionTiming.FromValues("Skill", 1f, new[] { 0.5f }));
+        if (death) list.Add(ActionTiming.FromValues("Death", 1f, new float[0]));
+        return new ActionTimingSet(list);
     }
 
-    public static FakeTimelines Timelines(bool attack = true, bool death = false, bool skill = true)
-    {
-        var t = new FakeTimelines();
-        if (attack) t.Map["Attack"] = ActionTimeline.FromValues("Attack", 1f, new[] { 0.5f });
-        if (skill) t.Map["Skill"] = ActionTimeline.FromValues("Skill", 1f, new[] { 0.5f });
-        if (death) t.Map["Death"] = ActionTimeline.FromValues("Death", 1f, new float[0]);
-        return t;
-    }
+    // 스폰 사양(종류 없음). 시간표를 주지 않으면 기본 공격·스킬 시간표.
+    public static CombatantSpec Spec(CombatantStats stats, float halfWidth, ActionTimingSet timings = null, CombatReward reward = default) =>
+        new CombatantSpec(default, stats, new CombatantBody(halfWidth, timings ?? Timings()), reward);
 
     public static CombatantStats Stats(double hp = 100, double damage = 10, double interval = 0, float range = 0f,
         MovePolicy policy = MovePolicy.Hold, float speed = 0f) => new CombatantStats
@@ -69,10 +66,10 @@ public static class CombatTestKit
     public static CombatWorld World() => new CombatWorld(new SimClock(Step));
 
     public static Combatant Spawn(CombatWorld world, Team team, float x, float halfWidth, CombatantStats stats,
-        IActionTimelineSource timelines = null, SkillLoadout skills = null, FakeHost host = null, CombatReward reward = default)
+        ActionTimingSet timings = null, SkillLoadout skills = null, FakeHost host = null, CombatReward reward = default)
     {
         var combatant = new Combatant(team);
-        combatant.Spawn(stats, x, halfWidth, timelines ?? Timelines(), skills, reward);
+        combatant.Spawn(Spec(stats, halfWidth, timings, reward), x, skills);
         world.Add(combatant);
         if (host != null) Attach(world, combatant, host);
         return combatant;
@@ -80,14 +77,14 @@ public static class CombatTestKit
 
     public static SkillLoadout Loadout(params Skill[] skills)
     {
-        var byId = new Dictionary<int, SkillData>();
+        var byId = new Dictionary<int, SkillSpec>();
         var ids = new List<int>();
         foreach (Skill skill in skills)
         {
-            byId[skill.Data.Id] = skill.Data;
-            ids.Add(skill.Data.Id);
+            byId[skill.Spec.Id] = skill.Spec;
+            ids.Add(skill.Spec.Id);
         }
-        var loadout = new SkillLoadout(ids.Count, id => byId.TryGetValue(id, out SkillData d) ? d : null);
+        var loadout = new SkillLoadout(ids.Count, id => byId.TryGetValue(id, out SkillSpec s) ? s : null);
         loadout.SetSlots(ids);
         return loadout;
     }

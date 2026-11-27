@@ -47,7 +47,7 @@ public class GameRunner : MonoBehaviour
 
         // 흐른 게임 시간만큼 고정 단계를 돌린다(배속과 한 프레임 상한이 들어 있다). 단계 밖의 사건도 여기서 배달된다.
         Game.Advance(Time.deltaTime);
-        battleView.Render(Game.Loop.Alpha); // 그려지는 위치는 실제 시뮬레이션보다 최대 한 단계 늦다
+        battleView.Render(Game.RenderAlpha); // 그려지는 위치는 실제 시뮬레이션보다 최대 한 단계 늦다
     }
 
     private void OnApplicationQuit()

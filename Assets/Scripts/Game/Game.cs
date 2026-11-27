@@ -8,6 +8,8 @@ using UnityEngine;
 //   - 저장 계기(레벨업, 업그레이드, 스킬 학습·장착, 스테이지 입장)와 진행도 교체(LoadSnapshot)
 // 저장 I/O는 하지 않는다. 저장할 때가 되면 SaveRequested를 내고, 앱(GameRunner)이 저장소에 쓴다.
 // 게임(GameInitializer + GameRunner)과 씬 없는 실행(테스트, 이후 오프라인 보상)이 같은 객체를 쓴다.
+// 바깥(뷰, UI, 앱, 개발자 도구)에는 읽기 전용 접점(월드, 흐름)과 명령만 낸다. 전투를 만들고 진행하는 객체(월드, 디렉터, 루프, 시계,
+// 적 풀, 플레이어 전투원)는 이 안에만 있다(13-6, D52).
 public sealed class Game : IDisposable
 {
     private readonly CompositeDisposable subscriptions = new CompositeDisposable();
@@ -18,68 +20,82 @@ public sealed class Game : IDisposable
     {
         if (data == null) throw new ArgumentNullException(nameof(data));
 
-        var session = new GameSession(data.PlayerStats, data.Upgrades, data.Skills, data.Unlocks);
+        var session = new GameSession(data.PlayerStats, data.Upgrades, data.SkillRows, data.Unlocks);
         session.Apply(save);
 
         int savedStage = session.CurrentStageNumber.Value;
         if (data.Stage(savedStage) == null) return GameStart.Failed(GameStartError.StageMissing, savedStage);
 
-        CharacterData character = data.Character(options.CharacterId);
-        if (character == null || !data.TryGetCharacterBody(options.CharacterId, out CombatantBody body))
+        if (!data.TryGetPlayer(options.CharacterId, session.Stats.CombatStats.Value, out CombatantSpec player))
             return GameStart.Failed(GameStartError.CharacterMissing, savedStage);
 
-        return GameStart.Started(new Game(data, session, character, body, options));
+        return GameStart.Started(new Game(data, session, player, options));
     }
 
-    private Game(GameData data, GameSession session, CharacterData character, in CombatantBody body, in GameOptions options)
+    private readonly CombatWorld world;
+    private readonly EncounterDirector director;
+    private readonly SimulationLoop loop;
+
+    private Game(GameData data, GameSession session, in CombatantSpec player, in GameOptions options)
     {
         Data = data;
         Session = session;
-        Clock = new SimClock(options.StepLength);
-        World = new CombatWorld(Clock);
+        world = new CombatWorld(new SimClock(options.StepLength));
 
         // 플레이어가 먼저 등록된다(같은 팀 안의 처리 순서). 몬스터는 디렉터가 스폰할 때 등록한다.
-        Player = new PlayerCombat(session.Stats, character, body, data.Skill);
-        Player.Track(World);
-        World.Add(Player.Combatant);
+        Player = new PlayerCombat(session.Stats, data, player);
+        Player.Track(world);
+        world.Add(Player.Combatant);
 
         Roster = new EnemyRoster(data);
-        Flow = new EncounterDirector(World, Roster, data.Stage, FlowTimings.From(data.Balance));
-        Loop = new SimulationLoop(World, Flow, options.MaxFrameSeconds);
+        director = new EncounterDirector(world, Roster, data.Stage, data.FlowTimings);
+        loop = new SimulationLoop(world, director, options.MaxFrameSeconds);
 
         // 처치 보상: 사망 사건이 스폰 때 정한 보상을 싣고 온다(5-A). 뷰는 보상을 모른다.
-        World.Events.Subscribe(HandleCombatEvent).AddTo(subscriptions);
+        world.Events.Subscribe(HandleCombatEvent).AddTo(subscriptions);
 
         // 저장 계기: 플레이어가 직접 한 명령, 스테이지 입장(게임 시작 제외)
         session.Stats.LevelReached.Subscribe(_ => saveRequested.OnNext(SaveReason.LevelUp)).AddTo(subscriptions);
         session.Stats.Upgraded.Subscribe(_ => saveRequested.OnNext(SaveReason.Upgrade)).AddTo(subscriptions);
         session.Stats.SkillLearned.Subscribe(_ => saveRequested.OnNext(SaveReason.SkillLearned)).AddTo(subscriptions);
         session.Stats.SkillEquipChanged.Subscribe(_ => saveRequested.OnNext(SaveReason.SkillEquipped)).AddTo(subscriptions);
-        Flow.StageEntered.Subscribe(HandleStageEntered).AddTo(subscriptions);
+        director.StageEntered.Subscribe(HandleStageEntered).AddTo(subscriptions);
     }
 
     public GameData Data { get; }
     public GameSession Session { get; }
-    public SimClock Clock { get; }
-    public CombatWorld World { get; }
-    public EncounterDirector Flow { get; }
-    public SimulationLoop Loop { get; }
+    // 플레이어의 HP 상태, 쿨다운 비율, 스킬 요청(UI의 입구)
     public PlayerCombat Player { get; }
-    public EnemyRoster Roster { get; }
+
+    // 전투의 읽기 전용 접점: 사건, 전투원(읽기), 앞장, 원점 이동 합, 시각
+    public IReadOnlyCombatWorld World => world;
+    // 흐름의 접점: 상태, 사건, 명령(보스 도전, 재시작)
+    public IEncounterFlow Flow => director;
+    // 화면 보간 비율(0~1): 직전 두 고정 단계 사이 어디를 그릴지
+    public float RenderAlpha => loop.Alpha;
+
+    // 적 풀(테스트가 장부를 본다)
+    internal EnemyRoster Roster { get; }
 
     // 저장할 때가 됐다. 앱이 CreateSaveData()를 저장소에 쓴다.
     public Observable<SaveReason> SaveRequested => saveRequested;
 
     // 흐름을 시작한다(저장된 스테이지부터). 모든 구독(뷰, UI)을 이은 뒤에 부른다: 처음 값이 반응형으로 전달된다.
-    public void Begin() => Flow.Begin(Session.CurrentStageNumber.Value);
+    public void Begin() => director.Begin(Session.CurrentStageNumber.Value);
 
     // 화면 프레임 하나에 흐른 게임 시간(초)만큼 진행한다. 돌린 고정 단계 수를 돌려준다.
-    public int Advance(double frameSeconds) => Loop.Advance(frameSeconds);
+    public int Advance(double frameSeconds) => loop.Advance(frameSeconds);
 
     public PlayerSaveData CreateSaveData() => Session.ToSaveData();
 
-    // 에디터의 튜닝 덮어쓰기로 데이터가 바뀌면 진행도의 파생 상태를 다시 계산한다(플레이어 능력치는 구독으로 따라온다).
-    public void RecomputeFromData() => Session.RecomputeFromData();
+    // 에디터의 튜닝 덮어쓰기로 데이터가 바뀌면: 시뮬레이션 입력(사양)을 다시 만들고, 진행도의 파생 상태를 다시 계산하고
+    // (플레이어 능력치는 구독으로 따라온다), 플레이어의 장착 스킬을 새 값으로 바꿔 끼운다. 몬스터는 다음 스폰, 스테이지는 다음 입장(13-4).
+    public void RecomputeFromData()
+    {
+        Data.RefreshSpecs();
+        Session.RecomputeFromData();
+        Player.RefreshFromData();
+    }
 
     // ── 진행도 교체 (docs/DEV_TOOLS.md T5) ──
     // 진행도를 통째로 바꾸고 그 진행도의 스테이지를 처음부터 시작한다(전환 가운데에서 저장).
@@ -102,7 +118,7 @@ public sealed class Game : IDisposable
         }
 
         // 재시작을 먼저 받아 둔다(실행은 다음 고정 단계). 받지 못하면 진행도를 바꾸지 않는다.
-        switch (Flow.RestartAt(copy.currentStageNumber))
+        switch (director.RestartAt(copy.currentStageNumber))
         {
             case RestartResult.Accepted:
                 Session.Apply(copy);

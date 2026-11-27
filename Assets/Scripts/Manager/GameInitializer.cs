@@ -38,6 +38,8 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] private PoolManager pools;
     [Tooltip("바닥 높이(하단 UI 비율 기준)")]
     [SerializeField] private PlayAreaBounds playArea;
+    [Tooltip("대열의 앞장을 따라가는 카메라(Main Camera)")]
+    [SerializeField] private CameraRig cameraRig;
 
     // 조립이 끝난 뒤에만 있다(시작에 실패하면 null). 조립 지점이 모르는 쪽(개발 도구, docs/DEV_TOOLS.md T2)이 읽는다.
     public Game Game { get; private set; }
@@ -105,6 +107,7 @@ public class GameInitializer : MonoBehaviour
         // 뷰와 UI가 게임을 구독한다. 흐름을 시작하기 전에 잇는다(첫 사건부터 받는다).
         runner.View.Bind(game, presentation, pools, playArea);
         effects.Bind(game.World, runner.View.Views, presentation, pools);
+        cameraRig.Bind(game.World, runner.View.Views);
         background.Bind(game.Flow.CurrentStageNumber, presentation);
         uiRoot.BindGame(game, presentation);
         runner.Run(game);
@@ -131,6 +134,7 @@ public class GameInitializer : MonoBehaviour
         if (effects == null) { Debug.LogError("[GameInitializer] effects(CombatEffectManager)가 연결되지 않았습니다."); ok = false; }
         if (pools == null) { Debug.LogError("[GameInitializer] pools(PoolManager)가 연결되지 않았습니다."); ok = false; }
         if (playArea == null) { Debug.LogError("[GameInitializer] playArea(PlayAreaBounds)가 연결되지 않았습니다."); ok = false; }
+        if (cameraRig == null) { Debug.LogError("[GameInitializer] cameraRig(CameraRig)가 연결되지 않았습니다."); ok = false; }
         if (runner == null) { Debug.LogError("[GameInitializer] runner(GameRunner)가 연결되지 않았습니다."); ok = false; }
         else if (!runner.ValidateReferences()) ok = false;
         return ok;

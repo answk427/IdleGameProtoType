@@ -1108,6 +1108,7 @@ MonoBehaviour:
   effects: {fileID: 1394703049}
   pools: {fileID: 546248884}
   playArea: {fileID: 1766526031}
+  cameraRig: {fileID: 1686371076}
 --- !u!4 &1424901934
 Transform:
   m_ObjectHideFlags: 0
@@ -1422,7 +1423,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleGameProtoType.Runtime::CameraRig
   targetCamera: {fileID: 1686371074}
-  simulation: {fileID: 596820660}
   background: {fileID: 1909895860}
 --- !u!1 &1698183981
 GameObject:

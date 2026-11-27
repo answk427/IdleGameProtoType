@@ -13,7 +13,7 @@ using System.Collections.Generic;
 // 바깥(뷰, 이펙트, 보상)에는 사건(CombatEvent)으로만 알린다(5-A, P7). 사건은 일어날 때 버퍼에 쌓이고, 루프가 단계가 끝난 뒤
 // DeliverEvents로 배달한다. 배달 중에 생긴 사건(구독자가 전투원을 스폰하는 등)은 다음 배달로 간다.
 // 단계마다 배달하는 이유: 풀에서 다시 꺼낸 전투원은 같은 객체라, 지난 사건이 다음 단계의 재스폰 뒤에 도착하면 새 몬스터에 잘못 간다.
-public sealed class CombatWorld
+public sealed class CombatWorld : IReadOnlyCombatWorld
 {
     private readonly List<Combatant> combatants = new List<Combatant>(16);
     private readonly List<Combatant> pendingAdd = new List<Combatant>(4);
@@ -40,6 +40,13 @@ public sealed class CombatWorld
 
     // 전투 사건. 루프가 DeliverEvents를 부를 때 일어난 순서대로 온다.
     public Observable<CombatEvent> Events => events;
+
+    // 시뮬레이션 시각(초). 읽기 전용 접점이 시계 대신 낸다.
+    public double Now => Clock.Now;
+
+    // 읽기 전용 접점(13-6): 바깥은 전투원을 읽기만 한다.
+    IReadOnlyList<IReadOnlyCombatant> IReadOnlyCombatWorld.Combatants => combatants;
+    IReadOnlyCombatant IReadOnlyCombatWorld.LeadAlly => LeadAlly;
 
     // 아직 배달하지 않은 사건 수(테스트·진단용).
     public int PendingEventCount => pendingEvents.Count;

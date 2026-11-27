@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 상태(ReactiveProperty)와 사건(Subject)의 공통 구독 모양: Subscribe(콜백) → IDisposable (docs/UI_DESIGN.md 5-2, 5-5).
 //
@@ -84,7 +83,7 @@ public abstract class Observable<T> : IChangeSignal
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (++followUps > MaxFollowUpDeliveries)
                 {
-                    Debug.LogError($"[{GetType().Name}<{typeof(T).Name}>] 알림 한 번이 {MaxFollowUpDeliveries}번 넘게 이어졌습니다. 콜백이 같은 값을 계속 바꾸는지 확인하세요.");
+                    GameLog.Error($"[{GetType().Name}<{typeof(T).Name}>] 알림 한 번이 {MaxFollowUpDeliveries}번 넘게 이어졌습니다. 콜백이 같은 값을 계속 바꾸는지 확인하세요.");
                     pending.Clear();
                     break;
                 }
@@ -145,7 +144,7 @@ public abstract class Observable<T> : IChangeSignal
             }
             catch (Exception e)
             {
-                Debug.LogException(e);
+                GameLog.Exception(e);
             }
         }
 

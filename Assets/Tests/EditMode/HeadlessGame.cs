@@ -35,19 +35,20 @@ public sealed class HeadlessGame
         Game = start.Game;
 
         Game.World.Events.Subscribe(Record);
-        Game.Flow.StageEntered.Subscribe(e => Line("S", Clock.Now).Append(' ').Append(e.StageNumber).Append(' ').Append(e.Reason).Append('\n'));
+        Game.Flow.StageEntered.Subscribe(e => Line("S", Now).Append(' ').Append(e.StageNumber).Append(' ').Append(e.Reason).Append('\n'));
         // 보스 도전은 도전 가능해지는 순간(고정 단계 ① 안) 요청한다. 실행은 다음 ①이라 프레임과 무관하다.
         if (challengeBosses) Game.Flow.BossChallengeAvailable.Subscribe(available => { if (available) Game.Flow.RequestBossChallenge(); });
 
         Game.Begin();
     }
 
-    public SimClock Clock => Game.Clock;
+    // 시뮬레이션 시각(초)
+    public double Now => Game.World.Now;
 
     // 시뮬레이션 시각 until까지 돌린다. frameSeconds(i) = i번째 화면 프레임의 길이.
     public void RunUntil(double until, Func<int, double> frameSeconds)
     {
-        for (int i = 0; Clock.Now < until; i++) Game.Advance(frameSeconds(i));
+        for (int i = 0; Now < until; i++) Game.Advance(frameSeconds(i));
     }
 
     // until 미만에 일어난 일만(마지막 프레임이 넘어간 만큼은 프레임 길이에 따라 다르다).

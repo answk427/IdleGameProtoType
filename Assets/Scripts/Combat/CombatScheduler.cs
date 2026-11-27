@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 한 고정 단계 [t0, t1] 안에서 교전 중인 모든 전투원의 사건을 시각 순서대로 처리한다(docs/COMBAT_ARCHITECTURE.md 7-11). 순수 C#.
 //
@@ -46,7 +45,7 @@ public sealed class CombatScheduler
                 if (!reportedCap)
                 {
                     reportedCap = true;
-                    Debug.LogError($"[CombatScheduler] 한 단계의 사건이 {cap}개를 넘었습니다. 행동 길이가 너무 짧습니다. 남은 사건은 다음 단계로 미룹니다.");
+                    GameLog.Error($"[CombatScheduler] 한 단계의 사건이 {cap}개를 넘었습니다. 행동 길이가 너무 짧습니다. 남은 사건은 다음 단계로 미룹니다.");
                 }
                 break;
             }

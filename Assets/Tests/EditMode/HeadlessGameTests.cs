@@ -90,12 +90,12 @@ public class HeadlessGameTests
         var stages = new HashSet<int>();
         game.Game.Flow.StageEntered.Subscribe(e => stages.Add(e.StageNumber));
 
-        for (int i = 0; game.Clock.Now < 300.0; i++)
+        for (int i = 0; game.Now < 300.0; i++)
         {
             game.Game.Advance(frames(i));
             int enemies = 0;
-            foreach (Combatant c in game.Game.World.Combatants) if (c.Team == Team.Enemy) enemies++;
-            Assert.AreEqual(enemies, game.Game.Roster.ActiveCount, $"{game.Clock.Now:0.00}초");
+            foreach (IReadOnlyCombatant c in game.Game.World.Combatants) if (c.Team == Team.Enemy) enemies++;
+            Assert.AreEqual(enemies, game.Game.Roster.ActiveCount, $"{game.Now:0.00}초");
         }
 
         Assert.Greater(game.Kills, 10);

@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 캐릭터의 행동 하나(기본 공격, 스킬, 사망)의 애니메이션 시간표(docs/COMBAT_ARCHITECTURE.md 7-2, 7-13).
+// 캐릭터의 행동 하나(기본 공격, 스킬, 사망)의 애니메이션 시간표 에셋 값(docs/COMBAT_ARCHITECTURE.md 7-2, 7-13).
+// 클립과 거기서 구운 값을 갖는 데이터 쪽 형식이다. 시뮬레이션은 이것이 아니라 GameData가 바꾼 ActionTiming을 받는다(13-4).
 // 애니메이션이 정하는 것은 타격이 행동의 몇 % 지점인지(비율)와, 재생 속도 계산에 쓸 클립 길이뿐이다.
 // 행동의 길이는 게임 데이터가 정한다: 기본 공격 = 공격 간격, 스킬 = SkillData.CastTime. 사망은 클립 길이.
 // 그래서 아트를 바꿔도 밸런스가 바뀌지 않는다. 전투 로직은 애니메이션 이벤트나 애니메이터 전이를 읽지 않는다.
@@ -30,21 +31,5 @@ public sealed class ActionTimeline
     // 값이 규칙을 지키는가(굽지 않았거나 잘못 구운 시간표는 행동으로 시작하지 않는다)
     public bool IsValid => ValidationError == null;
     public string ValidationError =>
-        ActionTimelineBaking.ValidateValues(clipLength, hitFractions ?? new float[0])
-        ?? ActionTimelineBaking.ValidateUsage(key, hitFractions?.Length ?? 0);
-
-    // 클립 없이 값으로 만든다(코드와 테스트용). 굽기와 같은 규칙으로 검사한다.
-    public static ActionTimeline FromValues(string key, float clipLength, float[] hitFractions)
-    {
-        var timeline = new ActionTimeline
-        {
-            key = key,
-            clipLength = clipLength,
-            hitFractions = hitFractions ?? new float[0],
-        };
-
-        string error = timeline.ValidationError;
-        if (error != null) throw new ArgumentException($"잘못된 시간표 '{key}': {error}");
-        return timeline;
-    }
+        ActionTiming.Validate(key, clipLength, hitFractions ?? new float[0]);
 }

@@ -7,10 +7,10 @@ using UnityEngine;
 public sealed class BossChallengePresenter : IDisposable
 {
     private readonly IBossChallengeView view;
-    private readonly EncounterDirector director;
+    private readonly IEncounterFlow director;
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
-    public BossChallengePresenter(IBossChallengeView view, EncounterDirector director)
+    public BossChallengePresenter(IBossChallengeView view, IEncounterFlow director)
     {
         this.view = view ?? throw new ArgumentNullException(nameof(view));
         this.director = director ?? throw new ArgumentNullException(nameof(director));

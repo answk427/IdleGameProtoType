@@ -3,8 +3,8 @@ using System;
 // 행동 하나의 표식(타격들, 완료)을 시각 순서대로 알린다(docs/COMBAT_ARCHITECTURE.md 7-3, 7-11, 7-13).
 public interface IActionListener
 {
-    void OnActionHit(ActionTimeline action, int hitIndex);
-    void OnActionCompleted(ActionTimeline action);
+    void OnActionHit(ActionTiming action, int hitIndex);
+    void OnActionCompleted(ActionTiming action);
 }
 
 // 순수 C#. 시각은 시뮬레이션 시계의 절대 시각(초, double)이다.
@@ -14,7 +14,7 @@ public interface IActionListener
 // 알림을 받는 쪽은 표식 처리 도중에 Start/Cancel을 부르지 않는다(다음 행동은 처리가 끝난 뒤 결정한다).
 public sealed class ActionRunner
 {
-    private ActionTimeline current;
+    private ActionTiming current;
     private double startTime;
     private double duration;
     private double endTime;
@@ -24,7 +24,7 @@ public sealed class ActionRunner
     private bool firing;
 
     public bool IsRunning => current != null;
-    public ActionTimeline Current => current;
+    public ActionTiming Current => current;
     public double StartTime => startTime;
     public double Duration => duration;
     public double EndTime => endTime;
@@ -39,7 +39,7 @@ public sealed class ActionRunner
         }
     }
 
-    public void Start(ActionTimeline action, double actionDuration, double atTime)
+    public void Start(ActionTiming action, double actionDuration, double atTime)
     {
         if (firing) throw new InvalidOperationException("표식 처리 도중에는 새 행동을 시작할 수 없습니다.");
         if (action == null) throw new ArgumentNullException(nameof(action));
@@ -83,7 +83,7 @@ public sealed class ActionRunner
         firing = true;
         try
         {
-            ActionTimeline action = current;
+            ActionTiming action = current;
             while (nextHit < hitCount && hitTimes[nextHit] <= time)
             {
                 // 증가를 호출 인자 안에 두지 않는다: listener?.M(i++)은 listener가 null이면 인자까지 건너뛰어 무한 반복이 된다.

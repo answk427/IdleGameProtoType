@@ -9,7 +9,7 @@ public class FadeController : MonoBehaviour
 {
     [SerializeField] private CanvasGroup fadeCanvasGroup;
 
-    private EncounterDirector director;
+    private IEncounterFlow director;
     private InputBlocker inputBlocker;
     private IDisposable phaseSubscription;
 
@@ -17,7 +17,7 @@ public class FadeController : MonoBehaviour
     private IDisposable inputLease;
 
     // 그리는 순서(System 구분)와 입력 차단은 UIRoot가 준다.
-    public void Initialize(InputBlocker blocker, EncounterDirector flow)
+    public void Initialize(InputBlocker blocker, IEncounterFlow flow)
     {
         inputBlocker = blocker;
         director = flow;
@@ -59,7 +59,7 @@ public class FadeController : MonoBehaviour
         if (director == null || fadeCanvasGroup == null) return;
 
         fadeCanvasGroup.alpha = director.Phase.Value == FlowPhase.Transition
-            ? FadeAlpha(director.Transition, director.Clock.Now)
+            ? FadeAlpha(director.Transition, director.Now)
             : 0f;
     }
 

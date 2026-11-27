@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Newtonsoft.Json.Linq;
 using UnityEngine.TestTools.Constraints;
 using static CombatTestKit;
 using Is = UnityEngine.TestTools.Constraints.Is;
@@ -22,7 +21,7 @@ public class EncounterDirectorTests
     private sealed class FakeEnemyRoster : IEnemyRoster
     {
         private readonly List<Combatant> free = new List<Combatant>(64);
-        private readonly FakeTimelines timelines = Timelines(attack: true, death: false, skill: false);
+        private readonly ActionTimingSet timings = Timings(attack: true, death: false, skill: false);
 
         public CombatantStats NormalStats = Stats(hp: 30, policy: MovePolicy.Hold);
         public CombatantStats BossStats = Stats(hp: 100, policy: MovePolicy.Approach, speed: 2f);
@@ -30,7 +29,7 @@ public class EncounterDirectorTests
         public int Spawned, BossesSpawned, Despawned, Released;
         public Action<Combatant, bool, float> OnSpawned;
 
-        public Combatant Spawn(int monsterId, StageData stage, float x, bool isBoss)
+        public Combatant Spawn(int monsterId, StageSpec stage, float x, bool isBoss)
         {
             Combatant c;
             if (free.Count > 0)
@@ -43,7 +42,7 @@ public class EncounterDirectorTests
                 c = new Combatant(Team.Enemy);
             }
 
-            c.Spawn(isBoss ? BossStats : NormalStats, x, HalfWidth, timelines, null);
+            c.Spawn(Spec(isBoss ? BossStats : NormalStats, HalfWidth, timings), x, null);
             Spawned++;
             if (isBoss) BossesSpawned++;
             OnSpawned?.Invoke(c, isBoss, x);
@@ -56,7 +55,7 @@ public class EncounterDirectorTests
             free.Add(combatant);
         }
 
-        public void ReleaseStage(StageData stage) => Released++;
+        public void ReleaseStage(StageSpec stage) => Released++;
     }
 
     private sealed class Rig
@@ -64,7 +63,7 @@ public class EncounterDirectorTests
         public readonly CombatWorld World;
         public readonly FakeEnemyRoster Roster = new FakeEnemyRoster();
         public int EnteredCount;
-        public readonly Dictionary<int, StageData> Stages = new Dictionary<int, StageData>();
+        public readonly Dictionary<int, StageSpec> Stages = new Dictionary<int, StageSpec>();
         public readonly List<(long step, FlowPhase phase)> Phases = new List<(long, FlowPhase)>();
         public readonly List<(long step, StageEntered entry)> Entries = new List<(long, StageEntered)>();
         public readonly List<string> Log = new List<string>();
@@ -75,27 +74,27 @@ public class EncounterDirectorTests
         private readonly FlowTimings timings;
         private readonly bool record;
 
-        public Rig(FlowTimings timings, bool record = true, params StageData[] stages) : this(CombatTestKit.Step, timings, record, stages) { }
+        public Rig(FlowTimings timings, bool record = true, params StageSpec[] stages) : this(CombatTestKit.Step, timings, record, stages) { }
 
-        public Rig(double stepLength, FlowTimings timings, bool record, params StageData[] stages)
+        public Rig(double stepLength, FlowTimings timings, bool record, params StageSpec[] stages)
         {
             World = new CombatWorld(new SimClock(stepLength));
             this.timings = timings;
             this.record = record;
-            foreach (StageData s in stages) Stages[s.StageNumber] = s;
+            foreach (StageSpec s in stages) Stages[s.StageNumber] = s;
         }
 
         public long Now => World.Clock.StepIndex;
 
         public Rig WithPlayer(CombatantStats stats, bool deathTimeline = true)
         {
-            Player = Spawn(World, Team.Ally, 0f, 0.4f, stats, Timelines(death: deathTimeline));
+            Player = Spawn(World, Team.Ally, 0f, 0.4f, stats, Timings(death: deathTimeline));
             return this;
         }
 
         public Rig Start(int stage = 1)
         {
-            Director = new EncounterDirector(World, Roster, n => Stages.TryGetValue(n, out StageData s) ? s : null, timings);
+            Director = new EncounterDirector(World, Roster, n => Stages.TryGetValue(n, out StageSpec s) ? s : null, timings);
             Director.Stalled.Subscribe(text => Stalls.Add((Now, text)));
             Director.StageEntered.Subscribe(_ => EnteredCount++);
             if (record)
@@ -159,26 +158,15 @@ public class EncounterDirectorTests
         }
     }
 
-    private static StageData Stage(int number, int monsters = 2, int encounters = 2, float spacing = 1.5f,
+    private static StageSpec Stage(int number, int monsters = 2, int encounters = 2, float spacing = 1.5f,
         float spawnDistance = 3f, double bossTimeLimit = 0.0) =>
-        new JObject
-        {
-            ["stageNumber"] = number,
-            ["normalMonsterId"] = NormalId,
-            ["bossMonsterId"] = BossId,
-            ["monstersPerEncounter"] = monsters,
-            ["encountersToComplete"] = encounters,
-            ["monsterSpacing"] = spacing,
-            ["spawnDistance"] = spawnDistance,
-            ["bossTimeLimit"] = bossTimeLimit,
-            ["clearType"] = 0,
-        }.ToObject<StageData>();
+        new StageSpec(number, NormalId, BossId, monsters, encounters, spacing, spawnDistance, bossTimeLimit, StageClearType.KillBoss);
 
     // 인카운터 몬스터와 보스를 한 방에 잡는 플레이어
     private static CombatantStats StrongPlayer(float speed = 5f) =>
         Stats(hp: 1e6, damage: 1000, interval: 0.1, range: 0.5f, policy: MovePolicy.Advance, speed: speed);
 
-    private static Rig StartedRig(FlowTimings timings, CombatantStats player, bool deathTimeline = true, params StageData[] stages) =>
+    private static Rig StartedRig(FlowTimings timings, CombatantStats player, bool deathTimeline = true, params StageSpec[] stages) =>
         new Rig(timings, true, stages).WithPlayer(player, deathTimeline).Start();
 
     private static void RunUntilBossAvailable(Rig rig) =>
@@ -371,7 +359,7 @@ public class EncounterDirectorTests
     public void Commands_ReturnResults_AndRunOnlyAtNextTick()
     {
         var rig = new Rig(DefaultTimings, true, Stage(1, encounters: 1), Stage(2)).WithPlayer(StrongPlayer());
-        var director = new EncounterDirector(rig.World, rig.Roster, n => rig.Stages.TryGetValue(n, out StageData s) ? s : null, DefaultTimings);
+        var director = new EncounterDirector(rig.World, rig.Roster, n => rig.Stages.TryGetValue(n, out StageSpec s) ? s : null, DefaultTimings);
         Assert.That(director.RestartAt(1), NUnit.Framework.Is.EqualTo(RestartResult.Busy), "시작 전");
         Assert.That(director.RequestBossChallenge(), NUnit.Framework.Is.EqualTo(BossChallengeResult.NotAvailable));
 
@@ -533,7 +521,7 @@ public class EncounterDirectorTests
     // ── 스폰 규칙 ──
 
     [Test]
-    public void Spawn_RecentersOnLead_AndPlacesByStageData()
+    public void Spawn_RecentersOnLead_AndPlacesByStageSpec()
     {
         Rig rig = StartedRig(DefaultTimings, StrongPlayer(speed: 7.3f), true, Stage(1, monsters: 3, spacing: 1.25f, spawnDistance: 4.5f, encounters: 9));
         var pivots = new List<float>();
@@ -588,7 +576,7 @@ public class EncounterDirectorTests
         var random = new Random(seed);
         double R(double min, double max) => min + random.NextDouble() * (max - min);
 
-        var stages = new List<StageData>();
+        var stages = new List<StageSpec>();
         for (int s = 1; s <= 3; s++)
         {
             stages.Add(Stage(s, monsters: random.Next(1, 7), encounters: random.Next(1, 4), spacing: (float)R(0, 3),

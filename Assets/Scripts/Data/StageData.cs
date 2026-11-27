@@ -1,13 +1,7 @@
 using UnityEngine;
 using Newtonsoft.Json;
 
-// 스테이지 클리어 방식. 처리 코드가 있는 것만 둔다(D26): 예전의 SurviveTime·KillCount는 처리 코드가 없어서,
-// 데이터에 넣으면 보스를 잡아도 클리어되지 않고 게임이 멈췄다. 새 방식은 처리 코드(EncounterDirector)와 함께 더한다.
-public enum StageClearType
-{
-    KillBoss,       // 보스 처치
-}
-
+// 클리어 방식(StageClearType)은 흐름의 입력 StageSpec 옆에 있다(docs/COMBAT_ARCHITECTURE.md 13-4).
 [System.Serializable]
 public class StageData : IData
 {

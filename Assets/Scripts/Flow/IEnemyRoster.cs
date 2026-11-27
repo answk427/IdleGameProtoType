@@ -5,11 +5,11 @@ public interface IEnemyRoster
 {
     // monsterId 몬스터를 몸 중심 x에 꺼내 능력치(몬스터 표 × 스테이지 배율)를 넣은 전투원을 돌려준다. 실패하면 null.
     // 월드 등록은 디렉터가 한다. 위치는 몸 중심이라 그림(피벗)과 무관하다(docs/COMBAT_ARCHITECTURE.md 12절 D50).
-    Combatant Spawn(int monsterId, StageData stage, float x, bool isBoss);
+    Combatant Spawn(int monsterId, StageSpec stage, float x, bool isBoss);
 
     // 전투원을 화면에서 치운다(풀로 돌려놓는다). 디렉터가 월드에서 먼저 뺀다.
     void Despawn(Combatant combatant);
 
     // 스테이지를 떠날 때 그 스테이지의 자원(몬스터 풀)을 비운다.
-    void ReleaseStage(StageData stage);
+    void ReleaseStage(StageSpec stage);
 }

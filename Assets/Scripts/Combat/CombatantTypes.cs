@@ -24,7 +24,7 @@ public enum CombatantPhase
     Dead,
 }
 
-// 전투원의 능력치. 호스트가 데이터(플레이어 진행도 + 캐릭터 표, 몬스터 표 × 스테이지 배율)에서 만들어 넣는다.
+// 전투원의 능력치. 게임 데이터(GameData)가 데이터(플레이어 진행도 + 캐릭터 표, 몬스터 표 × 스테이지 배율)에서 만들어 넣는다.
 public struct CombatantStats
 {
     public GameNumber MaxHp;
@@ -33,12 +33,6 @@ public struct CombatantStats
     public float AttackRange;     // 표면 거리 기준
     public float MoveSpeed;       // 월드 유닛/초. 지금은 스크롤 속도의 원천(플레이어)
     public MovePolicy MovePolicy;
-}
-
-// 행동 시간표 조회. ActionTimelineSet(ScriptableObject)이 구현하고, 테스트는 가짜를 쓴다.
-public interface IActionTimelineSource
-{
-    bool TryGet(string key, out ActionTimeline timeline);
 }
 
 // 전투원이 무엇인지(12절 D44). 뷰는 이것으로 그릴 프리팹을 고른다. 시뮬레이션 규칙은 이것을 읽지 않는다.
@@ -73,11 +67,29 @@ public readonly struct CombatantArchetype
 public readonly struct CombatantBody
 {
     public readonly float HalfWidth;
-    public readonly IActionTimelineSource Timelines;
+    public readonly ActionTimingSet Timings;
 
-    public CombatantBody(float halfWidth, IActionTimelineSource timelines)
+    public CombatantBody(float halfWidth, ActionTimingSet timings)
     {
         HalfWidth = halfWidth;
-        Timelines = timelines;
+        Timings = timings;
+    }
+}
+
+// 스폰할 때 전투원에 넣는 값 전부(docs/COMBAT_ARCHITECTURE.md 13-4, 12-8 셋째). 데이터 쪽(GameData)이 데이터 행에서 만든다.
+// 위치(스폰마다)와 스킬 로드아웃(주인이 갖는 실행 상태: 플레이어는 스테이지를 넘어 쿨다운을 유지한다)은 따로 넘긴다.
+public readonly struct CombatantSpec
+{
+    public readonly CombatantArchetype Archetype;
+    public readonly CombatantStats Stats;
+    public readonly CombatantBody Body;
+    public readonly CombatReward Reward; // 처치 보상(몬스터). 사망 사건이 싣고 가서 게임 쪽이 지급한다
+
+    public CombatantSpec(in CombatantArchetype archetype, in CombatantStats stats, in CombatantBody body, in CombatReward reward = default)
+    {
+        Archetype = archetype;
+        Stats = stats;
+        Body = body;
+        Reward = reward;
     }
 }

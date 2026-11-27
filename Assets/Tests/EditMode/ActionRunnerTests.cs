@@ -13,22 +13,22 @@ public class ActionRunnerTests
         public readonly List<string> Order = new List<string>();
         public Action OnHitCallback;
 
-        public void OnActionHit(ActionTimeline action, int hitIndex)
+        public void OnActionHit(ActionTiming action, int hitIndex)
         {
             Order.Add("hit" + hitIndex);
             OnHitCallback?.Invoke();
         }
 
-        public void OnActionCompleted(ActionTimeline action) => Order.Add("complete");
+        public void OnActionCompleted(ActionTiming action) => Order.Add("complete");
     }
 
     // 지금 플레이어 기본 공격 클립과 같은 비율(1.2초 클립, 타격 0.7초)
-    private static ActionTimeline Attack() => ActionTimeline.FromValues("Attack", 1.2f, new[] { 0.7f / 1.2f });
+    private static ActionTiming Attack() => ActionTiming.FromValues("Attack", 1.2f, new[] { 0.7f / 1.2f });
 
     [Test]
     public void MarkerTimes_AreStoredOnce_AndFireExactlyAtThoseTimes()
     {
-        ActionTimeline attack = Attack();
+        ActionTiming attack = Attack();
         var runner = new ActionRunner();
         var recorder = new Recorder();
         runner.Start(attack, 1.0, 5.0);
@@ -78,7 +78,7 @@ public class ActionRunnerTests
     [Test]
     public void HitAtEnd_FiresHitThenComplete_AtExactlyTheEndTime()
     {
-        ActionTimeline hitAtEnd = ActionTimeline.FromValues("Attack", 1f, new[] { 1f });
+        ActionTiming hitAtEnd = ActionTiming.FromValues("Attack", 1f, new[] { 1f });
         var runner = new ActionRunner();
         var recorder = new Recorder();
         runner.Start(hitAtEnd, 0.3, 2.1);
@@ -92,7 +92,7 @@ public class ActionRunnerTests
     [Test]
     public void MultipleHits_EachFireOnce()
     {
-        ActionTimeline triple = ActionTimeline.FromValues("Skill", 1f, new[] { 0.2f, 0.5f, 0.5f });
+        ActionTiming triple = ActionTiming.FromValues("Skill", 1f, new[] { 0.2f, 0.5f, 0.5f });
         var runner = new ActionRunner();
         var recorder = new Recorder();
         runner.Start(triple, 0.1, 0.0);
@@ -107,7 +107,7 @@ public class ActionRunnerTests
     {
         // listener?.M(i++)처럼 증가를 인자 안에 두면 null일 때 증가가 건너뛰어져 무한 반복이 된다(실제로 겪은 버그).
         var runner = new ActionRunner();
-        runner.Start(ActionTimeline.FromValues("Skill", 1f, new[] { 0.2f, 0.5f }), 1.0, 0.0);
+        runner.Start(ActionTiming.FromValues("Skill", 1f, new[] { 0.2f, 0.5f }), 1.0, 0.0);
 
         runner.FireMarkersUpTo(0.3, null);
         Assert.AreEqual(0.5, runner.NextMarkerTime, 1e-9);
@@ -122,7 +122,7 @@ public class ActionRunnerTests
     public void ChainedActions_StartExactlyAtPreviousEnd(double duration)
     {
         // 다음 행동은 앞 행동의 끝 시각(저장된 값) 그대로에서 시작한다. 1만 번 이어도 시간을 잃거나 더하지 않는다.
-        ActionTimeline attack = Attack();
+        ActionTiming attack = Attack();
         var runner = new ActionRunner();
         double start = 0.0;
         for (int i = 0; i < 10000; i++)
@@ -184,13 +184,13 @@ public class ActionRunnerTests
     [TestCase(1f, new float[0])]            // 공격인데 타격 없음
     public void FromValues_RejectsBrokenTimeline(float clipLength, float[] hits)
     {
-        Assert.Throws<ArgumentException>(() => ActionTimeline.FromValues("Attack", clipLength, hits));
+        Assert.Throws<ArgumentException>(() => ActionTiming.FromValues("Attack", clipLength, hits));
     }
 
     [Test]
     public void FromValues_DeathMustHaveNoHits()
     {
-        Assert.Throws<ArgumentException>(() => ActionTimeline.FromValues("Death", 1f, new[] { 0.5f }));
-        Assert.DoesNotThrow(() => ActionTimeline.FromValues("Death", 1f, new float[0]));
+        Assert.Throws<ArgumentException>(() => ActionTiming.FromValues("Death", 1f, new[] { 0.5f }));
+        Assert.DoesNotThrow(() => ActionTiming.FromValues("Death", 1f, new float[0]));
     }
 }

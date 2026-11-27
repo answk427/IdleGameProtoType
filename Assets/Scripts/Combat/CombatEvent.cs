@@ -26,8 +26,9 @@ public readonly struct CombatEvent
 {
     public readonly CombatEventType Type;
     public readonly double Time;
-    public readonly Combatant Source;
-    public readonly Combatant Other;
+    // 사건의 주인과 상대. 받는 쪽(뷰, 이펙트, 게임)은 읽기만 한다(읽기 전용 접점, 13-6).
+    public readonly IReadOnlyCombatant Source;
+    public readonly IReadOnlyCombatant Other;
     public readonly GameNumber Amount;
     public readonly bool Moving;
     public readonly string ActionKey;
@@ -41,7 +42,7 @@ public readonly struct CombatEvent
     public bool ChangesHp => Type == CombatEventType.Joined || Type == CombatEventType.StatsChanged || Type == CombatEventType.Damaged
         || Type == CombatEventType.Healed || Type == CombatEventType.Revived;
 
-    private CombatEvent(CombatEventType type, double time, Combatant source, Combatant other = null, GameNumber amount = default,
+    private CombatEvent(CombatEventType type, double time, IReadOnlyCombatant source, IReadOnlyCombatant other = null, GameNumber amount = default,
         bool moving = false, string actionKey = null, double duration = 0.0, int skillId = 0, GameNumber gold = default, int exp = 0,
         float delta = 0f)
     {
@@ -82,7 +83,7 @@ public readonly struct CombatEvent
     public static CombatEvent Revived(double time, Combatant source) => new CombatEvent(CombatEventType.Revived, time, source);
     public static CombatEvent OriginShifted(double time, float delta) => new CombatEvent(CombatEventType.OriginShifted, time, null, delta: delta);
 
-    public override string ToString() => $"{Type} t={Time} {Source?.Team} {Source?.Order}";
+    public override string ToString() => $"{Type} t={Time} {Source?.Team} {(Source as Combatant)?.Order}";
 }
 
 // 처치 보상. 스폰할 때 전투원에 넣고 사망 사건이 싣고 간다(게임 쪽이 지급한다). 지금은 몬스터만 갖는다.

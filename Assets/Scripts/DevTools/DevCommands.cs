@@ -15,7 +15,7 @@ public sealed class DevCommands
 
     private readonly Game game;
     private readonly GameSession session;
-    private readonly EncounterDirector flow;
+    private readonly IEncounterFlow flow;
     private readonly DevBackupStore backups;
 
     public DevCommands(Game game, DevBackupStore backups)

@@ -48,7 +48,7 @@ public class CombatEffectManager : MonoBehaviour
 
     // GameInitializer가 게임을 만든 뒤 잇는다. 위치는 뷰 표에서 찾는다(시뮬레이션 위치 기준).
     // 스킬의 VFX·소리는 Presentation(그림 자산)에서 스킬 id로 찾는다(docs/COMBAT_ARCHITECTURE.md 12절 D47).
-    public void Bind(CombatWorld world, CombatantViews combatantViews, Presentation presentationAssets, PoolManager poolManager)
+    public void Bind(IReadOnlyCombatWorld world, CombatantViews combatantViews, Presentation presentationAssets, PoolManager poolManager)
     {
         eventSubscription?.Dispose();
         views = combatantViews;
@@ -88,10 +88,10 @@ public class CombatEffectManager : MonoBehaviour
         }
     }
 
-    private Vector3 PivotOf(Combatant combatant) =>
+    private Vector3 PivotOf(IReadOnlyCombatant combatant) =>
         views != null && views.TryGet(combatant, out CombatantHost host) ? host.PivotPosition : Vector3.zero;
 
-    private Vector3 EffectOf(Combatant combatant) =>
+    private Vector3 EffectOf(IReadOnlyCombatant combatant) =>
         views != null && views.TryGet(combatant, out CombatantHost host) ? host.EffectPosition : Vector3.zero;
 
     private SkillEntry FindSkill(int skillId) => presentation?.Skill(skillId);
@@ -118,7 +118,7 @@ public class CombatEffectManager : MonoBehaviour
     }
 
     // 어떤 이펙트를 쓸지는 "맞은 대상이 아군(플레이어)인가"로 결정한다 (데미지 텍스트 색 판단과 동일한 기준).
-    public void SpawnHitParticle(Combatant target)
+    public void SpawnHitParticle(IReadOnlyCombatant target)
     {
         bool isPlayerHit = target.Team == Team.Ally;
         GameObject prefab = isPlayerHit && playerHitParticlePrefab != null

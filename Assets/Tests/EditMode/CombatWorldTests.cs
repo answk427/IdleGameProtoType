@@ -298,7 +298,7 @@ public class CombatWorldTests
         var c = new Combatant(Team.Enemy);
         Attach(world, c, host);
 
-        c.Spawn(Stats(hp: 50), 0f, 0.5f, Timelines(), null);
+        c.Spawn(Spec(Stats(hp: 50), 0.5f), 0f, null);
         c.TakeDamage(1); // 월드가 없다: 사건 없음
         world.Add(c);
         Deliver(world);
@@ -339,8 +339,8 @@ public class CombatWorldTests
         var withHost = new FakeHost();
         var withoutHost = new FakeHost();
         Spawn(world, Team.Ally, 0f, 0.5f, Stats(hp: 1e9, damage: 1000, interval: 0.1, range: 5f, policy: MovePolicy.Advance));
-        Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 1), timelines: Timelines(death: true), host: withHost);
-        Spawn(world, Team.Enemy, 1.1f, 0.5f, Stats(hp: 1), timelines: Timelines(death: false), host: withoutHost);
+        Spawn(world, Team.Enemy, 1f, 0.5f, Stats(hp: 1), timings: Timings(death: true), host: withHost);
+        Spawn(world, Team.Enemy, 1.1f, 0.5f, Stats(hp: 1), timings: Timings(death: false), host: withoutHost);
 
         Run(world, 10); // 0.07초에 가까운 쪽, 0.17초에 다음 쪽이 죽는다
         Assert.AreEqual(1, withHost.Died);
@@ -382,7 +382,7 @@ public class CombatWorldTests
         });
 
         world.Remove(c);
-        c.Spawn(Stats(), 2f, 0.5f, Timelines(), null);
+        c.Spawn(Spec(Stats(), 0.5f), 2f, null);
         world.Add(c);
         Deliver(world);
 

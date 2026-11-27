@@ -20,7 +20,8 @@ public abstract class CombatantHost : MonoBehaviour
     private readonly ReactiveProperty<HpState> hp = new ReactiveProperty<HpState>();
     private CombatantViews views;
 
-    public Combatant Combatant { get; private set; }
+    // 그리는 전투원(읽기 전용 접점, 13-6). 뷰는 전투원을 바꾸지 않는다.
+    public IReadOnlyCombatant Combatant { get; private set; }
 
     // HP(현재, 최대)는 상태다. 머리 위 HP 바와 HUD가 같이 구독한다(docs/COMBAT_ARCHITECTURE.md 10-10 D29).
     public IReadOnlyReactiveProperty<HpState> Hp => hp;
@@ -51,7 +52,7 @@ public abstract class CombatantHost : MonoBehaviour
     protected virtual void OnDestroy() => views?.Forget(this);
 
     // BattleView가 Joined에 부른다. 처음 상태(HP, 이동 동작)는 이어서 오는 Joined 사건이 그린다.
-    public virtual void Bind(Combatant combatant) => Combatant = combatant;
+    public virtual void Bind(IReadOnlyCombatant combatant) => Combatant = combatant;
 
     // BattleView가 Left에 부른다(풀로 돌려놓기 전).
     public virtual void Unbind() => Combatant = null;
@@ -88,7 +89,7 @@ public abstract class CombatantHost : MonoBehaviour
                 break;
             case CombatEventType.ActionStarted:
                 // 시간표는 그 전투원의 것(데이터)이다. 클립 길이로 재생 속도를 맞춘다.
-                if (view != null && Combatant != null && Combatant.TryGetTimeline(e.ActionKey, out ActionTimeline action))
+                if (view != null && Combatant != null && Combatant.TryGetTiming(e.ActionKey, out ActionTiming action))
                     view.PlayAction(action, (float)e.Duration);
                 break;
             case CombatEventType.Died:

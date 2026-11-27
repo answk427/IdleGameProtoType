@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 전투 행동을 하는 쪽(Combatant)이 제공해야 하는 것. 테스트는 가짜 시전자로 이 규칙만 따로 확인한다.
 // 시각은 모두 시뮬레이션 시계의 절대 시각(초)이다.
@@ -8,7 +7,7 @@ public interface ICombatActor
 {
     bool IsAlive { get; }
 
-    bool TryGetTimeline(string key, out ActionTimeline timeline);
+    bool TryGetTiming(string key, out ActionTiming timing);
 
     // 기본 공격이 있는가(데이터: 공격 간격 > 0). 없으면 스킬만 쓴다.
     bool HasBasicAttack { get; }
@@ -31,7 +30,7 @@ public interface ICombatActor
     void ApplySkillHit(Skill skill);
 
     // 연출 훅. skill은 기본 공격이면 null.
-    void OnActionStarted(ActionTimeline action, double duration, Skill skill);
+    void OnActionStarted(ActionTiming action, double duration, Skill skill);
     void OnActionsIdle();
 }
 
@@ -42,7 +41,7 @@ public interface ICombatActor
 // 규칙:
 //   - **취소 없음.** 모든 행동(기본 공격, 스킬)은 끝까지 한다. 다음 행동은 지금 행동이 완료된 뒤에만 정한다.
 //     어떤 행동도 다른 행동을 끊지 못한다. 행동을 끊는 것은 사망 같은 강제 중단(Disengage)뿐이다.
-//   - 행동의 길이는 게임 데이터가 정한다: 기본 공격 = 시전자의 공격 간격, 스킬 = SkillData.CastTime. 애니메이션은 타격 비율만 정한다.
+//   - 행동의 길이는 게임 데이터가 정한다: 기본 공격 = 시전자의 공격 간격, 스킬 = SkillSpec.CastTime. 애니메이션은 타격 비율만 정한다.
 //   - 다음 행동: 수동 요청 → 준비된 스킬(우선순위) → 기본 공격. 스킬은 시작하는 순간 쿨다운이 시작된다.
 //   - 결정 입력이 바뀌는 시각(행동이 없을 때의 스킬 준비, 요청한 스킬 준비)도 사건이다. 그 시각에 정확히 다시 결정한다.
 public sealed class CombatActions : IActionListener
@@ -66,7 +65,7 @@ public sealed class CombatActions : IActionListener
 
     // 행동이 없을 때만 다른 일(다음 행동, 달리기 복귀)을 할 수 있다(취소 없음).
     public bool IsFree => !runner.IsRunning;
-    public ActionTimeline CurrentAction => runner.Current;
+    public ActionTiming CurrentAction => runner.Current;
     public double CurrentActionStartTime => runner.StartTime;
 
     public void RequestSkill(Skill skill) => requestedSkill = skill;
@@ -112,10 +111,10 @@ public sealed class CombatActions : IActionListener
         if (!actor.TryAcquireTarget()) return false;
 
         Skill skill = TakeRequest(t) ?? actor.PickReadySkill(t);
-        if (skill != null && TryResolve(skill.Data.AnimationTrigger, out ActionTimeline skillAction)
+        if (skill != null && TryResolve(skill.Spec.ActionKey, out ActionTiming skillAction)
             && HasValidCastTime(skill))
         {
-            double castTime = skill.Data.CastTime;
+            double castTime = skill.Spec.CastTime;
             skill.BeginCooldown(t);
             currentSkill = skill;
             runner.Start(skillAction, castTime, t);
@@ -123,7 +122,7 @@ public sealed class CombatActions : IActionListener
             return true;
         }
 
-        if (!actor.HasBasicAttack || !TryResolve(ActionKeys.Attack, out ActionTimeline attack)) return false;
+        if (!actor.HasBasicAttack || !TryResolve(ActionKeys.Attack, out ActionTiming attack)) return false;
 
         double duration = actor.BasicAttackDuration;
         if (!IsValidDuration(duration, "attack-duration", "기본 공격 길이(공격 간격)")) return false;
@@ -144,9 +143,9 @@ public sealed class CombatActions : IActionListener
 
     private bool HasValidCastTime(Skill skill)
     {
-        if (IsPositiveFinite(skill.Data.CastTime)) return true;
-        Report("cast-time:" + skill.Data.Id,
-            $"[CombatActions] 스킬 {skill.Data.Id}({skill.Data.SkillName})의 시전 시간(castTime)이 잘못됐습니다: {skill.Data.CastTime}. 0보다 커야 합니다.");
+        if (IsPositiveFinite(skill.Spec.CastTime)) return true;
+        Report("cast-time:" + skill.Spec.Id,
+            $"[CombatActions] 스킬 {skill.Spec.Id}({skill.Spec.Name})의 시전 시간(castTime)이 잘못됐습니다: {skill.Spec.CastTime}. 0보다 커야 합니다.");
         return false;
     }
 
@@ -160,11 +159,11 @@ public sealed class CombatActions : IActionListener
         return skill;
     }
 
-    private bool TryResolve(string key, out ActionTimeline timeline)
+    private bool TryResolve(string key, out ActionTiming timeline)
     {
-        if (!actor.TryGetTimeline(key, out timeline))
+        if (!actor.TryGetTiming(key, out timeline))
         {
-            Report("missing:" + key, $"[CombatActions] '{key}' 행동 시간표가 없습니다. 캐릭터의 ActionTimelineSet을 확인하세요.");
+            Report("missing:" + key, $"[CombatActions] '{key}' 행동 시간표가 없습니다. 데이터 항목의 행동 시간표(timelines)를 확인하세요.");
             return false;
         }
 
@@ -185,16 +184,16 @@ public sealed class CombatActions : IActionListener
     // 같은 문제를 매번 찍지 않게 한 번만 남긴다. 숨기지는 않는다.
     private void Report(string problemKey, string message)
     {
-        if (reportedProblems.Add(problemKey)) Debug.LogError(message);
+        if (reportedProblems.Add(problemKey)) GameLog.Error(message);
     }
 
-    void IActionListener.OnActionHit(ActionTimeline action, int hitIndex)
+    void IActionListener.OnActionHit(ActionTiming action, int hitIndex)
     {
         if (currentSkill != null) actor.ApplySkillHit(currentSkill);
         else actor.ApplyBasicAttackHit();
     }
 
-    void IActionListener.OnActionCompleted(ActionTimeline action)
+    void IActionListener.OnActionCompleted(ActionTiming action)
     {
         currentSkill = null;
     }

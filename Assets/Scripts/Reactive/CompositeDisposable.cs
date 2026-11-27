@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 구독 손잡이 묶음. 창 수명에 묶어 두고 닫힐 때 한 번에 해제한다 (docs/UI_DESIGN.md 5-7).
 public sealed class CompositeDisposable : IDisposable
@@ -30,7 +29,7 @@ public sealed class CompositeDisposable : IDisposable
             }
             catch (Exception e)
             {
-                Debug.LogException(e);
+                GameLog.Exception(e);
             }
         }
         items.Clear();

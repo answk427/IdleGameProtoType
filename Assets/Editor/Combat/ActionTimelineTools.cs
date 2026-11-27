@@ -50,7 +50,7 @@ public static class ActionTimelineTools
                     continue;
                 }
 
-                string usageError = ActionTimelineBaking.ValidateUsage(key, result.HitFractions.Length);
+                string usageError = ActionTiming.ValidateUsage(key, result.HitFractions.Length);
                 if (usageError != null)
                 {
                     errors.Add($"[ActionTimeline] {where}: {usageError} (클립 {clip.name})");

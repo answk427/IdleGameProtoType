@@ -24,7 +24,7 @@ public class CombatantViewsTests
     private CombatantViews NewViews(CombatWorld world) => new CombatantViews(world.Events, Attach, Detach);
 
     // BattleView와 같은 규칙: 풀에서 꺼내(없으면 만들어) 붙이고, 떼면 풀로.
-    private CombatantHost Attach(Combatant combatant)
+    private CombatantHost Attach(IReadOnlyCombatant combatant)
     {
         CombatantHost host = pool.Count > 0 ? pool.Pop() : NewHost();
         host.Bind(combatant);
@@ -32,7 +32,7 @@ public class CombatantViewsTests
         return host;
     }
 
-    private void Detach(Combatant combatant, CombatantHost host)
+    private void Detach(IReadOnlyCombatant combatant, CombatantHost host)
     {
         host.Unbind();
         pool.Push(host);
@@ -77,7 +77,7 @@ public class CombatantViewsTests
         Deliver(world);
 
         world.Remove(c);
-        c.Spawn(Stats(hp: 50), 2f, 0.5f, Timelines(), null);
+        c.Spawn(Spec(Stats(hp: 50), 0.5f), 2f, null);
         world.Add(c);
         Deliver(world);
 

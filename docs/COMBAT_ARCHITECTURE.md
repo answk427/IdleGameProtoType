@@ -1592,3 +1592,156 @@ Core          GameNumber, 반응형
 - **`Combatant.Spawn`의 인자가 7개다**(능력치, 위치, 반너비, 시간표, 스킬, 보상, 종류). 5-C의 입력 구조(D37)를 정할 때 함께 묶는다.
 
 **결과:** 동작은 바뀌지 않았다. 테스트 318개 모두 통과(새 7개 포함), 사본 플레이 기준선이 5-R6과 비트 단위로 같다(30fps = 120fps = 렉 섞기, `cb06dd14e3a4ad7f`), 씬 없는 실행 = 플레이.
+
+## 13. 5-C 상세 설계: 어셈블리 분리 (2026-11-27 승인, D51~D54 추천안대로)
+
+5-C는 동작을 바꾸지 않는 단계다. 문서 규칙("시뮬레이션은 Unity를 모른다", "모델은 화면을 모른다", 한 방향 의존)을 컴파일 오류로 바꾼다(D37, D40). 12-8에서 남긴 세 가지(읽기 전용 접점, 파일 위치, `Combatant.Spawn` 인자)를 같이 푼다. 기준선(150초 미만 268줄, `cb06dd14e3a4ad7f`)이 비트 단위로 같아야 한다.
+
+### 13-1. 지금 코드 점검 (12절 뒤, `3a7e380`)
+
+파일마다 선언한 형식과 쓰는 형식을 훑는 일회성 스크립트로 아래 배치(13-2)를 넣어 봤다(주석·문자열 제외, 스크립트는 저장소 밖). 최종 판정은 컴파일러다.
+
+| 문제 | 근거(코드) |
+|---|---|
+| 어셈블리 하나 | 런타임 코드(약 156개 파일)가 `IdleGameProtoType.Runtime` 하나다. 개발자 도구만 따로 있다 |
+| 시뮬레이션이 데이터 행·에셋 형식을 쓴다 | `ActionTimeline`(`AnimationClip`, `[SerializeField]`): `ActionRunner`, `CombatActions`, `Combatant`, `CombatantTypes`. `SkillData`: `Skill`, `SkillLoadout`(그리고 `SkillEffectType`이 `SkillData.cs`에 있다). `StageData`·`StageClearType`: `EncounterDirector`, `IEnemyRoster`. `BalanceConfig`(에셋): `FlowTimings.From` |
+| 엔진 호출 | `Debug.Log*`: 반응형 3곳(`CompositeDisposable`, `Observable` 2), 시뮬레이션 13곳(`EncounterDirector` 9, `CombatActions`, `CombatScheduler`, `Combatant`, `SkillLoadout`). `Mathf`: `Combatant.Sweep`, `Skill.CooldownRatio`(`GameNumber`의 것은 주석뿐) |
+| 위로 가는 참조 | `CameraRig`(뷰)가 앱의 `GameRunner`를 씬 필드로 쥐고 `simulation.Game.World`, `simulation.View.Views`를 읽는다. 위 목록 밖의 위반은 없다 |
+| 폴더와 주인이 다르다(12-8 둘째) | 뷰가 `Combat/`(`CombatantHost`, `CombatantViews`, `CharacterAnimationView`)와 `UI/`(`DamageText`, `FloatingHpBar`)에, 데이터 행 → 능력치 계산(`CombatantSetup`)과 데이터 에셋 형식(`ActionTimeline`, `ActionTimelineSet`)이 `Combat/`에, 앱의 저장소(`LocalFileSaveStorage`, `SaveProfile` …)가 진행도와 같은 `Player/`에, 최상위에 9개 |
+| `Game`이 구체 객체를 낸다(12-8 첫째) | `World`, `Flow`, `Loop`, `Clock`, `Roster`, `Player.Combatant`. 바깥이 쓰는 것은 읽기와 명령뿐이다(13-6 표) |
+| `Combatant.Spawn` 인자 7개(12-8 셋째) | 능력치, 위치, 반너비, 시간표, 스킬, 보상, 종류 |
+
+### 13-2. 어셈블리
+
+```
+Core ← Simulation ← Game ← View ← UI ← App        DevTools → 전부(에디터·개발 빌드만), 테스트 → 전부
+```
+
+| 어셈블리 | 엔진 | 참조 | 담는 것 | 경계가 강제하는 규칙 |
+|---|---|---|---|---|
+| `Core` | 없음 | — | `GameNumber`, `NumberFormatUtility`, 반응형, `GameLog` | 게임 개념을 모른다 |
+| `Simulation` | 없음 | Core | 전투(전투원, 월드, 스케줄러, 행동), 스킬, 흐름(디렉터, 루프), 입력 구조(13-4), 읽기 접점(13-6) | Unity를 모른다. `Time`, `Debug`, `Mathf`, Unity 객체, 데이터 행·에셋을 쓰면 컴파일되지 않는다 |
+| `Game` | 있음 | Core, Simulation, Newtonsoft | `Game`, `GameData`, `EnemyRoster`, `PlayerCombat`, 진행도, 저장 형식·검사, 데이터 행·표 에셋·튜닝 | 화면을 모른다(뷰·UI·앱 형식 불가). MonoBehaviour 없음은 테스트(13-7) |
+| `View` | 있음 | + Game, TMP, uGUI | `BattleView`, 호스트·애니메이션, 이펙트·데미지 숫자·머리 위 HP 바, 카메라·배경, 풀, 바닥 높이, `Presentation` | UI·조립·저장소를 모른다 |
+| `UI` | 있음 | + View, Input System | 창 시스템, Presenter, HUD 위젯, 탭, 토스트·확인창 | 조립·저장소를 모른다 |
+| `App` | 있음 | 전부 | `GameInitializer`, `GameRunner`, 저장소(`ISaveStorage`, `LocalFileSaveStorage`, `SaveStorageProvider`, `SaveProfile`), Unity 로그 연결 | 조립 지점 |
+
+- 기존 `DevTools`(define constraint 그대로), `TestSupport`(View, UI), `EditModeTests`(전부)는 참조만 바꾼다. 옛 `IdleGameProtoType.Runtime`은 지운다.
+- 에디터 스크립트(`Assets/Editor/`, 어셈블리 정의 없음)는 그대로다. 여섯 어셈블리를 지금처럼 자동 참조로 두어 에디터가 모두 본다.
+- 이름공간은 지금처럼 쓰지 않는다(전역). 더하면 바뀌는 줄만 늘고 강제하는 규칙은 같다.
+- D40의 `World`를 `View`로 부른다(D53): 12절에서 만든 폴더 `View/`, 문서의 "뷰"와 같고, 시뮬레이션의 `CombatWorld`와 헷갈리지 않는다.
+
+### 13-3. 폴더 (파일은 한 번에 옮긴다)
+
+```
+Assets/Scripts/
+  Core/        Economy/(GameNumber, NumberFormatUtility), Reactive/, Log/(GameLog)
+  Simulation/  Combat/(전투원, 월드, 스케줄러, 행동, 사건, 시계, ActionTiming, CombatantSpec, 읽기 접점), Skill/(+ SkillSpec), Flow/(+ StageSpec)
+  Game/        Game, GameData, EnemyRoster, PlayerCombat
+               Data/(데이터 행·표·항목, BalanceConfig, GameDataAssets, GameTables, DataTuning, ActionTimeline, ActionTimelineSet, ActionTimelineBaking)
+               Progress/(GameSession, PlayerStats, GoldWallet, ContentUnlocks, PlayerUpgradeConfig, UpgradeStats/)
+               Save/(PlayerSaveData, PlayerStatsSaveData, SaveDataValidator)
+  View/        BattleView, BodyAnchor, Presentation, PoolManager, PlayAreaBounds
+               Combatants/(CombatantHost, CombatantViews, CharacterAnimationView, Monster, PlayerController, FloatingHpBar)
+               Effects/(CombatEffectManager, HitEffect, HitParticle, RewardDropEffect, DamageText)
+               Stage/(CameraRig, BackgroundScroller, BackgroundFitter)
+  UI/          지금 그대로(DamageText, FloatingHpBar만 View로)
+  App/         GameInitializer, GameRunner, UnityLogSink, Save/(ISaveStorage, LocalFileSaveStorage, SaveStorageProvider, SaveProfile)
+  DevTools/    그대로
+```
+
+- 파일은 `.meta`와 같이 옮긴다. 씬·프리팹·에셋은 스크립트를 GUID로 찾으므로 참조가 그대로다. 클래스 이름은 바꾸지 않는다(파일 이름 = 클래스 이름).
+- 에셋 27개의 `m_EditorClassIdentifier: IdleGameProtoType.Runtime::…`는 GUID가 맞으면 쓰지 않는 표시값이라 고치지 않는다(그 에셋을 다시 저장할 때 Unity가 새 이름으로 쓴다). 보스 버튼의 `m_TargetAssemblyTypeName`도 지금부터 `Assembly-CSharp`로 낡아 있고 동작한다(대상 객체로 찾는다).
+- 직렬화 함정과 무관하다: 데이터 행의 필드 이름, 열거형 값, 직렬화 클래스(`ActionTimeline`)의 필드는 그대로이고, Unity는 직렬화 클래스를 어셈블리 이름이 아니라 필드 배치로 저장한다(`[SerializeReference]`는 쓰지 않는다).
+
+### 13-4. 시뮬레이션 입력 구조 (D37 상세)
+
+시뮬레이션은 데이터 행(`[SerializeField]`, Newtonsoft 속성)과 에셋(클립)을 모른다. 필요한 값만 담은 구조를 받는다. **데이터 행 → 입력 구조는 `GameData` 한 곳이다.**
+
+| 구조 | 값 | 대신하는 것 |
+|---|---|---|
+| `ActionTiming`(불변 클래스) | 키, 클립 길이, 타격 비율(복사), 검사 결과(만들 때 한 번) | 시뮬레이션·뷰가 쓰던 `ActionTimeline`. 값 규칙(`ValidateValues`, `ValidateUsage`)이 여기로 온다 |
+| `ActionTimingSet` | 키 → `ActionTiming` | `IActionTimelineSource`(지운다: 구현이 에셋 하나였고, 테스트는 값으로 만든다) |
+| `SkillSpec`(불변 클래스) | id, 이름(오류 메시지), 쿨다운, 시전 시간, 행동 키, 효과 종류, 값 1·2 | `Skill`·`SkillLoadout`이 쥐던 `SkillData`. 학습 레벨은 진행도 값이라 없다. `SkillEffectType`은 시뮬레이션으로 |
+| `StageSpec`(불변 클래스) | 스테이지 번호, 몬스터 id 둘, 마리 수, 인카운터 수, 간격, 스폰 거리, 보스 제한 시간, 클리어 방식 | 흐름이 쥐던 `StageData`. 배경 경로는 없다(`Presentation`). `StageClearType`은 시뮬레이션으로 |
+| `CombatantSpec`(읽기 전용 구조체) | 종류, 능력치, 몸(반너비, `ActionTimingSet`), 처치 보상 | `Spawn` 인자 7개 → `Spawn(in CombatantSpec, float x, SkillLoadout skills)`. 위치는 스폰마다, 로드아웃은 주인이 갖는 실행 상태(플레이어는 스테이지를 넘어 쿨다운 유지)라 사양에 넣지 않는다 |
+| `FlowTimings` | 그대로 | `From(BalanceConfig)` → `GameData.FlowTimings` |
+
+- **`GameData`**: 시작 때 사양을 만들어 둔다(스킬·스테이지는 id별, 시간표는 `ActionTimelineSet`마다 한 번). 내는 것: `Stage(번호)` → `StageSpec`, `Skill(id)` → `SkillSpec`, `FlowTimings`, `TryGetMonster(id, 스테이지, 보스, out CombatantSpec, out 이유)`, `TryGetPlayer(캐릭터, 능력치, out CombatantSpec)`, 플레이어 능력치 변화용 `PlayerStatsOf(캐릭터, 능력치)`, 튜닝 뒤 `RefreshSpecs()`. 진행도·UI가 쓰는 행 조회(몬스터·캐릭터 행, 스킬 행 목록 `SkillRows`)는 그대로. `CombatantSetup`의 공식(스테이지 배율, 몬스터·플레이어 능력치, 보상)은 `GameData`로 합치고 파일을 지운다.
+- **굽기는 데이터 쪽:** 클립 표식 → 비율(`ActionTimelineBaking.Bake`, 서명)은 에셋을 만드는 일이라 `Game/Data/`의 `ActionTimeline` 옆에 둔다. 값 규칙은 `ActionTiming`만 갖고 굽기·에셋·에디터 검사가 그것을 부른다(규칙 한 곳).
+- **튜닝 덮어쓰기와 캐시:** 지금 튜닝은 데이터 행을 제자리에서 바꾸고, 행을 쥔 쪽(스킬)이 바로 새 값을 본다. 사양은 값 사본이라, 튜닝이 다시 적용되면(`DataTuning.Changed` → `Game.RecomputeFromData`) `GameData`가 사양을 새로 만들고 쓰는 쪽은 입력이 들어가는 시점에 받는다.
+  - 플레이어 스킬: 바로(로드아웃이 장착을 다시 맞추며 사양을 바꿔 끼운다, 준비 시각은 유지 = 지금과 같다). 플레이어 능력치: 바로(지금처럼 구독).
+  - 몬스터: 다음 스폰(지금과 같다).
+  - 스테이지 값: **다음 입장부터**(지금은 진행 중인 스테이지에도 바로 들어갔다). 에디터 도구의 작은 차이라 CLAUDE.md에 적는다.
+  - 할당: 사양이 캐시라 스폰·장착에 할당이 없다(R6). 사양을 바꿔 끼울 때(튜닝)만 효과 객체를 새로 만든다.
+
+### 13-5. 로그 접점 `GameLog`
+
+- `Core`의 `GameLog.Info/Warning/Error/Exception`이 받는 쪽 하나(`IGameLogSink`)에 넘긴다. 앱의 `UnityLogSink`가 `Debug.Log/LogWarning/LogError/LogException`으로 그대로 보낸다. 메시지가 같아 테스트의 `LogAssert`는 그대로다.
+- 설치: `App`의 `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`(플레이, 빌드)와 에디터의 `[InitializeOnLoadMethod]`(EditMode 테스트). 설치 전·Unity 밖에서는 표준 오류 출력(버리지 않는다).
+- 정적이지만 **밖으로 내기만 한다**(`UIButtonEvents`와 같은 예외, CLAUDE.md "이벤트 버스"). 호출자는 아무것도 돌려받지 않으므로 서비스를 찾는 길이 아니다.
+- 바꾸는 곳: Core 3, Simulation 13. Game 이상은 엔진이 있는 층이라 `Debug` 그대로.
+- `Mathf` → 같은 규칙의 지역 함수(`Combatant`의 `Min`/`Max`, `Skill`의 `Clamp01`). `System.Math`는 NaN과 부호 있는 0을 다르게 다뤄서 쓰지 않는다(기준선을 비트 단위로 지킨다).
+- 대가: 콘솔에서 로그를 두 번 누르면 `UnityLogSink`가 열린다(실제 위치는 스택의 다음 줄). 엔진 없는 Core에는 `[HideInCallstack]`을 붙일 수 없다.
+
+### 13-6. 읽기 전용 접점 (12-8 첫째)
+
+바깥이 쓰는 것(코드 전체):
+
+| 쓰는 쪽 | 쓰는 것 |
+|---|---|
+| View | `BattleView`: 월드 사건, 흐름 `StageEntered` / `CombatEffectManager`: 월드 사건 / `CameraRig`: `LeadAlly`, `TotalShift` / 호스트: 전투원의 위치·HP·단계·시간표 |
+| UI | `FadeController`: `Phase`, `Transition`, 시각 / Presenter: `BossChallengeAvailable`, `RequestBossChallenge`, `BossDeadline`, 시각, `CurrentStageNumber` |
+| App | `GameRunner`: `StageEntered`, `Stalled`, 보간 비율 / `GameInitializer`: `CurrentStageNumber` |
+| DevTools | `Phase`, `Stage`, `EncountersCleared`, `RestartAt`, `RequestBossChallenge` / 판정 몸 표시: 전투원 목록 |
+
+모두 읽기와 명령이다. 그래서 (추천 A, D52):
+
+- Simulation에 접점 셋: `IReadOnlyCombatant`(팀, 종류, 단계, 살아 있음, x, 반너비, 사거리, HP, 최대 HP, 보간 x, 시간표 조회), `IReadOnlyCombatWorld`(사건, 전투원 목록, 앞장, `TotalShift`, 시각), `IEncounterFlow`(상태·사건·시각·지금 스테이지·깬 인카운터 수 + 명령 `RequestBossChallenge`, `RestartAt`. `Begin`·`Tick`은 없다).
+- 사건의 `Source`/`Other`는 `IReadOnlyCombatant`다. 받는 쪽(뷰, 이펙트, 게임)은 전투원을 읽기만 한다.
+- `Game`이 내는 것: `World`(`IReadOnlyCombatWorld`), `Flow`(`IEncounterFlow`), 보간 비율, `Data`, `Session`, `Player`(HP 상태, 쿨다운 비율, 스킬 요청). 구체 객체(월드, 디렉터, 루프, 시계, 적 풀, 플레이어 전투원, 장착 `Skill`)는 `Game` 안에만 있다. 테스트가 적 풀 장부를 볼 때만 `InternalsVisibleTo("IdleGameProtoType.EditModeTests")`.
+- 소유자 API(`Spawn`, `Add`, `Tick`, `DeliverEvents` …)는 public 그대로 둔다(Game과 테스트가 쓴다). 우회는 형 변환뿐이라 **서명 검사 테스트**를 둔다: View·UI·App·DevTools의 형식은 필드·속성·인자·반환형(제네릭 인자 포함)에 시뮬레이션의 구체 형식(`Combatant`, `CombatWorld`, `EncounterDirector`, `SimulationLoop`, `SimClock`, `SkillLoadout`, `Skill`, `CombatActions`, `EnemyRoster`)을 갖지 않는다. 메서드 안의 형 변환은 보지 못한다(리뷰 몫).
+- 대안 B: 소유자 API를 `internal`로 하고 Game·테스트에 `InternalsVisibleTo`. 컴파일러가 막지만 Game이 시뮬레이션의 내부(`StepPhase`, `Emit`, 등록 순번 설정)까지 보게 되고, 경계가 친구 선언 하나에 달린다. 시험 코드가 부르는 단계 함수도 모두 친구 접근이 된다.
+
+### 13-7. 그 밖에 바뀌는 것
+
+- **`CameraRig`**: `GameRunner` 필드를 지우고 조립 지점이 `Bind(월드, 뷰 표)`를 부른다(이펙트·배경과 같은 길). 씬 편집 하나: `GameInitializer.cameraRig`에 Main Camera의 `CameraRig`를 연결(12-6 방식: 사용자 에디터에서 MainScene을 추가로 열어 `SerializedObject`로 고치고 저장 후 닫음, 배경 `m_LocalScale` 부작용 되돌림). `CameraRig`의 옛 `simulation` 키는 씬을 저장할 때 Unity가 지운다.
+- **구조 테스트 2개**(`ArchitectureTests`): 위 서명 검사, Core·Simulation·Game에 `UnityEngine.Component` 파생 형식이 없다. 어셈블리 참조 방향은 asmdef가 강제하므로 테스트하지 않는다.
+- **바뀌지 않는 것:** 전투·흐름 규칙, 사건 종류와 순서(`Source`의 형식만 접점), 저장 형식, 데이터 변환(엑셀 열, `.asset` 키), 씬의 스크립트 GUID, 배속·단계 길이. 그래서 기준선이 같아야 한다.
+
+### 13-8. 순서와 검증
+
+| 단계 | 내용 | 확인 |
+|---|---|---|
+| 1 코드 정리 | 어셈블리 하나 안에서: 입력 구조와 `GameData`, `GameLog`, 읽기 접점, `CameraRig.Bind`, 구조 테스트 | 사본 `Sync` 0 → 테스트 전부, 데이터 검사, 기준선 |
+| 2 이동과 분리 | 파일을 폴더로(`.cs`와 `.meta`를 한 명령으로), asmdef 6개, 기존 3개의 참조, 씬 편집 | 사용자 에디터 컴파일, git이 이름 바꾸기로만 보는지(새 `.meta` 없음) |
+| 3 강제 확인 | 사본에서 일부러 위반을 넣어(Simulation에 `UnityEngine.Debug`, Game에서 View 형식, View에서 App 형식) 컴파일 오류가 나는지 보고 지운다 | 오류 3개 |
+| 4 검증 | 테스트 전부(318 + 새 구조 테스트), `ValidateCombatData` 에러 0, 기준선 30/120/렉 150초 = `cb06dd14e3a4ad7f`(268줄), 씬 없는 실행 = 플레이, 릴리스·개발 APK의 `global-metadata.dat` 비교로 DevTools가 릴리스에 없는지(DEV_TOOLS 7절 방법) | 13-10 결과 |
+| 5 문서 | 13절 결과, CLAUDE.md(경로·어셈블리·튜닝), README, TODO, UI_DESIGN(어셈블리 메모), DEV_TOOLS | |
+| 6 S24(D41) | 사본에서 개발 APK, `ANDROID_SERIAL` 기기에만 설치, 기기 세이브는 `run-as`로 백업·복원. 구조 정리 뒤 처음 보는 화면: 전투원 그림 위치, 보스 부모, 스테이지가 바뀔 때 풀 비우기, HP 바, HUD | 사용자 눈 확인 |
+
+1을 2와 나누는 이유: 동작을 건드릴 수 있는 변경(입력 구조, 사건의 형식)과 넓지만 기계적인 이동을 따로 검증해서, 이동에서 생긴 오류가 코드 변경과 섞이지 않게 한다. 1 뒤에 커밋하면 이동 커밋은 git에서 이름 바꾸기와 asmdef만 남는다(D54).
+
+### 13-9. 결정 (2026-11-27 추천안대로 승인)
+
+| | 질문 | 추천 | 이유 |
+|---|---|---|---|
+| D51 | Game 어셈블리의 엔진 참조 | 참조한다. MonoBehaviour 없음은 구조 테스트 | 데이터 행(`[SerializeField]`)과 표 에셋을 그대로 읽어야 한다. 엔진 없는 Game은 데이터 행 6종과 진행도가 직접 읽는 에셋 4개(`PlayerStatDatabase`, `PlayerUpgradeConfig`, `ContentUnlockDatabase`, `BalanceConfig`)를 엔진 없는 형식으로 한 번 더 바꾸는 층이 필요하다. 서버는 게임 규칙을 돌리지 않으므로(SERVER_DESIGN 2장) 지금 얻는 것이 없다. 필요해지면 `GameData`가 그 층이 된다 |
+| D52 | 읽기 전용 접점 | A: 접점 셋 + 서명 검사 테스트 | 시뮬레이션이 친구 선언 없이 닫혀 있고, 바깥이 볼 수 있는 것이 형식으로 적힌다. 대가: 형 변환 우회는 테스트가 못 본다 |
+| D53 | 어셈블리 이름 `World` | `View` | 12절의 폴더 `View/`, 문서의 "뷰"와 같고 `CombatWorld`와 헷갈리지 않는다 |
+| D54 | 커밋 단위 | 1(코드 정리) 뒤에 멈춰 커밋 여부를 묻는다 | 이동 커밋이 이름 바꾸기만 남아 리뷰가 쉽다. 커밋은 지시가 있을 때만 |
+
+### 13-10. 결과: 1단계 코드 정리 (2026-11-27, 어셈블리 하나 안에서)
+
+| 항목 | 결과 |
+|---|---|
+| 새 형식 | Core: `GameLog`(+ `IGameLogSink`). Simulation: `ActionTiming`·`ActionTimingSet`(값 규칙 한 곳), `SkillSpec`(+ `SkillEffectType`), `StageSpec`(+ `StageClearType`), `CombatantSpec`, 읽기 접점 `IReadOnlyCombatant`·`IReadOnlyCombatWorld`·`IEncounterFlow`. Game: `AssemblyInfo`(테스트에만 `InternalsVisibleTo`). App: `UnityLogSink` |
+| 지운 것 | `CombatantSetup`(공식은 `GameData`로), `IActionTimelineSource`, `FlowTimings.From`, `ActionTimeline.FromValues`, `GameData.TryGetMonsterBody`/`TryGetCharacterBody`, `PlayerCombat.GetEquippedSkill`·`Character`(행), `CameraRig`의 `GameRunner` 필드 |
+| 바뀐 접점 | `Combatant.Spawn(in CombatantSpec, x, 로드아웃)`. 사건의 `Source`/`Other`는 `IReadOnlyCombatant`. `Game.World`/`Flow`는 접점, `Game.RenderAlpha`, 구체 객체(월드, 디렉터, 루프, 적 풀, 플레이어 전투원)는 `Game` 안에만. 뷰·UI·개발자 도구는 접점만 받는다(`CombatantViews`, 호스트, 이펙트, 카메라, 판정 몸 표시, 페이드, 보스 버튼, HUD) |
+| 튜닝 | `Game.RecomputeFromData` = `GameData.RefreshSpecs` → 진행도 다시 계산 → 플레이어 장착 다시 맞춤. 로드아웃은 장착을 맞출 때 사양을 다시 찾아 바꿔 끼운다(`Skill.Rebind`, 준비 시각 유지). 새 테스트 `SkillLoadoutTests.ChangedSpec_IsSwappedInOnSetSlots_KeepingReadyTime` |
+| `Mathf` | `System.Math`가 아니라 같은 규칙의 지역 함수(13-5). 기준선을 비트 단위로 지키려고 |
+| 씬 | `GameInitializer.cameraRig` ← Main Camera(사용자 에디터에서 MainScene을 추가로 열어 `SerializedObject`로 고치고 닫음). `CameraRig.simulation` 키는 저장할 때 Unity가 지웠다. 배경 `m_LocalScale` 부작용은 되돌렸다. 씬의 차이는 이 두 줄뿐 |
+| 테스트 | 사본에서 EditMode 319개 모두 통과(318 + 새 1). 시험 도구는 `CombatTestKit.Spec`/`Timings`, `TestSkills.CreateSpec`으로 바뀌었다 |
+| 데이터 검사 | `ActionTimelineTools.ValidateCombatData` 에러 0 |
+| 기준선 | 사본 플레이 30fps / 120fps / 렉 섞기 150초: 150초 미만 268줄, 지문 `cb06dd14e3a4ad7f`, 셋이 같고 5-R6·12-8과 같다. 콘솔 에러 0. 씬 없는 실행(`HeadlessGame`, 30fps) = 플레이(시작 입장 줄 하나 빼고 268줄 같음) |
+| 남은 것 | 2단계(파일 이동, asmdef 6개, 구조 테스트, 강제 확인), 릴리스 빌드 확인, 문서, S24 |

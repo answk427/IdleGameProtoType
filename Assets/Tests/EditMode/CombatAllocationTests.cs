@@ -17,7 +17,7 @@ public class CombatAllocationTests
         Skill bossSkill = TestSkills.Create(id: 3, cooldown: 1.1f, castTime: 0.3f);
 
         Combatant ally = Spawn(world, Team.Ally, 0f, 0.4f, Stats(hp: 1e12, damage: 50, interval: 0.05, range: 0.2f, policy: MovePolicy.Advance, speed: 3f),
-            timelines: Timelines(death: true), skills: Loadout(strike, aoe), host: new FakeHost());
+            timings: Timings(death: true), skills: Loadout(strike, aoe), host: new FakeHost());
 
         // 다가오는 적(공격함), 화면과 함께 오는 적(공격 안 함), 금방 죽는 적이 섞여 있다.
         for (int i = 0; i < 5; i++)
@@ -26,7 +26,7 @@ public class CombatAllocationTests
             Spawn(world, Team.Enemy, 1.2f + i * 0.9f, 0.4f,
                 Stats(hp: i == 1 ? 300 : 1e9, damage: 3, interval: attacker ? 0.4 : 0, range: 0.1f,
                     policy: attacker ? MovePolicy.Approach : MovePolicy.Hold, speed: attacker ? 1f : 0f),
-                timelines: Timelines(death: true),
+                timings: Timings(death: true),
                 skills: attacker ? Loadout(bossSkill) : null,
                 host: new FakeHost());
         }

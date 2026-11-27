@@ -1,25 +1,25 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 전투원의 스킬 런타임 상태(docs/COMBAT_ARCHITECTURE.md 7-6). 순수 C#. 플레이어는 장착 슬롯 5칸, 몬스터는 데이터의 스킬 1칸.
 //
 // 쿨다운은 슬롯이 아니라 스킬 id에 붙는다. 처음 장착할 때 인스턴스를 만들고, 장착을 풀어도 버리지 않는다.
 // 예전에는 슬롯마다 인스턴스를 새로 만들어서, 스킬을 다른 슬롯으로 옮기기만 해도 쿨다운이 0이 됐다.
 // 쿨다운은 준비 시각(절대 시각)이라 장착하지 않은 동안에도 흐른다(결정 S2). 저장하지 않는다(앱을 다시 켜면 0).
+// 스킬 값(SkillSpec)은 id로 찾는다. 장착을 맞출 때마다 다시 찾아서, 데이터가 바뀌었으면(튜닝) 새 값으로 바꿔 끼운다(13-4).
 public sealed class SkillLoadout
 {
     public const int EmptySlot = -1;
 
-    private readonly Func<int, SkillData> resolveData;
+    private readonly Func<int, SkillSpec> resolveSpec;
     private readonly Dictionary<int, Skill> skillsById = new Dictionary<int, Skill>();
     private readonly Skill[] slots;
 
-    public SkillLoadout(int slotCount, Func<int, SkillData> resolveData)
+    public SkillLoadout(int slotCount, Func<int, SkillSpec> resolveSpec)
     {
         if (slotCount < 0) throw new ArgumentOutOfRangeException(nameof(slotCount));
         slots = new Skill[slotCount];
-        this.resolveData = resolveData ?? throw new ArgumentNullException(nameof(resolveData));
+        this.resolveSpec = resolveSpec ?? throw new ArgumentNullException(nameof(resolveSpec));
     }
 
     public int SlotCount => slots.Length;
@@ -78,16 +78,20 @@ public sealed class SkillLoadout
 
     private Skill GetOrCreate(int skillId)
     {
-        if (skillsById.TryGetValue(skillId, out Skill skill)) return skill;
-
-        SkillData data = resolveData(skillId);
-        if (data == null)
+        SkillSpec spec = resolveSpec(skillId);
+        if (skillsById.TryGetValue(skillId, out Skill skill))
         {
-            Debug.LogError($"[SkillLoadout] 스킬 {skillId}의 데이터가 없습니다. 슬롯은 비워 둡니다.");
+            if (spec != null) skill.Rebind(spec); // 같은 값이면 아무것도 하지 않는다
+            return skill;
+        }
+
+        if (spec == null)
+        {
+            GameLog.Error($"[SkillLoadout] 스킬 {skillId}의 데이터가 없습니다. 슬롯은 비워 둡니다.");
             return null;
         }
 
-        skill = new Skill(data);
+        skill = new Skill(spec);
         skillsById.Add(skillId, skill);
         return skill;
     }

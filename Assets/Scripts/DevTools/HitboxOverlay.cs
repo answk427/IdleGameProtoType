@@ -14,12 +14,12 @@ public sealed class HitboxOverlay
     private static readonly Color EnemyColor = new Color(1f, 0.3f, 0.3f);
     private static readonly Color DeadColor = new Color(0.6f, 0.6f, 0.6f);
 
-    private readonly CombatWorld world;
+    private readonly IReadOnlyCombatWorld world;
     private readonly CombatantViews views;
     private readonly PlayAreaBounds playArea;
     private GUIStyle labelStyle;
 
-    public HitboxOverlay(CombatWorld world, CombatantViews views, PlayAreaBounds playArea)
+    public HitboxOverlay(IReadOnlyCombatWorld world, CombatantViews views, PlayAreaBounds playArea)
     {
         this.world = world;
         this.views = views;
@@ -35,7 +35,7 @@ public sealed class HitboxOverlay
         if (labelStyle == null) labelStyle = new GUIStyle(GUI.skin.label);
         labelStyle.fontSize = Mathf.RoundToInt(11f * unit);
 
-        foreach (Combatant c in world.Combatants)
+        foreach (IReadOnlyCombatant c in world.Combatants)
         {
             if (c.Phase == CombatantPhase.Inactive) continue;
 

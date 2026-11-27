@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using static ActionTimelineBaking;
+using static ActionTiming;
 
 // 클립 타격 표식 → 시간표 비율 굽기와 그 검사 규칙(docs/COMBAT_ARCHITECTURE.md 7-2, 7-13).
 // 표식은 AE_OnHit 하나뿐이다. 옛 해제 표식(AE_OnAttackEnd/AE_OnDeathEnd)은 남아 있으면 오류로 알린다.

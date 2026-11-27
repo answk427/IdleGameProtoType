@@ -12,13 +12,13 @@ using System.Collections.Generic;
 // 다른 구독자(이펙트, 보상)는 월드의 사건을 직접 구독한다.
 public sealed class CombatantViews : IDisposable
 {
-    private readonly Dictionary<Combatant, CombatantHost> byCombatant = new Dictionary<Combatant, CombatantHost>();
+    private readonly Dictionary<IReadOnlyCombatant, CombatantHost> byCombatant = new Dictionary<IReadOnlyCombatant, CombatantHost>();
     private readonly List<CombatantHost> all = new List<CombatantHost>();
-    private readonly Func<Combatant, CombatantHost> attach;
-    private readonly Action<Combatant, CombatantHost> detach;
+    private readonly Func<IReadOnlyCombatant, CombatantHost> attach;
+    private readonly Action<IReadOnlyCombatant, CombatantHost> detach;
     private readonly IDisposable subscription;
 
-    public CombatantViews(Observable<CombatEvent> events, Func<Combatant, CombatantHost> attach, Action<Combatant, CombatantHost> detach)
+    public CombatantViews(Observable<CombatEvent> events, Func<IReadOnlyCombatant, CombatantHost> attach, Action<IReadOnlyCombatant, CombatantHost> detach)
     {
         this.attach = attach ?? throw new ArgumentNullException(nameof(attach));
         this.detach = detach ?? throw new ArgumentNullException(nameof(detach));
@@ -27,7 +27,7 @@ public sealed class CombatantViews : IDisposable
 
     public IReadOnlyList<CombatantHost> All => all;
 
-    public bool TryGet(Combatant combatant, out CombatantHost host)
+    public bool TryGet(IReadOnlyCombatant combatant, out CombatantHost host)
     {
         host = null;
         return combatant != null && byCombatant.TryGetValue(combatant, out host) && host != null;
@@ -40,7 +40,7 @@ public sealed class CombatantViews : IDisposable
         int index = all.IndexOf(host);
         if (index < 0) return;
         all.RemoveAt(index);
-        foreach (KeyValuePair<Combatant, CombatantHost> pair in byCombatant)
+        foreach (KeyValuePair<IReadOnlyCombatant, CombatantHost> pair in byCombatant)
         {
             if (pair.Value != host) continue;
             byCombatant.Remove(pair.Key);
@@ -52,7 +52,7 @@ public sealed class CombatantViews : IDisposable
 
     private void Route(CombatEvent e)
     {
-        Combatant source = e.Source;
+        IReadOnlyCombatant source = e.Source;
         if (source == null) return;
 
         if (e.Type == CombatEventType.Joined && !byCombatant.ContainsKey(source))

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using UnityEngine;
 
 // 흐름의 주인: 인카운터 → 보스 → 스테이지(docs/COMBAT_ARCHITECTURE.md 10절). 순수 C#.
 //
@@ -23,7 +22,7 @@ using UnityEngine;
 //   4. 끝난 대기 넘기기. 대기가 0이면 같은 ①에서 다음 단계로 이어진다.
 //   5. 진전 감시(에디터·개발 빌드)
 //   6. 이 ①의 변화(단계, 스테이지 번호, 보스 도전 가능, 입장, 진전 경고)를 순서대로 바깥에 낸다(D48, 처리 밖)
-public sealed class EncounterDirector
+public sealed class EncounterDirector : IEncounterFlow
 {
     // 진전(피해, 사망, 이동, 흐름 변화)이 없는 게임 시간이 이만큼이면 경고한다(R4).
     public const double StallSeconds = 30.0;
@@ -37,7 +36,7 @@ public sealed class EncounterDirector
     private readonly CombatWorld world;
     private readonly SimClock clock;
     private readonly IEnemyRoster roster;
-    private readonly Func<int, StageData> findStage;
+    private readonly Func<int, StageSpec> findStage;
     private readonly FlowTimings timings;
 
     private readonly ReactiveProperty<FlowPhase> phase = new ReactiveProperty<FlowPhase>(FlowPhase.NotStarted);
@@ -57,7 +56,7 @@ public sealed class EncounterDirector
     // 이 디렉터가 스폰해서 월드에 등록한 전투원(인카운터 몬스터 또는 보스). 정리할 때 모두 뺀다.
     private readonly List<Combatant> spawned = new List<Combatant>(8);
 
-    private StageData stage;
+    private StageSpec stage;
     private Combatant boss;
     private int encountersCleared;
 
@@ -76,7 +75,7 @@ public sealed class EncounterDirector
     private long lastFlowProgressStep;
     private long stallReportedFor = -1; // 경고를 낸 마지막 진전 단계. 그 뒤로 진전이 있으면 다시 감시한다
 
-    public EncounterDirector(CombatWorld world, IEnemyRoster roster, Func<int, StageData> findStage, FlowTimings timings)
+    public EncounterDirector(CombatWorld world, IEnemyRoster roster, Func<int, StageSpec> findStage, FlowTimings timings)
     {
         this.world = world ?? throw new ArgumentNullException(nameof(world));
         this.roster = roster ?? throw new ArgumentNullException(nameof(roster));
@@ -107,7 +106,8 @@ public sealed class EncounterDirector
         phaseNow == FlowPhase.Boss && bossDeadlineStep != long.MaxValue ? bossDeadlineStep * clock.StepLength : double.PositiveInfinity;
 
     public SimClock Clock => clock;
-    public StageData Stage => stage;
+    public double Now => clock.Now;
+    public StageSpec Stage => stage;
     public int EncountersCleared => encountersCleared;
     public Combatant Boss => boss;
 
@@ -118,14 +118,14 @@ public sealed class EncounterDirector
     {
         if (phaseNow != FlowPhase.NotStarted)
         {
-            Debug.LogError("[EncounterDirector] 이미 시작했습니다.");
+            GameLog.Error("[EncounterDirector] 이미 시작했습니다.");
             return false;
         }
 
-        StageData first = findStage(stageNumber);
+        StageSpec first = findStage(stageNumber);
         if (first == null)
         {
-            Debug.LogError($"[EncounterDirector] 스테이지 {stageNumber}가 없어 시작하지 않습니다.");
+            GameLog.Error($"[EncounterDirector] 스테이지 {stageNumber}가 없어 시작하지 않습니다.");
             return false;
         }
 
@@ -199,7 +199,7 @@ public sealed class EncounterDirector
         for (int i = 0; AdvancePhase(now); i++)
         {
             if (i < MaxAdvancesPerTick) continue;
-            Debug.LogError($"[EncounterDirector] 한 단계에서 흐름이 {MaxAdvancesPerTick}번 넘게 바뀌었습니다(지금 {phaseNow}). 다음 단계에서 이어 갑니다.");
+            GameLog.Error($"[EncounterDirector] 한 단계에서 흐름이 {MaxAdvancesPerTick}번 넘게 바뀌었습니다(지금 {phaseNow}). 다음 단계에서 이어 갑니다.");
             break;
         }
 
@@ -295,14 +295,14 @@ public sealed class EncounterDirector
     }
 
     // 스테이지에 들어간다: 정리 → (다른 스테이지면) 이전 스테이지 자원 정리 → 진행 초기화 → 아군 부활 → 알림.
-    private void EnterStage(StageData next, StageEntryReason reason)
+    private void EnterStage(StageSpec next, StageEntryReason reason)
     {
         DespawnAll();
         if (stage != null && stage.StageNumber != next.StageNumber) roster.ReleaseStage(stage);
 
         stage = next;
         if (stage.ClearType != StageClearType.KillBoss)
-            Debug.LogError($"[EncounterDirector] 스테이지 {stage.StageNumber}의 클리어 방식 {stage.ClearType}은 처리하지 않습니다. 보스 처치로 진행합니다.");
+            GameLog.Error($"[EncounterDirector] 스테이지 {stage.StageNumber}의 클리어 방식 {stage.ClearType}은 처리하지 않습니다. 보스 처치로 진행합니다.");
 
         encountersCleared = 0;
         SetBossAvailable(false);
@@ -324,12 +324,12 @@ public sealed class EncounterDirector
     private int NextStageNumber() => findStage(stage.StageNumber + 1) != null ? stage.StageNumber + 1 : stage.StageNumber;
 
     // 받을 때 검사한 스테이지가 실행 때 없을 일은 없지만(데이터는 플레이 중에 줄지 않는다), 있으면 지금 스테이지에 머문다.
-    private StageData FindStageOrCurrent(int stageNumber)
+    private StageSpec FindStageOrCurrent(int stageNumber)
     {
-        StageData found = findStage(stageNumber);
+        StageSpec found = findStage(stageNumber);
         if (found != null) return found;
 
-        Debug.LogError($"[EncounterDirector] 스테이지 {stageNumber}가 없어 스테이지 {stage.StageNumber}를 다시 시작합니다.");
+        GameLog.Error($"[EncounterDirector] 스테이지 {stageNumber}가 없어 스테이지 {stage.StageNumber}를 다시 시작합니다.");
         return stage;
     }
 
@@ -413,7 +413,7 @@ public sealed class EncounterDirector
             Register(roster.Spawn(stage.NormalMonsterId, stage, firstX + stage.MonsterSpacing * i, false));
 
         if (spawned.Count == 0)
-            Debug.LogError($"[EncounterDirector] 스테이지 {stage.StageNumber}의 인카운터를 스폰하지 못했습니다(몬스터 {stage.NormalMonsterId}).");
+            GameLog.Error($"[EncounterDirector] 스테이지 {stage.StageNumber}의 인카운터를 스폰하지 못했습니다(몬스터 {stage.NormalMonsterId}).");
     }
 
     private void SpawnBoss()
@@ -423,7 +423,7 @@ public sealed class EncounterDirector
 
         boss = Register(roster.Spawn(stage.BossMonsterId, stage, x, true));
         if (boss == null)
-            Debug.LogError($"[EncounterDirector] 스테이지 {stage.StageNumber}의 보스를 스폰하지 못했습니다(몬스터 {stage.BossMonsterId}).");
+            GameLog.Error($"[EncounterDirector] 스테이지 {stage.StageNumber}의 보스를 스폰하지 못했습니다(몬스터 {stage.BossMonsterId}).");
     }
 
     private Combatant Register(Combatant combatant)
@@ -454,7 +454,7 @@ public sealed class EncounterDirector
         Combatant lead = world.LeadAlly;
         if (lead == null)
         {
-            Debug.LogError("[EncounterDirector] 대열 앞장(플레이어)이 전투 월드에 없어 스폰 위치를 정할 수 없습니다.");
+            GameLog.Error("[EncounterDirector] 대열 앞장(플레이어)이 전투 월드에 없어 스폰 위치를 정할 수 없습니다.");
             return false;
         }
 
@@ -493,7 +493,7 @@ public sealed class EncounterDirector
     private static double ValidWait(double seconds, string name)
     {
         if (seconds >= 0.0 && !double.IsInfinity(seconds)) return seconds;
-        Debug.LogError($"[EncounterDirector] 흐름 대기 {name}이 잘못됐습니다: {seconds}. 0으로 진행합니다.");
+        GameLog.Error($"[EncounterDirector] 흐름 대기 {name}이 잘못됐습니다: {seconds}. 0으로 진행합니다.");
         return 0.0;
     }
 

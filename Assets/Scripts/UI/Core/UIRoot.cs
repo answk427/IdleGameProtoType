@@ -179,11 +179,11 @@ public class UIRoot : MonoBehaviour
     private void OpenSkillManage() => windows.Open<SkillManageWindow>(new SkillManageArgs());
 
     // 씬에 배치된 HUD 위젯. 창이 아니라 WindowManager를 거치지 않고, Presenter의 수명은 UIRoot와 같다.
-    private void BindHudWidgets(GameSession session, PlayerCombat player, EncounterDirector flow)
+    private void BindHudWidgets(GameSession session, PlayerCombat player, IEncounterFlow flow)
     {
         // 보스전 남은 시간은 흐름의 제한 시각과 시뮬레이션 시계로 계산한다(매 프레임 값, Tick).
         hudPresenter = new PlayerHudPresenter(playerHud, session.Stats, session.Wallet, player.Hp,
-            () => flow.BossDeadline, () => flow.Clock.Now).AddTo(disposables);
+            () => flow.BossDeadline, () => flow.Now).AddTo(disposables);
         new BossChallengePresenter(bossChallengeButton, flow).AddTo(disposables);
         new StageAnnouncementPresenter(stageAnnouncement, flow.CurrentStageNumber).AddTo(disposables);
 

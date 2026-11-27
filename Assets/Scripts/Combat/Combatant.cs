@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 전투원 하나(docs/COMBAT_ARCHITECTURE.md 8절). 플레이어, 일반 몬스터, 보스가 모두 이 클래스다. 순수 C#.
 //
@@ -13,14 +12,14 @@ using UnityEngine;
 // - 기본 공격 능력은 데이터다: 공격 간격 > 0이면 있다. 기본 공격도 스킬도 없으면 교전하지 않는다.
 // - 바깥(뷰, 이펙트, 보상)을 모른다. 일어난 일은 월드에 사건으로 남긴다(CombatEvent, 5-A). 월드에 등록되기 전의 일은
 //   사건이 되지 않는다(등록할 때 Joined가 처음 상태를 알린다).
-public sealed class Combatant : ICombatActor, IActionListener
+public sealed class Combatant : ICombatActor, IActionListener, IReadOnlyCombatant
 {
     private readonly ActionRunner deathRunner = new ActionRunner();
     private readonly List<Combatant> hitBuffer = new List<Combatant>(8);
 
     private CombatantStats stats;
     private CombatReward reward;
-    private IActionTimelineSource timelines;
+    private ActionTimingSet timings;
     private SkillLoadout skills;
     private bool deathCompletionReported;
 
@@ -71,16 +70,17 @@ public sealed class Combatant : ICombatActor, IActionListener
     // ── 생애 ──
 
     // 스폰(풀에서 다시 꺼낼 때 포함). 같은 객체를 다시 쓰므로 이전 상태를 모두 지운다.
-    // newReward: 처치 보상(몬스터). 사망 사건이 싣고 가서 게임 쪽이 지급한다. archetype: 무엇인지(뷰가 프리팹을 고른다).
-    public void Spawn(in CombatantStats newStats, float x, float halfWidth, IActionTimelineSource timelineSource, SkillLoadout skillLoadout,
-        in CombatReward newReward = default, in CombatantArchetype archetype = default)
+    // spec: 종류(뷰가 프리팹을 고른다), 능력치, 몸(반너비, 행동 시간표), 처치 보상(사망 사건이 싣고 가서 게임 쪽이 지급한다).
+    // x: 몸 중심. skillLoadout: 스킬 실행 상태(주인이 갖는다, 없으면 null).
+    public void Spawn(in CombatantSpec spec, float x, SkillLoadout skillLoadout)
     {
-        stats = Sanitize(newStats);
-        reward = newReward;
-        Archetype = archetype;
-        timelines = timelineSource;
+        stats = Sanitize(spec.Stats);
+        reward = spec.Reward;
+        Archetype = spec.Archetype;
+        timings = spec.Body.Timings;
         skills = skillLoadout;
 
+        float halfWidth = spec.Body.HalfWidth;
         HalfWidth = halfWidth >= 0f && !float.IsInfinity(halfWidth) ? halfWidth : ReportAndUse(0f, $"반너비가 잘못됐습니다: {halfWidth}");
         Place(x);
 
@@ -155,7 +155,7 @@ public sealed class Combatant : ICombatActor, IActionListener
         World?.NoteProgress();
 
         // 사망 시간표는 기다릴 일이 있는 전투원(지금은 플레이어)만 갖는다. 사망 시각(사건 처리 중의 정확한 시각)부터 진행한다.
-        if (World != null && timelines != null && timelines.TryGet(ActionKeys.Death, out ActionTimeline death) && death.IsValid)
+        if (World != null && timings != null && timings.TryGet(ActionKeys.Death, out ActionTiming death) && death.IsValid)
             deathRunner.Start(death, death.ClipLength, World.Clock.Now);
 
         Emit(CombatEvent.Died(Now, this, reward));
@@ -260,11 +260,15 @@ public sealed class Combatant : ICombatActor, IActionListener
         float contact = World.FindBlockingContact(this, direction);
 
         float moved = direction > 0f
-            ? Mathf.Min(next, Mathf.Max(X, contact))
-            : Mathf.Max(next, Mathf.Min(X, contact));
+            ? Min(next, Max(X, contact))
+            : Max(next, Min(X, contact));
         if (moved != X) World.NoteProgress();
         X = moved;
     }
+
+    // Mathf.Min/Max와 같은 규칙(같으면 뒤의 값, 부호 있는 0도 그대로). System.Math는 NaN·부호 있는 0을 다르게 다룬다.
+    private static float Min(float a, float b) => a < b ? a : b;
+    private static float Max(float a, float b) => a > b ? a : b;
 
     // ── 대상 ──
 
@@ -289,10 +293,10 @@ public sealed class Combatant : ICombatActor, IActionListener
 
     // ── ICombatActor ──
 
-    public bool TryGetTimeline(string key, out ActionTimeline timeline)
+    public bool TryGetTiming(string key, out ActionTiming timing)
     {
-        timeline = null;
-        return timelines != null && timelines.TryGet(key, out timeline);
+        timing = null;
+        return timings != null && timings.TryGet(key, out timing);
     }
 
     double ICombatActor.BasicAttackDuration => stats.AttackInterval;
@@ -318,18 +322,18 @@ public sealed class Combatant : ICombatActor, IActionListener
         hitBuffer.Clear();
         skill.Apply(this, AcquireTarget(), hitBuffer);
 
-        int skillId = skill.Data != null ? skill.Data.Id : 0;
+        int skillId = skill.Spec.Id;
         for (int i = 0; i < hitBuffer.Count; i++) Emit(CombatEvent.SkillHit(Now, this, skillId, hitBuffer[i]));
     }
 
-    void ICombatActor.OnActionStarted(ActionTimeline action, double duration, Skill skill) =>
-        Emit(CombatEvent.ActionStarted(Now, this, action.Key, duration, skill?.Data != null ? skill.Data.Id : 0));
+    void ICombatActor.OnActionStarted(ActionTiming action, double duration, Skill skill) =>
+        Emit(CombatEvent.ActionStarted(Now, this, action.Key, duration, skill != null ? skill.Spec.Id : 0));
 
     void ICombatActor.OnActionsIdle() => Emit(CombatEvent.Locomotion(Now, this, false));
 
     // 사망 러너의 알림(표식 처리 중). 완료 여부는 AdvanceDeath가 러너 상태로 확인한다.
-    void IActionListener.OnActionHit(ActionTimeline action, int hitIndex) { }
-    void IActionListener.OnActionCompleted(ActionTimeline action) { }
+    void IActionListener.OnActionHit(ActionTiming action, int hitIndex) { }
+    void IActionListener.OnActionCompleted(ActionTiming action) { }
 
     // ── 값 검사 ──
     // 데이터 검사(에디터·빌드)가 먼저 막는다. 여기는 그래도 들어온 값으로 진행이 멈추지 않게 하고, 숨기지 않고 알린다.
@@ -346,7 +350,7 @@ public sealed class Combatant : ICombatActor, IActionListener
 
     private T ReportAndUse<T>(T fallback, string message)
     {
-        Debug.LogError($"[Combatant] {Team} {Order}: {message}. {fallback}(으)로 진행합니다.");
+        GameLog.Error($"[Combatant] {Team} {Order}: {message}. {fallback}(으)로 진행합니다.");
         return fallback;
     }
 }

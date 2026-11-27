@@ -54,7 +54,7 @@ public enum RestartResult
     NoSuchStage,
 }
 
-// 흐름의 대기 시간(초). 데이터(BalanceConfig, D24)에서 온다. 0이면 그 대기가 없다(같은 ①에서 다음 단계로).
+// 흐름의 대기 시간(초). 데이터(BalanceConfig, D24)에서 GameData.FlowTimings가 만든다. 0이면 그 대기가 없다(같은 ①에서 다음 단계로).
 public readonly struct FlowTimings
 {
     public readonly double EncounterClearDelay;
@@ -67,9 +67,6 @@ public readonly struct FlowTimings
         BossIntroDelay = bossIntroDelay;
         TransitionDuration = transitionDuration;
     }
-
-    public static FlowTimings From(BalanceConfig balance) =>
-        new FlowTimings(balance.encounterClearDelay, balance.bossIntroDelay, balance.transitionDuration);
 }
 
 // 전환의 시각(절대 시각, 초). 페이드가 이것과 시계로 그린다(매 프레임 값의 원인은 상태로, docs/UI_DESIGN.md 5-3).

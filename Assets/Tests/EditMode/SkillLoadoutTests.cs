@@ -10,8 +10,37 @@ public class SkillLoadoutTests
 {
     private const int Empty = SkillLoadout.EmptySlot;
 
-    private static SkillLoadout NewLoadout() =>
-        new SkillLoadout(5, id => id == 99 ? null : TestSkills.CreateData(id: id, cooldown: 10f));
+    // GameData처럼 id마다 사양 하나를 만들어 둔다(99는 데이터에 없는 스킬).
+    private static SkillLoadout NewLoadout()
+    {
+        var specs = new System.Collections.Generic.Dictionary<int, SkillSpec>();
+        return new SkillLoadout(5, id =>
+        {
+            if (id == 99) return null;
+            if (!specs.TryGetValue(id, out SkillSpec spec)) specs[id] = spec = TestSkills.CreateSpec(id: id, cooldown: 10f);
+            return spec;
+        });
+    }
+
+    // 데이터가 바뀌면(튜닝 덮어쓰기, 13-4) 장착을 다시 맞출 때 같은 스킬 객체가 새 값으로 바뀐다. 준비 시각은 그대로이고 새 쿨다운은 다음 시전부터.
+    [Test]
+    public void ChangedSpec_IsSwappedInOnSetSlots_KeepingReadyTime()
+    {
+        SkillSpec current = TestSkills.CreateSpec(id: 1, cooldown: 10f);
+        var loadout = new SkillLoadout(5, id => id == 1 ? current : null);
+        loadout.SetSlots(new[] { 1, Empty, Empty, Empty, Empty });
+        Skill skill = loadout.GetSlot(0);
+        skill.BeginCooldown(0.0);
+
+        current = TestSkills.CreateSpec(id: 1, cooldown: 3f);
+        loadout.SetSlots(new[] { 1, Empty, Empty, Empty, Empty });
+
+        Assert.AreSame(skill, loadout.GetSlot(0), "같은 스킬 객체(쿨다운 상태)를 쓴다");
+        Assert.AreSame(current, skill.Spec);
+        Assert.AreEqual(10.0, skill.ReadyAt, "이미 시작한 쿨다운은 옛 값 그대로");
+        skill.BeginCooldown(20.0);
+        Assert.AreEqual(23.0, skill.ReadyAt, "다음 시전부터 새 쿨다운");
+    }
 
     [Test]
     public void MovingSkillToAnotherSlot_KeepsCooldown()

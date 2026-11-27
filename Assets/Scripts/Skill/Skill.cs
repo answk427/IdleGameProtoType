@@ -1,4 +1,4 @@
-﻿// 스킬 하나의 런타임 상태(쿨다운)와 효과. 밸런스 수치는 SkillData, 타이밍은 시전자의 행동 시간표가 갖는다.
+﻿// 스킬 하나의 런타임 상태(쿨다운)와 효과. 밸런스 수치는 SkillSpec(데이터 행에서 만든 값), 타이밍은 시전자의 행동 시간표가 갖는다.
 // 그림 자산(아이콘, VFX, 소리)은 모른다: 뷰가 스킬 id로 Presentation에서 찾는다(docs/COMBAT_ARCHITECTURE.md 12절 D47).
 //
 // 쿨다운은 남은 시간이 아니라 "준비 시각"(시뮬레이션 시계의 절대 시각)으로 갖는다(docs/COMBAT_ARCHITECTURE.md 7-11).
@@ -6,14 +6,23 @@
 // 시간이 흐르는 동안 값을 깎을 필요가 없어서 Tick이 없다. 장착 여부와 상관없이 시간은 흐른다.
 public class Skill
 {
-    public SkillData Data { get; }
+    private ISkillBehavior behavior;
 
-    private readonly ISkillBehavior behavior;
-
-    public Skill(SkillData data)
+    public Skill(SkillSpec spec)
     {
-        Data = data ?? throw new System.ArgumentNullException(nameof(data));
-        behavior = CreateBehavior(Data);
+        Spec = spec ?? throw new System.ArgumentNullException(nameof(spec));
+        behavior = CreateBehavior(Spec);
+    }
+
+    public SkillSpec Spec { get; private set; }
+
+    // 데이터가 바뀌었을 때(에디터의 튜닝 덮어쓰기) 새 값으로 바꿔 끼운다. 준비 시각은 그대로다(새 쿨다운은 다음 시전부터).
+    public void Rebind(SkillSpec spec)
+    {
+        if (spec == null) throw new System.ArgumentNullException(nameof(spec));
+        if (ReferenceEquals(spec, Spec)) return;
+        Spec = spec;
+        behavior = CreateBehavior(spec);
     }
 
     // 이 시각부터 쓸 수 있다. 한 번도 쓰지 않았으면 언제든 쓸 수 있다.
@@ -24,7 +33,7 @@ public class Skill
     // 시전을 시작하는 순간 쿨다운이 시작된다.
     public void BeginCooldown(double castTime)
     {
-        ReadyAt = castTime + Data.Cooldown;
+        ReadyAt = castTime + Spec.Cooldown;
     }
 
     // 다시 쓰는 전투원(풀에서 꺼낸 몬스터)이 이전 생의 쿨다운을 물려받지 않게 한다.
@@ -33,7 +42,7 @@ public class Skill
     public double RemainingCooldown(double now) => ReadyAt > now ? ReadyAt - now : 0.0;
 
     public float CooldownRatio(double now) =>
-        Data.Cooldown > 0f ? UnityEngine.Mathf.Clamp01((float)(RemainingCooldown(now) / Data.Cooldown)) : 0f;
+        Spec.Cooldown > 0f ? Clamp01((float)(RemainingCooldown(now) / Spec.Cooldown)) : 0f;
 
     // 타격 표식마다 한 번 부른다. 효과가 실제로 적용된 전투원을 hits에 더한다(이펙트 기준점).
     public void Apply(Combatant caster, Combatant target, System.Collections.Generic.List<Combatant> hits)
@@ -41,18 +50,21 @@ public class Skill
         behavior.Execute(caster, target, hits);
     }
 
-    private static ISkillBehavior CreateBehavior(SkillData data)
+    private static ISkillBehavior CreateBehavior(SkillSpec spec)
     {
-        switch (data.EffectType)
+        switch (spec.EffectType)
         {
             case SkillEffectType.Damage:
-                return new DamageSkillBehavior(data.Value1);
+                return new DamageSkillBehavior(spec.Value1);
             case SkillEffectType.AoeDamage:
-                return new AoeDamageSkillBehavior(data.Value1, data.Value2);
+                return new AoeDamageSkillBehavior(spec.Value1, spec.Value2);
             case SkillEffectType.Heal:
-                return new HealSkillBehavior(data.Value1);
+                return new HealSkillBehavior(spec.Value1);
             default:
-                throw new System.ArgumentException($"Unknown skill effect type: {data.EffectType}");
+                throw new System.ArgumentException($"Unknown skill effect type: {spec.EffectType}");
         }
     }
+
+    // Mathf.Clamp01과 같은 규칙(NaN은 그대로)
+    private static float Clamp01(float value) => value < 0f ? 0f : value > 1f ? 1f : value;
 }

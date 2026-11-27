@@ -31,7 +31,7 @@ public class CharacterAnimationView : MonoBehaviour
     }
 
     // 행동 상태를 처음부터 재생하고, 클립이 정확히 duration초 동안 재생되도록 속도를 맞춘다.
-    public void PlayAction(ActionTimeline action, float duration)
+    public void PlayAction(ActionTiming action, float duration)
     {
         if (animator == null || action == null || !(duration > 0f)) return;
 

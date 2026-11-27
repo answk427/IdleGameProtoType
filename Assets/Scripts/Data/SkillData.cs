@@ -1,12 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-public enum SkillEffectType
-{
-    Damage,
-    AoeDamage,
-    Heal
-}
-
+// 효과 종류(SkillEffectType)는 시뮬레이션 입력 SkillSpec 옆에 있다(docs/COMBAT_ARCHITECTURE.md 13-4).
 [System.Serializable]
 public class SkillData : IData
 {
