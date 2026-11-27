@@ -5,7 +5,7 @@ using UnityEngine;
 
 // 흐름의 주인: 인카운터 → 보스 → 스테이지(docs/COMBAT_ARCHITECTURE.md 10절). 순수 C#.
 //
-// 고정 단계의 첫 국면(①, D22)이다. CombatSimulation이 매 단계 전투 사건(②)보다 먼저 Tick을 부른다.
+// 고정 단계의 첫 국면(①, D22)이다. SimulationLoop가 매 단계 전투 사건(②)보다 먼저 Tick을 부른다.
 // ①은 월드 처리 밖이라 스폰·정리, 원점 재설정(D16)을 바로 할 수 있다. 흐름 판단은 여기서만 한다:
 // 전투 알림(사망 등)은 흐름을 부르지 않고, 디렉터가 지난 단계의 결과를 월드에 묻는다. 그래서 재진입이 없다.
 //
@@ -22,6 +22,7 @@ using UnityEngine;
 //   3. 받아 둔 보스 도전(아직 인카운터 중일 때만)
 //   4. 끝난 대기 넘기기. 대기가 0이면 같은 ①에서 다음 단계로 이어진다.
 //   5. 진전 감시(에디터·개발 빌드)
+//   6. 이 ①의 변화(단계, 스테이지 번호, 보스 도전 가능, 입장, 진전 경고)를 순서대로 바깥에 낸다(D48, 처리 밖)
 public sealed class EncounterDirector
 {
     // 진전(피해, 사망, 이동, 흐름 변화)이 없는 게임 시간이 이만큼이면 경고한다(R4).
@@ -35,7 +36,7 @@ public sealed class EncounterDirector
 
     private readonly CombatWorld world;
     private readonly SimClock clock;
-    private readonly IEncounterHost host;
+    private readonly IEnemyRoster roster;
     private readonly Func<int, StageData> findStage;
     private readonly FlowTimings timings;
 
@@ -44,6 +45,14 @@ public sealed class EncounterDirector
     private readonly ReactiveProperty<bool> bossChallengeAvailable = new ReactiveProperty<bool>(false);
     private readonly Subject<StageEntered> stageEntered = new Subject<StageEntered>();
     private readonly Subject<string> stalled = new Subject<string>();
+
+    // 흐름 안의 판단은 이 값들을 읽는다. 바깥에 보이는 값(위의 반응형 값과 사건)은 처리 밖에서만 바뀐다(12절 D48):
+    // ① 동안의 변화는 순서대로 모았다가(outbox) ①이 끝난 뒤 낸다. 처리 밖에서 부른 명령(Begin, 보스 도전)의 변화는 그 자리에서 낸다.
+    // 그래서 알림을 받는 쪽(저장, 배경, UI)이 디렉터의 동작 한가운데에서 돌지 않는다. 받는 쪽이 보는 순서와 값, 단계 번호는 예전과 같다.
+    private FlowPhase phaseNow = FlowPhase.NotStarted;
+    private bool bossAvailableNow;
+    private readonly List<Notice> outbox = new List<Notice>(16);
+    private bool flushing;
 
     // 이 디렉터가 스폰해서 월드에 등록한 전투원(인카운터 몬스터 또는 보스). 정리할 때 모두 뺀다.
     private readonly List<Combatant> spawned = new List<Combatant>(8);
@@ -67,10 +76,10 @@ public sealed class EncounterDirector
     private long lastFlowProgressStep;
     private long stallReportedFor = -1; // 경고를 낸 마지막 진전 단계. 그 뒤로 진전이 있으면 다시 감시한다
 
-    public EncounterDirector(CombatWorld world, IEncounterHost host, Func<int, StageData> findStage, FlowTimings timings)
+    public EncounterDirector(CombatWorld world, IEnemyRoster roster, Func<int, StageData> findStage, FlowTimings timings)
     {
         this.world = world ?? throw new ArgumentNullException(nameof(world));
-        this.host = host ?? throw new ArgumentNullException(nameof(host));
+        this.roster = roster ?? throw new ArgumentNullException(nameof(roster));
         this.findStage = findStage ?? throw new ArgumentNullException(nameof(findStage));
         clock = world.Clock;
         this.timings = Sanitize(timings);
@@ -95,7 +104,7 @@ public sealed class EncounterDirector
         transitionStartStep * clock.StepLength, transitionMiddleStep * clock.StepLength, phaseEndStep * clock.StepLength);
     // 보스전 제한 시각. 제한이 없거나 보스전이 아니면 무한대.
     public double BossDeadline =>
-        phase.Value == FlowPhase.Boss && bossDeadlineStep != long.MaxValue ? bossDeadlineStep * clock.StepLength : double.PositiveInfinity;
+        phaseNow == FlowPhase.Boss && bossDeadlineStep != long.MaxValue ? bossDeadlineStep * clock.StepLength : double.PositiveInfinity;
 
     public SimClock Clock => clock;
     public StageData Stage => stage;
@@ -107,7 +116,7 @@ public sealed class EncounterDirector
     // 전환 없이 스테이지에 들어간다(저장하지 않는다). 다음 ①에서 첫 인카운터를 스폰한다.
     public bool Begin(int stageNumber)
     {
-        if (phase.Value != FlowPhase.NotStarted)
+        if (phaseNow != FlowPhase.NotStarted)
         {
             Debug.LogError("[EncounterDirector] 이미 시작했습니다.");
             return false;
@@ -122,6 +131,7 @@ public sealed class EncounterDirector
 
         EnterStage(first, StageEntryReason.Start);
         SetPhase(FlowPhase.Starting);
+        Flush();
         return true;
     }
 
@@ -129,18 +139,19 @@ public sealed class EncounterDirector
 
     public BossChallengeResult RequestBossChallenge()
     {
-        if (!bossChallengeAvailable.Value) return BossChallengeResult.NotAvailable;
+        if (!bossAvailableNow) return BossChallengeResult.NotAvailable;
         if (bossRequested || restartRequested || !IsInEncounter || !HasLivingAlly) return BossChallengeResult.Busy;
 
         bossRequested = true;
-        bossChallengeAvailable.Value = false; // 버튼이 바로 사라진다
+        SetBossAvailable(false); // 버튼이 바로 사라진다
+        Flush();
         return BossChallengeResult.Accepted;
     }
 
     // 스테이지를 처음부터 시작한다(전환을 거친다). 사망·클리어도 안에서 같은 전환을 쓴다.
     public RestartResult RestartAt(int stageNumber)
     {
-        if (phase.Value == FlowPhase.NotStarted || phase.Value == FlowPhase.Transition || restartRequested) return RestartResult.Busy;
+        if (phaseNow == FlowPhase.NotStarted || phaseNow == FlowPhase.Transition || restartRequested) return RestartResult.Busy;
         if (findStage(stageNumber) == null) return RestartResult.NoSuchStage;
 
         restartRequested = true;
@@ -148,7 +159,7 @@ public sealed class EncounterDirector
         return RestartResult.Accepted;
     }
 
-    private bool IsInEncounter => phase.Value == FlowPhase.Encounter || phase.Value == FlowPhase.EncounterCleared;
+    private bool IsInEncounter => phaseNow == FlowPhase.Encounter || phaseNow == FlowPhase.EncounterCleared;
     // 아군이 모두 죽어 있으면(사망 행동 중 포함) 보스 도전을 받지 않는다. 곧 전멸로 다시 시작한다.
     private bool HasLivingAlly => world.CountAlive(Team.Ally) > 0;
 
@@ -156,7 +167,7 @@ public sealed class EncounterDirector
 
     public void Tick()
     {
-        if (phase.Value == FlowPhase.NotStarted) return;
+        if (phaseNow == FlowPhase.NotStarted) return;
         long now = clock.StepIndex;
 
         // 1. 받아 둔 재시작
@@ -167,13 +178,13 @@ public sealed class EncounterDirector
         }
 
         // 2. 지난 단계의 결과
-        if (phase.Value != FlowPhase.Transition)
+        if (phaseNow != FlowPhase.Transition)
         {
-            if (phase.Value == FlowPhase.Boss && boss != null && !boss.IsAlive)
+            if (phaseNow == FlowPhase.Boss && boss != null && !boss.IsAlive)
                 StartTransition(NextStageNumber(), StageEntryReason.Cleared, now);
             else if (world.IsDefeated(Team.Ally))
                 StartTransition(stage.StageNumber, StageEntryReason.Defeated, now);
-            else if (phase.Value == FlowPhase.Boss && now >= bossDeadlineStep)
+            else if (phaseNow == FlowPhase.Boss && now >= bossDeadlineStep)
                 StartTransition(stage.StageNumber, StageEntryReason.Defeated, now);
         }
 
@@ -188,7 +199,7 @@ public sealed class EncounterDirector
         for (int i = 0; AdvancePhase(now); i++)
         {
             if (i < MaxAdvancesPerTick) continue;
-            Debug.LogError($"[EncounterDirector] 한 단계에서 흐름이 {MaxAdvancesPerTick}번 넘게 바뀌었습니다(지금 {phase.Value}). 다음 단계에서 이어 갑니다.");
+            Debug.LogError($"[EncounterDirector] 한 단계에서 흐름이 {MaxAdvancesPerTick}번 넘게 바뀌었습니다(지금 {phaseNow}). 다음 단계에서 이어 갑니다.");
             break;
         }
 
@@ -196,12 +207,15 @@ public sealed class EncounterDirector
         // 5. 진전 감시
         WatchProgress(now);
 #endif
+
+        // 6. 이 ①의 변화를 바깥에 낸다(처리 밖)
+        Flush();
     }
 
     // 지금 단계가 끝났으면 다음 단계로 넘기고 true.
     private bool AdvancePhase(long now)
     {
-        switch (phase.Value)
+        switch (phaseNow)
         {
             case FlowPhase.Starting:
                 SpawnEncounter();
@@ -220,7 +234,7 @@ public sealed class EncounterDirector
                 if (now < phaseEndStep) return false;
                 DespawnAll();
                 encountersCleared++;
-                if (encountersCleared >= stage.EncountersToComplete) bossChallengeAvailable.Value = true;
+                if (encountersCleared >= stage.EncountersToComplete) SetBossAvailable(true);
                 SpawnEncounter();
                 SetPhase(FlowPhase.Encounter);
                 return true;
@@ -268,7 +282,7 @@ public sealed class EncounterDirector
     private void StartTransition(int targetStage, StageEntryReason reason, long now)
     {
         bossRequested = false;
-        bossChallengeAvailable.Value = false;
+        SetBossAvailable(false);
         bossDeadlineStep = long.MaxValue;
 
         transitionTarget = targetStage;
@@ -284,14 +298,14 @@ public sealed class EncounterDirector
     private void EnterStage(StageData next, StageEntryReason reason)
     {
         DespawnAll();
-        if (stage != null && stage.StageNumber != next.StageNumber) host.ReleaseStage(stage);
+        if (stage != null && stage.StageNumber != next.StageNumber) roster.ReleaseStage(stage);
 
         stage = next;
         if (stage.ClearType != StageClearType.KillBoss)
             Debug.LogError($"[EncounterDirector] 스테이지 {stage.StageNumber}의 클리어 방식 {stage.ClearType}은 처리하지 않습니다. 보스 처치로 진행합니다.");
 
         encountersCleared = 0;
-        bossChallengeAvailable.Value = false;
+        SetBossAvailable(false);
         bossDeadlineStep = long.MaxValue;
 
         if (reason != StageEntryReason.Start)
@@ -303,8 +317,8 @@ public sealed class EncounterDirector
             }
         }
 
-        currentStageNumber.Value = stage.StageNumber;
-        stageEntered.OnNext(new StageEntered(stage.StageNumber, reason));
+        Post(Notice.Stage(stage.StageNumber));
+        Post(Notice.StageEnteredNotice(new StageEntered(stage.StageNumber, reason)));
     }
 
     private int NextStageNumber() => findStage(stage.StageNumber + 1) != null ? stage.StageNumber + 1 : stage.StageNumber;
@@ -322,10 +336,73 @@ public sealed class EncounterDirector
     private void SetPhase(FlowPhase next)
     {
         lastFlowProgressStep = clock.StepIndex;
-        phase.Value = next;
+        phaseNow = next;
+        Post(Notice.Phase(next));
     }
 
-    // ── 스폰 (규칙은 여기, 뷰는 호스트) ──
+    private void SetBossAvailable(bool available)
+    {
+        bossAvailableNow = available;
+        Post(Notice.BossAvailable(available));
+    }
+
+    // ── 바깥 알림 (처리 밖에서만, D48) ──
+
+    private void Post(in Notice notice) => outbox.Add(notice);
+
+    // 모아 둔 변화를 순서대로 낸다. 받는 쪽이 명령을 불러 새 변화가 생기면 같은 순회에서 이어서 낸다(순서 그대로).
+    private void Flush()
+    {
+        if (flushing) return;
+        flushing = true;
+        try
+        {
+            for (int i = 0; i < outbox.Count; i++)
+            {
+                Notice n = outbox[i];
+                switch (n.Kind)
+                {
+                    case NoticeKind.Phase: phase.Value = (FlowPhase)n.Value; break;
+                    case NoticeKind.Stage: currentStageNumber.Value = n.Value; break;
+                    case NoticeKind.BossAvailable: bossChallengeAvailable.Value = n.Value != 0; break;
+                    case NoticeKind.Entered: stageEntered.OnNext(n.Entered); break;
+                    case NoticeKind.Stalled: stalled.OnNext(n.Text); break;
+                }
+            }
+        }
+        finally
+        {
+            outbox.Clear();
+            flushing = false;
+        }
+    }
+
+    private enum NoticeKind : byte { Phase, Stage, BossAvailable, Entered, Stalled }
+
+    // 바깥에 낼 변화 하나(구조체라 모으는 데 할당이 없다).
+    private readonly struct Notice
+    {
+        public readonly NoticeKind Kind;
+        public readonly int Value;
+        public readonly StageEntered Entered;
+        public readonly string Text;
+
+        private Notice(NoticeKind kind, int value, in StageEntered entered = default, string text = null)
+        {
+            Kind = kind;
+            Value = value;
+            Entered = entered;
+            Text = text;
+        }
+
+        public static Notice Phase(FlowPhase phase) => new Notice(NoticeKind.Phase, (int)phase);
+        public static Notice Stage(int stageNumber) => new Notice(NoticeKind.Stage, stageNumber);
+        public static Notice BossAvailable(bool available) => new Notice(NoticeKind.BossAvailable, available ? 1 : 0);
+        public static Notice StageEnteredNotice(in StageEntered entered) => new Notice(NoticeKind.Entered, 0, entered);
+        public static Notice Stalled(string text) => new Notice(NoticeKind.Stalled, 0, default, text);
+    }
+
+    // ── 스폰 (규칙은 여기, 전투원은 적 풀 IEnemyRoster) ──
 
     private void SpawnEncounter()
     {
@@ -333,7 +410,7 @@ public sealed class EncounterDirector
         if (!TryPrepareSpawn(out float firstX)) return;
 
         for (int i = 0; i < stage.MonstersPerEncounter; i++)
-            Register(host.Spawn(stage.NormalMonsterId, stage, firstX + stage.MonsterSpacing * i, false));
+            Register(roster.Spawn(stage.NormalMonsterId, stage, firstX + stage.MonsterSpacing * i, false));
 
         if (spawned.Count == 0)
             Debug.LogError($"[EncounterDirector] 스테이지 {stage.StageNumber}의 인카운터를 스폰하지 못했습니다(몬스터 {stage.NormalMonsterId}).");
@@ -344,7 +421,7 @@ public sealed class EncounterDirector
         DespawnAll();
         if (!TryPrepareSpawn(out float x)) return;
 
-        boss = Register(host.Spawn(stage.BossMonsterId, stage, x, true));
+        boss = Register(roster.Spawn(stage.BossMonsterId, stage, x, true));
         if (boss == null)
             Debug.LogError($"[EncounterDirector] 스테이지 {stage.StageNumber}의 보스를 스폰하지 못했습니다(몬스터 {stage.BossMonsterId}).");
     }
@@ -363,13 +440,13 @@ public sealed class EncounterDirector
         {
             Combatant c = spawned[i];
             world.Remove(c);
-            host.Despawn(c);
+            roster.Despawn(c);
         }
         spawned.Clear();
         boss = null;
     }
 
-    // 원점을 대열 앞장 근처로 재설정하고(D16), 첫 몬스터의 피벗 x = 앞장 몸 중심 + spawnDistance(D18, 9-3)를 돌려준다.
+    // 원점을 대열 앞장 근처로 재설정하고(D16), 첫 몬스터의 몸 중심 x = 앞장 몸 중심 + spawnDistance(D18, 9-3, 12절 D50)를 돌려준다.
     // 둘째부터는 monsterSpacing 간격. 화면 크기와 무관한 데이터라 기기 화면비가 전투를 바꾸지 않는다.
     private bool TryPrepareSpawn(out float firstX)
     {
@@ -430,14 +507,14 @@ public sealed class EncounterDirector
         if ((now - last) * clock.StepLength < StallSeconds) return;
 
         stallReportedFor = last;
-        stalled.OnNext(DescribeStall(now));
+        Post(Notice.Stalled(DescribeStall(now)));
     }
 
     private string DescribeStall(long now)
     {
         var text = new StringBuilder();
         text.Append($"[EncounterDirector] 게임 시간 {StallSeconds:0}초 동안 진전(피해, 사망, 이동, 흐름 변화)이 없습니다. ");
-        text.Append($"스테이지 {currentStageNumber.Value}, 단계 {phase.Value}, 시각 {now * clock.StepLength:0.00}초.");
+        text.Append($"스테이지 {(stage != null ? stage.StageNumber : 0)}, 단계 {phaseNow}, 시각 {now * clock.StepLength:0.00}초.");
         for (int i = 0; i < world.Combatants.Count; i++)
         {
             Combatant c = world.Combatants[i];

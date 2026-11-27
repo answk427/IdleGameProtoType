@@ -20,6 +20,18 @@ public class PlayerStatsSaveData
     // 전투 슬롯에 배치된 스킬 id (빈 슬롯은 EmptySlot)
     public int[] equippedSkillSlotIds = NewEmptySlots();
 
+    // 깊은 복사(목록과 배열도 새로 만든다). PlayerSaveData.Clone이 부른다.
+    public PlayerStatsSaveData Clone() => new PlayerStatsSaveData
+    {
+        level = level,
+        currentExp = currentExp,
+        hpUpgradeLevel = hpUpgradeLevel,
+        attackUpgradeLevel = attackUpgradeLevel,
+        attackSpeedUpgradeLevel = attackSpeedUpgradeLevel,
+        learnedSkillIds = learnedSkillIds != null ? new List<int>(learnedSkillIds) : null,
+        equippedSkillSlotIds = equippedSkillSlotIds != null ? (int[])equippedSkillSlotIds.Clone() : null,
+    };
+
     private static int[] NewEmptySlots()
     {
         var slots = new int[SkillSlotCount];

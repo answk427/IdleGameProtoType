@@ -1,6 +1,6 @@
 using System;
 
-// 플레이어 HUD의 로직(docs/COMBAT_ARCHITECTURE.md 10-10, docs/UI_DESIGN.md 5-7). uGUI와 GameManager를 모른다.
+// 플레이어 HUD의 로직(docs/COMBAT_ARCHITECTURE.md 10-10, docs/UI_DESIGN.md 5-7). uGUI를 모른다(게임 쪽은 주입받은 상태와 명령만 안다).
 // - 진행도(레벨, 경험치, 골드)와 플레이어 HP는 상태라 구독한다. 구독하는 순간 지금 값을 그리고, 진행도를 통째로 바꿔도 따라온다.
 // - 보스전 남은 시간은 매 프레임 값이다(원인은 흐름의 보스 제한 시각). UIRoot가 Tick을 부른다. 글자는 보이는 초가 바뀔 때만 만든다.
 // - 표시 문자열("Lv.12", "1.2K", "보스 0:27")은 여기서만 만든다(현지화 자리, docs/UI_DESIGN.md 9장).

@@ -25,8 +25,10 @@ MonoBehaviour:
       skillId: 0
       movePolicy: 0
       moveSpeed: 0
+      halfWidth: 0.4
     prefab: {fileID: 4813688462502952101, guid: 51901248889719b4aa6e22480d2d8c8b, type: 3}
     groundOffset: 0.5
+    timelines: {fileID: 11400000, guid: 9bdb788fceae10048ac18505b653f311, type: 2}
   - data:
       id: 1002
       monsterName: BlueSlime2
@@ -39,8 +41,10 @@ MonoBehaviour:
       skillId: 0
       movePolicy: 0
       moveSpeed: 0
+      halfWidth: 0.4
     prefab: {fileID: 4813688462502952101, guid: 05968968a0bcf4245a9b6c7874fa1c4f, type: 3}
     groundOffset: 0.5
+    timelines: {fileID: 11400000, guid: 9bdb788fceae10048ac18505b653f311, type: 2}
   - data:
       id: 2001
       monsterName: BossSlime
@@ -53,8 +57,10 @@ MonoBehaviour:
       skillId: 1
       movePolicy: 1
       moveSpeed: 1
+      halfWidth: 1.5
     prefab: {fileID: 4813688462502952101, guid: 62ffaddaaf2019d41987bd02d9dc3e92, type: 3}
     groundOffset: 1.2
+    timelines: {fileID: 11400000, guid: 483bb1713eea03142a98979dce32136c, type: 2}
   - data:
       id: 2002
       monsterName: BossUndead
@@ -67,5 +73,7 @@ MonoBehaviour:
       skillId: 6
       movePolicy: 1
       moveSpeed: 1
+      halfWidth: 0.1
     prefab: {fileID: 4813688462502952101, guid: cb04ea20ab6f88b42ab65829f1994016, type: 3}
     groundOffset: 1.2
+    timelines: {fileID: 11400000, guid: 4d87de1f4e294174582c69eb316e5882, type: 2}

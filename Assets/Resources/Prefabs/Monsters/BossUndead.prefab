@@ -131,9 +131,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IdleGameProtoType.Runtime::Monster
   view: {fileID: 8381791553889091782}
-  timelines: {fileID: 11400000, guid: 4d87de1f4e294174582c69eb316e5882, type: 2}
-  hitboxProfile:
-    halfWidth: 0.1
+  bodyAnchor:
     bodyOffset: {x: 1.1, y: 0}
   hpBar: {fileID: 0}
 --- !u!114 &7220386100751836

@@ -68,7 +68,7 @@ public class ProgressRulesTests
         assets.Clear();
     }
 
-    private GameSession Session(ContentUnlockDatabase unlocks = null, IReadOnlyList<SkillEntry> skills = null, int level = 1, int stage = 1, double gold = 0)
+    private GameSession Session(ContentUnlockDatabase unlocks = null, IReadOnlyList<SkillData> skills = null, int level = 1, int stage = 1, double gold = 0)
     {
         var session = new GameSession(statDatabase, upgradeConfig, skills, unlocks);
         session.Apply(new PlayerSaveData { stats = new PlayerStatsSaveData { level = level }, currentStageNumber = stage, gold = gold });
@@ -223,7 +223,7 @@ public class ProgressRulesTests
     [Test]
     public void HasLearnableSkill_FollowsLevelAndLearned()
     {
-        var skills = new[] { TestSkills.CreateEntry(id: 1, requiredLevel: 1), TestSkills.CreateEntry(id: 2, requiredLevel: 3) };
+        var skills = new[] { TestSkills.CreateData(id: 1, requiredLevel: 1), TestSkills.CreateData(id: 2, requiredLevel: 3) };
         GameSession session = Session(skills: skills);
         PlayerStats stats = session.Stats;
 

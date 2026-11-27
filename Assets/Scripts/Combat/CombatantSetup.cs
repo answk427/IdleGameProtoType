@@ -1,7 +1,7 @@
 using System;
 
 // 데이터 → 전투원 입력(능력치, 처치 보상)의 계산 한 곳(docs/COMBAT_ARCHITECTURE.md 11절 5-B).
-// 게임(MonsterSpawner, Monster, PlayerController)과 씬 없는 실행(헤드리스 시험, 이후 오프라인 보상)이 같은 계산을 쓴다.
+// 게임 쪽(EnemyRoster, PlayerCombat)이 쓰므로 게임과 씬 없는 실행(헤드리스 시험, 이후 오프라인 보상)이 같은 계산을 쓴다.
 // 예전에는 몬스터 호스트, 스포너, 플레이어 호스트에 나뉘어 있어서 씬 없이 같은 전투를 만들 수 없었다.
 public static class CombatantSetup
 {

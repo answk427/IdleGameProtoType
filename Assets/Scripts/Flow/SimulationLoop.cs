@@ -19,11 +19,11 @@ public sealed class SimulationLoop
     private readonly EncounterDirector director;
     private double accumulator;
 
-    // director는 없어도 된다(전투만 돌리는 시험).
-    public SimulationLoop(SimClock clock, CombatWorld world, EncounterDirector director, double maxFrameSeconds = DefaultMaxFrameSeconds)
+    // director는 없어도 된다(전투만 돌리는 시험). 시계는 월드의 것이다(둘이 어긋날 수 없게 따로 받지 않는다).
+    public SimulationLoop(CombatWorld world, EncounterDirector director, double maxFrameSeconds = DefaultMaxFrameSeconds)
     {
-        this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         this.world = world ?? throw new ArgumentNullException(nameof(world));
+        clock = world.Clock;
         this.director = director;
         if (!(maxFrameSeconds > 0.0) || double.IsInfinity(maxFrameSeconds))
             throw new ArgumentOutOfRangeException(nameof(maxFrameSeconds), maxFrameSeconds, "한 프레임 상한은 0보다 큰 유한한 값이어야 합니다.");

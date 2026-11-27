@@ -4,6 +4,7 @@
     "id": 1,
     "characterName": "PlayerWarrior",
     "attackRange": 0.1,
-    "moveSpeed": 3.4
+    "moveSpeed": 3.4,
+    "halfWidth": 0.4
   }
 ]

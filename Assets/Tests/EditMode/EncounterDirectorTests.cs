@@ -6,8 +6,8 @@ using UnityEngine.TestTools.Constraints;
 using static CombatTestKit;
 using Is = UnityEngine.TestTools.Constraints.Is;
 
-// 흐름(EncounterDirector, docs/COMBAT_ARCHITECTURE.md 10절)을 씬 없이 돌린다: 진짜 CombatWorld·Combatant + 가짜 호스트.
-// 한 단계 = ① 흐름(Tick) → ② ③ ⑤(CombatTestKit.StepOnce). CombatSimulation의 국면 순서와 같다.
+// 흐름(EncounterDirector, docs/COMBAT_ARCHITECTURE.md 10절)을 씬 없이 돌린다: 진짜 CombatWorld·Combatant + 가짜 적 풀(FakeEnemyRoster).
+// 한 단계 = ① 흐름(Tick) → ② ③ ⑤ ⑥(CombatTestKit.StepOnce). SimulationLoop.Step의 국면 순서와 같다.
 // 지금 밸런스 값이 아니라 불변식(정확한 대기, 같은 입력 = 같은 결과, 멈추지 않음, 할당 0)을 본다.
 [TestFixture]
 public class EncounterDirectorTests
@@ -18,8 +18,8 @@ public class EncounterDirectorTests
 
     // ── 도구 ──
 
-    // 몬스터 뷰 대신 전투원만 만든다. 풀처럼 객체를 다시 써서 할당 측정 중에도 할당하지 않는다.
-    private sealed class FakeEncounterHost : IEncounterHost
+    // 데이터 없이 전투원만 만드는 적 풀. EnemyRoster처럼 객체를 다시 써서 할당 측정 중에도 할당하지 않는다.
+    private sealed class FakeEnemyRoster : IEnemyRoster
     {
         private readonly List<Combatant> free = new List<Combatant>(64);
         private readonly FakeTimelines timelines = Timelines(attack: true, death: false, skill: false);
@@ -30,7 +30,7 @@ public class EncounterDirectorTests
         public int Spawned, BossesSpawned, Despawned, Released;
         public Action<Combatant, bool, float> OnSpawned;
 
-        public Combatant Spawn(int monsterId, StageData stage, float pivotX, bool isBoss)
+        public Combatant Spawn(int monsterId, StageData stage, float x, bool isBoss)
         {
             Combatant c;
             if (free.Count > 0)
@@ -43,10 +43,10 @@ public class EncounterDirectorTests
                 c = new Combatant(Team.Enemy);
             }
 
-            c.Spawn(isBoss ? BossStats : NormalStats, pivotX, HalfWidth, timelines, null);
+            c.Spawn(isBoss ? BossStats : NormalStats, x, HalfWidth, timelines, null);
             Spawned++;
             if (isBoss) BossesSpawned++;
-            OnSpawned?.Invoke(c, isBoss, pivotX);
+            OnSpawned?.Invoke(c, isBoss, x);
             return c;
         }
 
@@ -62,7 +62,7 @@ public class EncounterDirectorTests
     private sealed class Rig
     {
         public readonly CombatWorld World;
-        public readonly FakeEncounterHost Host = new FakeEncounterHost();
+        public readonly FakeEnemyRoster Roster = new FakeEnemyRoster();
         public int EnteredCount;
         public readonly Dictionary<int, StageData> Stages = new Dictionary<int, StageData>();
         public readonly List<(long step, FlowPhase phase)> Phases = new List<(long, FlowPhase)>();
@@ -95,7 +95,7 @@ public class EncounterDirectorTests
 
         public Rig Start(int stage = 1)
         {
-            Director = new EncounterDirector(World, Host, n => Stages.TryGetValue(n, out StageData s) ? s : null, timings);
+            Director = new EncounterDirector(World, Roster, n => Stages.TryGetValue(n, out StageData s) ? s : null, timings);
             Director.Stalled.Subscribe(text => Stalls.Add((Now, text)));
             Director.StageEntered.Subscribe(_ => EnteredCount++);
             if (record)
@@ -110,7 +110,7 @@ public class EncounterDirectorTests
                     Entries.Add((Now, e));
                     Log.Add($"{Now} enter {e}");
                 });
-                Host.OnSpawned = (c, boss, x) => Log.Add($"{Now} spawn {(boss ? "boss" : "normal")} {BitConverter.SingleToInt32Bits(x)}");
+                Roster.OnSpawned = (c, boss, x) => Log.Add($"{Now} spawn {(boss ? "boss" : "normal")} {BitConverter.SingleToInt32Bits(x)}");
             }
             Assert.That(Director.Begin(stage), NUnit.Framework.Is.True);
             return this;
@@ -194,8 +194,8 @@ public class EncounterDirectorTests
 
         rig.Run(1);
         Assert.That(d.Phase.Value, NUnit.Framework.Is.EqualTo(FlowPhase.Encounter), "게임 시작 다음 ①에서 첫 인카운터");
-        Assert.That(rig.Host.Spawned, NUnit.Framework.Is.EqualTo(2));
-        Assert.That(rig.Host.Released, NUnit.Framework.Is.Zero);
+        Assert.That(rig.Roster.Spawned, NUnit.Framework.Is.EqualTo(2));
+        Assert.That(rig.Roster.Released, NUnit.Framework.Is.Zero);
 
         // 인카운터를 정확히 encountersToComplete번 마친 순간에 도전 가능이 켜진다.
         int clearedWhenAvailable = -1;
@@ -220,12 +220,12 @@ public class EncounterDirectorTests
         // 보스 등장 대기는 정확히 1초(50단계)
         long diedAt = -1;
         Combatant bossCombatant = null;
-        rig.Host.OnSpawned += (c, boss, x) => { if (boss) bossCombatant = c; };
+        rig.Roster.OnSpawned += (c, boss, x) => { if (boss) bossCombatant = c; };
         // 사건은 단계가 끝나고 시계가 넘어간 뒤 배달된다: 죽은 단계 = 배달 때의 단계 - 1
         rig.World.Events.Subscribe(e => { if (e.Type == CombatEventType.Died && e.Source == bossCombatant) diedAt = rig.Now - 1; });
         rig.RunUntil(() => d.Phase.Value == FlowPhase.Boss, what: "보스전");
         Assert.That(rig.StepOf(FlowPhase.Boss) - rig.StepOf(FlowPhase.BossIntro), NUnit.Framework.Is.EqualTo(50));
-        Assert.That(rig.Host.BossesSpawned, NUnit.Framework.Is.EqualTo(1));
+        Assert.That(rig.Roster.BossesSpawned, NUnit.Framework.Is.EqualTo(1));
 
         // 처치 → 다음 ①에서 전환 → 가운데(25단계)에서 다음 스테이지 → 끝(50단계)에서 첫 인카운터
         rig.RunUntil(() => d.Phase.Value == FlowPhase.Transition, what: "전환");
@@ -239,7 +239,7 @@ public class EncounterDirectorTests
         Assert.That(rig.StepOfFirstAfter(FlowPhase.Encounter, transition) - transition, NUnit.Framework.Is.EqualTo(50));
         Assert.That(d.CurrentStageNumber.Value, NUnit.Framework.Is.EqualTo(2));
         Assert.That(d.EncountersCleared, NUnit.Framework.Is.Zero);
-        Assert.That(rig.Host.Released, NUnit.Framework.Is.EqualTo(1), "다른 스테이지로 가면 이전 스테이지 자원을 비운다");
+        Assert.That(rig.Roster.Released, NUnit.Framework.Is.EqualTo(1), "다른 스테이지로 가면 이전 스테이지 자원을 비운다");
     }
 
     [Test]
@@ -251,7 +251,7 @@ public class EncounterDirectorTests
         Assert.That(rig.Director.CurrentStageNumber.Value, NUnit.Framework.Is.EqualTo(1));
         Assert.That(rig.Entries.Count, NUnit.Framework.Is.EqualTo(1));
         Assert.That(rig.Entries[0].entry.Reason, NUnit.Framework.Is.EqualTo(StageEntryReason.Start));
-        Assert.That(rig.Host.Spawned, NUnit.Framework.Is.Zero, "스폰은 다음 ①에서");
+        Assert.That(rig.Roster.Spawned, NUnit.Framework.Is.Zero, "스폰은 다음 ①에서");
     }
 
     [Test]
@@ -265,7 +265,7 @@ public class EncounterDirectorTests
         rig.RunUntil(() => rig.Entries.Count == 2, what: "클리어 뒤 입장");
 
         Assert.That(rig.Entries[1].entry, NUnit.Framework.Is.EqualTo(new StageEntered(1, StageEntryReason.Cleared)));
-        Assert.That(rig.Host.Released, NUnit.Framework.Is.Zero);
+        Assert.That(rig.Roster.Released, NUnit.Framework.Is.Zero);
     }
 
     [Test]
@@ -273,7 +273,7 @@ public class EncounterDirectorTests
     {
         // 사망 시간표가 없는 아군은 사망과 같은 단계에 사망 행동을 마친다.
         Rig rig = StartedRig(DefaultTimings, StrongPlayer(), false, Stage(1, encounters: 1), Stage(2));
-        rig.Host.BossStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
+        rig.Roster.BossStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
         EncounterDirector d = rig.Director;
 
         RunUntilBossAvailable(rig);
@@ -303,8 +303,8 @@ public class EncounterDirectorTests
         var timings = new FlowTimings(phase == FlowPhase.EncounterCleared ? 100 : 0.5, phase == FlowPhase.BossIntro ? 100 : 1.0, 1.0);
         Rig rig = StartedRig(timings, StrongPlayer(), true, Stage(1, encounters: 1), Stage(2));
         EncounterDirector d = rig.Director;
-        if (phase == FlowPhase.Encounter) rig.Host.NormalStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
-        rig.Host.BossStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
+        if (phase == FlowPhase.Encounter) rig.Roster.NormalStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
+        rig.Roster.BossStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
 
         if (phase == FlowPhase.BossIntro || phase == FlowPhase.Boss)
         {
@@ -343,7 +343,7 @@ public class EncounterDirectorTests
         rig.RunUntil(() => d.Phase.Value == FlowPhase.Encounter, what: "다시 인카운터");
         Assert.That(d.BossChallengeAvailable.Value, NUnit.Framework.Is.False);
         Assert.That(d.RequestBossChallenge(), NUnit.Framework.Is.EqualTo(BossChallengeResult.NotAvailable));
-        Assert.That(rig.Host.BossesSpawned, NUnit.Framework.Is.Zero);
+        Assert.That(rig.Roster.BossesSpawned, NUnit.Framework.Is.Zero);
     }
 
     // 받은 뒤 실행 전(같은 단계)에 전멸이 보이면 보스 도전은 버린다.
@@ -361,7 +361,7 @@ public class EncounterDirectorTests
 
         Assert.That(d.Phase.Value, NUnit.Framework.Is.EqualTo(FlowPhase.Transition));
         rig.RunUntil(() => d.Phase.Value == FlowPhase.Encounter, what: "다시 인카운터");
-        Assert.That(rig.Host.BossesSpawned, NUnit.Framework.Is.Zero);
+        Assert.That(rig.Roster.BossesSpawned, NUnit.Framework.Is.Zero);
         Assert.That(rig.Entries[1].entry.Reason, NUnit.Framework.Is.EqualTo(StageEntryReason.Defeated));
     }
 
@@ -371,7 +371,7 @@ public class EncounterDirectorTests
     public void Commands_ReturnResults_AndRunOnlyAtNextTick()
     {
         var rig = new Rig(DefaultTimings, true, Stage(1, encounters: 1), Stage(2)).WithPlayer(StrongPlayer());
-        var director = new EncounterDirector(rig.World, rig.Host, n => rig.Stages.TryGetValue(n, out StageData s) ? s : null, DefaultTimings);
+        var director = new EncounterDirector(rig.World, rig.Roster, n => rig.Stages.TryGetValue(n, out StageData s) ? s : null, DefaultTimings);
         Assert.That(director.RestartAt(1), NUnit.Framework.Is.EqualTo(RestartResult.Busy), "시작 전");
         Assert.That(director.RequestBossChallenge(), NUnit.Framework.Is.EqualTo(BossChallengeResult.NotAvailable));
 
@@ -433,7 +433,7 @@ public class EncounterDirectorTests
     {
         // 정리 대기
         Rig rig = StartedRig(new FlowTimings(wait, 1.0, 1.0), StrongPlayer(), true, Stage(1, encounters: 9));
-        rig.RunUntil(() => rig.Host.Spawned >= 4, what: "두 번째 인카운터");
+        rig.RunUntil(() => rig.Roster.Spawned >= 4, what: "두 번째 인카운터");
         long cleared = rig.StepOf(FlowPhase.EncounterCleared);
         Assert.That(rig.StepOfFirstAfter(FlowPhase.Encounter, cleared) - cleared, NUnit.Framework.Is.EqualTo(steps), "정리 대기");
 
@@ -462,13 +462,13 @@ public class EncounterDirectorTests
     {
         float unityFixedDeltaTime = BitConverter.Int32BitsToSingle(1017370374);
         Assert.That((double)unityFixedDeltaTime, NUnit.Framework.Is.Not.EqualTo(0.02));
-        Assert.That(CombatSimulation.StepLengthOf(unityFixedDeltaTime), NUnit.Framework.Is.EqualTo(0.02));
-        Assert.That(CombatSimulation.StepLengthOf(0.02f), NUnit.Framework.Is.EqualTo(0.02));
-        Assert.That(CombatSimulation.StepLengthOf(1f / 60), NUnit.Framework.Is.EqualTo(0.0166667));
+        Assert.That(SimClock.StepLengthFromSetting(unityFixedDeltaTime), NUnit.Framework.Is.EqualTo(0.02));
+        Assert.That(SimClock.StepLengthFromSetting(0.02f), NUnit.Framework.Is.EqualTo(0.02));
+        Assert.That(SimClock.StepLengthFromSetting(1f / 60), NUnit.Framework.Is.EqualTo(0.0166667));
 
-        var rig = new Rig(CombatSimulation.StepLengthOf(unityFixedDeltaTime), new FlowTimings(0.5, 1.0, 1.0), true, Stage(1, encounters: 9))
+        var rig = new Rig(SimClock.StepLengthFromSetting(unityFixedDeltaTime), new FlowTimings(0.5, 1.0, 1.0), true, Stage(1, encounters: 9))
             .WithPlayer(StrongPlayer()).Start();
-        rig.RunUntil(() => rig.Host.Spawned >= 4, what: "두 번째 인카운터");
+        rig.RunUntil(() => rig.Roster.Spawned >= 4, what: "두 번째 인카운터");
         long cleared = rig.StepOf(FlowPhase.EncounterCleared);
         Assert.That(rig.StepOfFirstAfter(FlowPhase.Encounter, cleared) - cleared, NUnit.Framework.Is.EqualTo(25));
     }
@@ -489,7 +489,7 @@ public class EncounterDirectorTests
         UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex("bossIntroDelay"));
         UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex("transitionDuration"));
         Rig rig = StartedRig(new FlowTimings(-1, double.NaN, double.PositiveInfinity), StrongPlayer(), true, Stage(1));
-        rig.RunUntil(() => rig.Host.Spawned >= 4, what: "두 번째 인카운터");
+        rig.RunUntil(() => rig.Roster.Spawned >= 4, what: "두 번째 인카운터");
         long cleared = rig.StepOf(FlowPhase.EncounterCleared);
         Assert.That(rig.StepOfFirstAfter(FlowPhase.Encounter, cleared), NUnit.Framework.Is.EqualTo(cleared));
     }
@@ -500,7 +500,7 @@ public class EncounterDirectorTests
     public void BossTimeLimit_EndsBossFightExactly_AsDefeat()
     {
         Rig rig = StartedRig(DefaultTimings, StrongPlayer(), true, Stage(1, encounters: 1, bossTimeLimit: 2.0), Stage(2));
-        rig.Host.BossStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
+        rig.Roster.BossStats = Stats(hp: 1e12, policy: MovePolicy.Hold);
         EncounterDirector d = rig.Director;
         RunUntilBossAvailable(rig);
         d.RequestBossChallenge();
@@ -519,7 +519,7 @@ public class EncounterDirectorTests
     public void BossTimeLimitZero_MeansNoLimit()
     {
         Rig rig = StartedRig(DefaultTimings, StrongPlayer(), true, Stage(1, encounters: 1, bossTimeLimit: 0.0));
-        rig.Host.BossStats = Stats(hp: 1e15, policy: MovePolicy.Hold);
+        rig.Roster.BossStats = Stats(hp: 1e15, policy: MovePolicy.Hold);
         EncounterDirector d = rig.Director;
         RunUntilBossAvailable(rig);
         d.RequestBossChallenge();
@@ -537,9 +537,9 @@ public class EncounterDirectorTests
     {
         Rig rig = StartedRig(DefaultTimings, StrongPlayer(speed: 7.3f), true, Stage(1, monsters: 3, spacing: 1.25f, spawnDistance: 4.5f, encounters: 9));
         var pivots = new List<float>();
-        rig.Host.OnSpawned += (c, boss, x) => pivots.Add(x);
+        rig.Roster.OnSpawned += (c, boss, x) => pivots.Add(x);
 
-        rig.RunUntil(() => rig.Host.Spawned >= 6, what: "두 번째 인카운터");
+        rig.RunUntil(() => rig.Roster.Spawned >= 6, what: "두 번째 인카운터");
 
         // 스폰 직전에 앞장이 원점 근처(0 이상 1 미만)로 오고, 첫 몬스터는 그 앞 spawnDistance, 다음은 monsterSpacing 간격
         float lead = rig.Player.X;
@@ -560,8 +560,8 @@ public class EncounterDirectorTests
         {
             var rig = new Rig(DefaultTimings, true, Stage(1, encounters: 2), Stage(2, monsters: 3, encounters: 1), Stage(3, monsters: 4, encounters: 1))
                 .WithPlayer(Stats(hp: 5000, damage: 120, interval: 0.37, range: 0.8f, policy: MovePolicy.Advance, speed: 3.3f));
-            rig.Host.NormalStats = Stats(hp: 200, damage: 7, interval: 0.9, range: 0.3f, policy: MovePolicy.Hold);
-            rig.Host.BossStats = Stats(hp: 2500, damage: 60, interval: 1.3, range: 0.4f, policy: MovePolicy.Approach, speed: 1.7f);
+            rig.Roster.NormalStats = Stats(hp: 200, damage: 7, interval: 0.9, range: 0.3f, policy: MovePolicy.Hold);
+            rig.Roster.BossStats = Stats(hp: 2500, damage: 60, interval: 1.3, range: 0.4f, policy: MovePolicy.Approach, speed: 1.7f);
             rig.Start();
             rig.Director.BossChallengeAvailable.Subscribe(on => { if (on) rig.Director.RequestBossChallenge(); });
 
@@ -599,10 +599,10 @@ public class EncounterDirectorTests
         var rig = new Rig(timings, true, stages.ToArray())
             .WithPlayer(Stats(hp: R(500, 5000), damage: R(50, 1000), interval: R(0.05, 0.5), range: (float)R(0, 3),
                 policy: MovePolicy.Advance, speed: (float)R(0.5, 30)), deathTimeline: random.Next(2) == 0);
-        rig.Host.HalfWidth = (float)R(0.1, 1.5);
-        rig.Host.NormalStats = Stats(hp: R(1, 300), damage: R(0, 30), interval: random.Next(2) == 0 ? 0 : R(0.3, 2),
+        rig.Roster.HalfWidth = (float)R(0.1, 1.5);
+        rig.Roster.NormalStats = Stats(hp: R(1, 300), damage: R(0, 30), interval: random.Next(2) == 0 ? 0 : R(0.3, 2),
             range: (float)R(0, 2), policy: MovePolicy.Hold);
-        rig.Host.BossStats = Stats(hp: R(100, 3000), damage: R(0, 150), interval: R(0.3, 2), range: (float)R(0, 2),
+        rig.Roster.BossStats = Stats(hp: R(100, 3000), damage: R(0, 150), interval: R(0.3, 2), range: (float)R(0, 2),
             policy: MovePolicy.Approach, speed: (float)R(0.5, 10));
         rig.Start();
         rig.Director.BossChallengeAvailable.Subscribe(on => { if (on) rig.Director.RequestBossChallenge(); });
@@ -626,7 +626,7 @@ public class EncounterDirectorTests
     {
         Rig rig = StartedRig(DefaultTimings, Stats(hp: 1000, damage: 0, interval: 0.2, range: 0.5f, policy: MovePolicy.Advance, speed: 5f), true,
             Stage(1));
-        rig.Host.NormalStats = Stats(hp: 10, policy: MovePolicy.Hold);
+        rig.Roster.NormalStats = Stats(hp: 10, policy: MovePolicy.Hold);
 
         rig.RunUntil(() => rig.Stalls.Count > 0, maxSteps: 10_000, what: "진전 감시 경고");
         long lastProgress = rig.World.LastProgressStep;
@@ -650,11 +650,35 @@ public class EncounterDirectorTests
         // 첫 실행의 일회성 할당(정적 초기화, JIT, 풀 채우기)을 빼고 잰다.
         rig.Run(3000);
         int enteredBefore = rig.EnteredCount;
-        int spawnedBefore = rig.Host.Spawned;
+        int spawnedBefore = rig.Roster.Spawned;
 
         Assert.That(() => rig.Run(3000), Is.Not.AllocatingGCMemory());
-        Assert.That(rig.Host.Spawned - spawnedBefore, NUnit.Framework.Is.GreaterThan(20), "측정 구간에 인카운터가 여러 번 돌았다");
+        Assert.That(rig.Roster.Spawned - spawnedBefore, NUnit.Framework.Is.GreaterThan(20), "측정 구간에 인카운터가 여러 번 돌았다");
         Assert.That(rig.EnteredCount - enteredBefore, NUnit.Framework.Is.GreaterThan(1), "측정 구간에 스테이지 전환이 있었다");
         Assert.That(rig.Stalls, NUnit.Framework.Is.Empty);
+    }
+
+    // ── 알림은 처리 밖에서 (docs/COMBAT_ARCHITECTURE.md 12절 D48) ──
+
+    // 흐름의 상태·사건은 ①이 끝난 뒤에 순서대로 온다. 정리 대기가 0이면 한 ① 안에서 정리 → 다음 인카운터 스폰까지 끝나므로,
+    // "정리됨"을 받는 순간 이미 다음 인카운터가 살아 있다(① 도중에 알리면 아직 없다). 그래도 받는 쪽은 변화를 하나도 빠짐없이 순서대로 본다.
+    [Test]
+    public void FlowNotices_ArriveAfterTheTick_InOrder()
+    {
+        Rig rig = StartedRig(new FlowTimings(0.0, 1.0, 1.0), StrongPlayer(), true, Stage(1, monsters: 2, encounters: 9));
+        var seen = new List<FlowPhase>();
+        int aliveWhenCleared = -1;
+        rig.Director.Phase.Subscribe(p =>
+        {
+            seen.Add(p);
+            if (p == FlowPhase.EncounterCleared && aliveWhenCleared < 0) aliveWhenCleared = rig.World.CountAlive(Team.Enemy);
+        });
+
+        rig.RunUntil(() => aliveWhenCleared >= 0, what: "첫 정리");
+
+        Assert.That(aliveWhenCleared, NUnit.Framework.Is.EqualTo(2), "정리를 알릴 때는 다음 인카운터(2마리)가 이미 스폰돼 있다");
+        int cleared = seen.IndexOf(FlowPhase.EncounterCleared);
+        Assert.That(seen[cleared - 1], NUnit.Framework.Is.EqualTo(FlowPhase.Encounter));
+        Assert.That(seen[cleared + 1], NUnit.Framework.Is.EqualTo(FlowPhase.Encounter), "같은 ①의 변화가 빠짐없이 순서대로 온다");
     }
 }

@@ -5,10 +5,9 @@ using UnityEngine;
 // 전투 사건(CombatEvent, 5-A)을 구독해서 그린다. 전투 규칙은 이 클래스를 모른다(P7).
 // 원점 재설정 사건 때는 지금 살아 있는 것을 같은 양만큼 옮긴다(docs/COMBAT_ARCHITECTURE.md 9-3).
 // 이펙트 프리팹은 로컬 시뮬레이션 공간이어야 한다(트랜스폼만 옮기면 파티클도 따라오게). 월드 공간이면 데이터 검사가 잡는다.
+// 조립 지점(GameInitializer)이 Bind로 잇는다(정적 조회 없음, docs/COMBAT_ARCHITECTURE.md 12절 5-R5).
 public class CombatEffectManager : MonoBehaviour
 {
-    public static CombatEffectManager Instance;
-
     [SerializeField] private GameObject damageTextPrefab;
     [SerializeField] private GameObject hitParticlePrefab; // 플레이어가 몬스터를 벨 때 (검 이펙트)
     [SerializeField] private GameObject playerHitParticlePrefab; // 플레이어가 맞을 때 (타격 이펙트)
@@ -35,6 +34,8 @@ public class CombatEffectManager : MonoBehaviour
 
     private System.IDisposable eventSubscription;
     private CombatantViews views;
+    private Presentation presentation;
+    private PoolManager pools;
 
     private Sprite defaultCoinSprite;
     private Sprite defaultChestSprite;
@@ -42,20 +43,17 @@ public class CombatEffectManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
         EnsureRewardDropPrefab();
     }
 
-    // GameInitializer가 전투 월드를 만든 뒤 잇는다. 위치는 뷰 표에서 찾는다(시뮬레이션 위치 기준).
-    public void Bind(CombatWorld world, CombatantViews combatantViews)
+    // GameInitializer가 게임을 만든 뒤 잇는다. 위치는 뷰 표에서 찾는다(시뮬레이션 위치 기준).
+    // 스킬의 VFX·소리는 Presentation(그림 자산)에서 스킬 id로 찾는다(docs/COMBAT_ARCHITECTURE.md 12절 D47).
+    public void Bind(CombatWorld world, CombatantViews combatantViews, Presentation presentationAssets, PoolManager poolManager)
     {
         eventSubscription?.Dispose();
         views = combatantViews;
+        presentation = presentationAssets;
+        pools = poolManager;
         eventSubscription = world.Events.Subscribe(HandleEvent);
     }
 
@@ -76,10 +74,10 @@ public class CombatEffectManager : MonoBehaviour
                 SpawnHitParticle(e.Other);
                 break;
             case CombatEventType.ActionStarted:
-                if (e.SkillId > 0) SkillPresentation.PlayCast(FindSkill(e.SkillId), EffectOf(e.Source));
+                if (e.SkillId > 0) PlayCast(FindSkill(e.SkillId), EffectOf(e.Source));
                 break;
             case CombatEventType.SkillHit:
-                SkillPresentation.PlayHit(FindSkill(e.SkillId), EffectOf(e.Other));
+                PlayHit(FindSkill(e.SkillId), EffectOf(e.Other));
                 break;
             case CombatEventType.Died:
                 if (e.Source.Team == Team.Enemy) SpawnRewardDrop(e.Gold, PivotOf(e.Source));
@@ -96,11 +94,11 @@ public class CombatEffectManager : MonoBehaviour
     private Vector3 EffectOf(Combatant combatant) =>
         views != null && views.TryGet(combatant, out CombatantHost host) ? host.EffectPosition : Vector3.zero;
 
-    private static SkillEntry FindSkill(int skillId) => GameDatabaseManager.Instance != null ? GameDatabaseManager.Instance.GetSkill(skillId) : null;
+    private SkillEntry FindSkill(int skillId) => presentation?.Skill(skillId);
 
     public void SpawnDamageText(GameNumber amount, Vector3 worldPos, Color color, string prefix = "")
     {
-        GameObject obj = PoolManager.Instance.Spawn(
+        GameObject obj = pools.Spawn(
             damageTextPrefab,
             Vector3.zero,
             Quaternion.identity,
@@ -128,7 +126,7 @@ public class CombatEffectManager : MonoBehaviour
             : hitParticlePrefab;
 
         Vector3 worldPos = EffectOf(target);
-        GameObject obj = PoolManager.Instance.Spawn(
+        GameObject obj = pools.Spawn(
             prefab,
             worldPos,
             Quaternion.identity
@@ -198,7 +196,7 @@ public class CombatEffectManager : MonoBehaviour
             return;
         }
 
-        GameObject obj = PoolManager.Instance.Spawn(prefab, startPosition, Quaternion.identity);
+        GameObject obj = pools.Spawn(prefab, startPosition, Quaternion.identity);
         if (!obj.TryGetComponent(out RewardDropEffect effect))
         {
             Debug.LogError($"{prefab.name} needs RewardDropEffect on root.");
@@ -328,12 +326,28 @@ public class CombatEffectManager : MonoBehaviour
     [Header("Generic Skill VFX")]
     [SerializeField] private float defaultVfxLifetime = 1.5f;
 
+    // 스킬 시전 연출(이펙트, 소리). 사건은 스킬 id만 싣고, 자산은 SkillEntry(Presentation)에 있다.
+    private void PlayCast(SkillEntry entry, Vector3 casterPosition)
+    {
+        if (entry == null) return;
+        if (entry.castVfxPrefab != null) PlayVfx(entry.castVfxPrefab, casterPosition);
+        if (entry.castSfx != null) AudioSource.PlayClipAtPoint(entry.castSfx, casterPosition);
+    }
+
+    // 스킬 타격 연출. 맞은 전투원 하나의 몸 위치에 재생한다(맞은 수만큼 사건이 온다).
+    private void PlayHit(SkillEntry entry, Vector3 targetPosition)
+    {
+        if (entry == null) return;
+        if (entry.hitVfxPrefab != null) PlayVfx(entry.hitVfxPrefab, targetPosition);
+        if (entry.hitSfx != null) AudioSource.PlayClipAtPoint(entry.hitSfx, targetPosition);
+    }
+
     // 스킬 등 범용 일회성 VFX 프리팹 재생. 풀링 후 일정 시간 뒤 자동 반납.
     public void PlayVfx(GameObject vfxPrefab, Vector3 worldPos)
     {
         if (vfxPrefab == null) return;
 
-        GameObject obj = PoolManager.Instance.Spawn(vfxPrefab, worldPos, Quaternion.identity);
+        GameObject obj = pools.Spawn(vfxPrefab, worldPos, Quaternion.identity);
         liveEffects.Add(obj.transform);
         StartCoroutine(ReturnVfxAfterDelay(vfxPrefab, obj, GetVfxLifetime(obj)));
     }
@@ -353,26 +367,26 @@ public class CombatEffectManager : MonoBehaviour
         if (instance != null)
         {
             liveEffects.Remove(instance.transform);
-            PoolManager.Instance.Despawn(prefab, instance);
+            pools.Despawn(prefab, instance);
         }
     }
 
     public void ReturnDamageText(GameObject obj)
     {
         if (obj.TryGetComponent(out DamageText text)) liveTexts.Remove(text);
-        PoolManager.Instance.Despawn(damageTextPrefab, obj);
+        pools.Despawn(damageTextPrefab, obj);
     }
 
     public void ReturnHitParticle(GameObject prefab, GameObject obj)
     {
         liveEffects.Remove(obj.transform);
-        PoolManager.Instance.Despawn(prefab, obj);
+        pools.Despawn(prefab, obj);
     }
 
     public void ReturnRewardDrop(GameObject obj)
     {
         if (obj.TryGetComponent(out RewardDropEffect drop)) liveDrops.Remove(drop);
-        PoolManager.Instance.Despawn(EnsureRewardDropPrefab(), obj);
+        pools.Despawn(EnsureRewardDropPrefab(), obj);
     }
 
     // 원점 재설정: 지금 살아 있는 월드 연출을 같은 양만큼 옮긴다(전투원·카메라·배경은 시뮬레이션에서 다시 계산하므로 할 일이 없다).

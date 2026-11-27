@@ -19,6 +19,8 @@ public class MonsterData : IData
     [SerializeField] private MovePolicy movePolicy;
     // 이동 속도(월드 유닛/초). 접근(Approach) 정책이 쓴다(docs/COMBAT_ARCHITECTURE.md 9-3, D17).
     [SerializeField] private float moveSpeed;
+    // 판정 몸의 반너비(월드 유닛, > 0). 교전·대상·범위의 표면 거리를 바꾸는 밸런스 값이라 프리팹이 아니라 데이터다(docs/COMBAT_ARCHITECTURE.md 12절 D50).
+    [SerializeField] private float halfWidth;
 
     [JsonProperty("id")]
     public int Id { get => id; private set => id = value; }
@@ -42,5 +44,7 @@ public class MonsterData : IData
     public MovePolicy MovePolicy { get => movePolicy; private set => movePolicy = value; }
     [JsonProperty("moveSpeed")]
     public float MoveSpeed { get => moveSpeed; private set => moveSpeed = value; }
+    [JsonProperty("halfWidth")]
+    public float HalfWidth { get => halfWidth; private set => halfWidth = value; }
 }
 

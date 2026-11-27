@@ -37,6 +37,8 @@ public sealed class Combatant : ICombatActor, IActionListener
 
     public Team Team { get; }
     public CombatActions Combat { get; }
+    // 무엇인지(캐릭터/몬스터, id, 보스). 뷰가 그릴 프리팹을 고른다. 규칙은 읽지 않는다. 스폰할 때 정한다.
+    public CombatantArchetype Archetype { get; private set; }
 
     // 등록한 월드와 등록 순번(같은 팀 안의 처리 순서, 같은 거리의 대상 순서). CombatWorld가 정한다.
     public CombatWorld World { get; internal set; }
@@ -69,12 +71,13 @@ public sealed class Combatant : ICombatActor, IActionListener
     // ── 생애 ──
 
     // 스폰(풀에서 다시 꺼낼 때 포함). 같은 객체를 다시 쓰므로 이전 상태를 모두 지운다.
-    // newReward: 처치 보상(몬스터). 사망 사건이 싣고 가서 게임 쪽이 지급한다.
+    // newReward: 처치 보상(몬스터). 사망 사건이 싣고 가서 게임 쪽이 지급한다. archetype: 무엇인지(뷰가 프리팹을 고른다).
     public void Spawn(in CombatantStats newStats, float x, float halfWidth, IActionTimelineSource timelineSource, SkillLoadout skillLoadout,
-        in CombatReward newReward = default)
+        in CombatReward newReward = default, in CombatantArchetype archetype = default)
     {
         stats = Sanitize(newStats);
         reward = newReward;
+        Archetype = archetype;
         timelines = timelineSource;
         skills = skillLoadout;
 

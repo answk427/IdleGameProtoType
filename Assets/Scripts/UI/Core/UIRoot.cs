@@ -8,7 +8,7 @@ using UnityEngine.InputSystem;
 // - Prepare: 창 시스템(정렬 구분, 입력 차단, WindowManager, 뒤로가기, 토스트, 확인창)과 세션이 필요 없는 창
 //   (세이브 오류 창, 확인창).
 //   GameInitializer가 참조 검사 직후 항상 부른다. 그래서 창 시스템은 시작의 성공과 실패가 같은 코드로 준비된다.
-// - BindGame: 게임이 시작될 때만. 세션·플레이어·흐름이 필요한 것(HUD Presenter, 탭과 스킬 창, 페이드).
+// - BindGame: 게임이 시작될 때만. 게임(Game)이 필요한 것(HUD Presenter, 탭과 스킬 창, 페이드).
 // 시작에 실패하면(세이브를 읽지 못함 등) BindGame 대신 ShowSaveError를 부른다. HUD 위젯은 Presenter가 없으면 숨어 있거나
 // (값을 보이는 위젯) 아무 일도 하지 않는다(탭바).
 //
@@ -97,8 +97,9 @@ public class UIRoot : MonoBehaviour
         return true;
     }
 
-    // 게임이 시작될 때만 부른다(Prepare 뒤).
-    public void BindGame(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerController player, EncounterDirector flow)
+    // 게임이 시작될 때만 부른다(Prepare 뒤). UI는 게임(Game: 진행도, 흐름, 플레이어 전투 상태와 명령)과 그림 자산(Presentation: 스킬 아이콘)만 본다.
+    // 뷰 객체(GameObject)를 거치지 않는다(docs/COMBAT_ARCHITECTURE.md 12절 D45).
+    public void BindGame(Game game, Presentation presentation)
     {
         if (isGameBound) return;
         if (windows == null)
@@ -108,9 +109,9 @@ public class UIRoot : MonoBehaviour
         }
         isGameBound = true;
 
-        fadeController.Initialize(inputBlocker, flow);
-        BindGameWindows(session, skills, player);
-        BindHudWidgets(session, player, flow);
+        fadeController.Initialize(inputBlocker, game.Flow);
+        BindGameWindows(game.Session, presentation.Skills, game.Player);
+        BindHudWidgets(game.Session, game.Player, game.Flow);
     }
 
     // 시작을 멈췄다는 안내(System 구분, 닫는 길 없음). 게임 종료 버튼만 있다.
@@ -159,10 +160,10 @@ public class UIRoot : MonoBehaviour
 #endif
     }
 
-    private void BindGameWindows(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerController player)
+    private void BindGameWindows(GameSession session, IReadOnlyList<SkillEntry> skills, PlayerCombat player)
     {
-        // 쿨다운은 저장되지 않는 전투 상태라 세션이 아니라 캐릭터가 갖는다. Presenter에는 읽는 함수만 넘긴다.
-        // 쿨다운은 시뮬레이션 시계 기준의 준비 시각이라, 지금 시각을 아는 캐릭터에게 비율을 묻는다.
+        // 쿨다운은 저장되지 않는 전투 상태라 세션이 아니라 플레이어 전투(PlayerCombat)가 갖는다. Presenter에는 읽는 함수만 넘긴다.
+        // 쿨다운은 시뮬레이션 시계 기준의 준비 시각이라, 지금 시각을 아는 쪽에 비율을 묻는다.
         float CooldownRatio(int slot) => player.GetSkillCooldownRatio(slot);
 
         windows.Bind<CharacterTabWindow, CharacterTabArgs>((view, args, window) =>
@@ -178,7 +179,7 @@ public class UIRoot : MonoBehaviour
     private void OpenSkillManage() => windows.Open<SkillManageWindow>(new SkillManageArgs());
 
     // 씬에 배치된 HUD 위젯. 창이 아니라 WindowManager를 거치지 않고, Presenter의 수명은 UIRoot와 같다.
-    private void BindHudWidgets(GameSession session, PlayerController player, EncounterDirector flow)
+    private void BindHudWidgets(GameSession session, PlayerCombat player, EncounterDirector flow)
     {
         // 보스전 남은 시간은 흐름의 제한 시각과 시뮬레이션 시계로 계산한다(매 프레임 값, Tick).
         hudPresenter = new PlayerHudPresenter(playerHud, session.Stats, session.Wallet, player.Hp,

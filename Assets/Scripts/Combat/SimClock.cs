@@ -17,6 +17,12 @@ public sealed class SimClock
         StepLength = stepLength;
     }
 
+    // 프로젝트 설정(Fixed Timestep, float)이 뜻하는 단계 길이. Unity 6은 고정 단계를 유리수로 저장해서 설정값 0.02가
+    // fixedDeltaTime(float)으로는 0.0199999921로 들어온다. 그대로 쓰면 데이터의 초가 단계 수와 맞지 않는다(흐름 대기 0.5초 =
+    // 25.00001단계 → 26단계, 플레이 측정에서 찾음). 그래서 유효숫자 6자리로 반올림한 값을 쓴다(docs/COMBAT_ARCHITECTURE.md 10-9).
+    public static double StepLengthFromSetting(float fixedDeltaTime) =>
+        double.Parse(fixedDeltaTime.ToString("G6", System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture);
+
     public double StepLength { get; }
     public long StepIndex { get; private set; }
     public double StepStart => StepIndex * StepLength;

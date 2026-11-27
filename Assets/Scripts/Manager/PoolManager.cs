@@ -2,22 +2,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
 
+// GameObject 풀(그림 쪽). 조립 지점(GameInitializer)이 쓰는 쪽(BattleView, CombatEffectManager)에 넘긴다(정적 조회 없음,
+// docs/COMBAT_ARCHITECTURE.md 12절 5-R5). 전투원(시뮬레이션)의 풀은 따로 있다(EnemyRoster).
 public class PoolManager : MonoBehaviour
 {
-    public static PoolManager Instance;
-
     // 프리팹을 키값으로, 해당 프리팹의 전용 '유니티 풀'을 값으로 가지는 딕셔너리
     private Dictionary<GameObject, IObjectPool<GameObject>> poolDict = new Dictionary<GameObject, IObjectPool<GameObject>>();
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-    }
 
     //해당 프리팹 전용 Pool이 없으면 만들고, 있으면 가져옴
     private IObjectPool<GameObject> GetPool(GameObject prefab)
@@ -89,6 +79,11 @@ public class PoolManager : MonoBehaviour
         if (pool != null)
         {
             pool.Release(obj);
+        }
+        else
+        {
+            // 풀이 이미 비워졌다(ClearPool). 돌려놓을 곳이 없으니 화면에 남지 않게 파괴한다.
+            Destroy(obj);
         }
     }
 

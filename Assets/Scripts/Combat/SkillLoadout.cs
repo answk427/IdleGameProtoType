@@ -11,15 +11,15 @@ public sealed class SkillLoadout
 {
     public const int EmptySlot = -1;
 
-    private readonly Func<int, SkillEntry> resolveEntry;
+    private readonly Func<int, SkillData> resolveData;
     private readonly Dictionary<int, Skill> skillsById = new Dictionary<int, Skill>();
     private readonly Skill[] slots;
 
-    public SkillLoadout(int slotCount, Func<int, SkillEntry> resolveEntry)
+    public SkillLoadout(int slotCount, Func<int, SkillData> resolveData)
     {
         if (slotCount < 0) throw new ArgumentOutOfRangeException(nameof(slotCount));
         slots = new Skill[slotCount];
-        this.resolveEntry = resolveEntry ?? throw new ArgumentNullException(nameof(resolveEntry));
+        this.resolveData = resolveData ?? throw new ArgumentNullException(nameof(resolveData));
     }
 
     public int SlotCount => slots.Length;
@@ -80,14 +80,14 @@ public sealed class SkillLoadout
     {
         if (skillsById.TryGetValue(skillId, out Skill skill)) return skill;
 
-        SkillEntry entry = resolveEntry(skillId);
-        if (entry?.data == null)
+        SkillData data = resolveData(skillId);
+        if (data == null)
         {
             Debug.LogError($"[SkillLoadout] 스킬 {skillId}의 데이터가 없습니다. 슬롯은 비워 둡니다.");
             return null;
         }
 
-        skill = new Skill(entry);
+        skill = new Skill(data);
         skillsById.Add(skillId, skill);
         return skill;
     }

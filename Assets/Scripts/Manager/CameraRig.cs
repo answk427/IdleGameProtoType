@@ -7,7 +7,7 @@ using UnityEngine;
 public class CameraRig : MonoBehaviour
 {
     [SerializeField] private Camera targetCamera;
-    [SerializeField] private CombatSimulation simulation;
+    [SerializeField] private GameRunner simulation; // 게임을 돌리는 실행기(예전 CombatSimulation, 같은 GUID라 씬 참조가 남는다)
     [SerializeField] private BackgroundScroller background;
 
     private float allyToCameraX;
@@ -17,17 +17,18 @@ public class CameraRig : MonoBehaviour
     {
         if (targetCamera == null) targetCamera = GetComponent<Camera>();
         if (targetCamera == null) Debug.LogError("[CameraRig] 따라갈 카메라가 없습니다.");
-        if (simulation == null) Debug.LogError("[CameraRig] CombatSimulation이 연결되지 않았습니다.");
+        if (simulation == null) Debug.LogError("[CameraRig] GameRunner(simulation)가 연결되지 않았습니다.");
     }
 
     private void LateUpdate()
     {
-        CombatWorld world = simulation != null ? simulation.World : null;
+        CombatWorld world = simulation != null ? simulation.Game?.World : null;
         Combatant lead = world?.LeadAlly;
-        if (targetCamera == null || lead == null || !simulation.Views.TryGet(lead, out CombatantHost host)) return;
+        CombatantViews views = simulation != null ? simulation.View.Views : null;
+        if (targetCamera == null || lead == null || views == null || !views.TryGet(lead, out CombatantHost host)) return;
 
         Transform cameraTransform = targetCamera.transform;
-        float allyX = host.transform.position.x; // 이번 화면 프레임의 보간 위치(CombatSimulation.Update가 그림)
+        float allyX = host.transform.position.x; // 이번 화면 프레임의 보간 위치(GameRunner.Update가 그림)
         if (!hasOffset)
         {
             allyToCameraX = cameraTransform.position.x - allyX;

@@ -4,11 +4,9 @@
 // '몬스터/플레이어가 위치해야 하는 플레이 가능 영역(월드 좌표)'을 계산하는 유틸리티.
 //
 // 화면 하단 UI 비율(BottomUIRoot)이 바뀌면 이 한 곳의 bottomUiScreenRatio 값만 수정하면
-// MonsterSpawner, PlayerController 등 위치를 다루는 모든 코드가 자동으로 맞춰진다.
+// BattleView(전투원 그림의 바닥 높이) 등 위치를 다루는 그림 코드가 자동으로 맞춰진다. 조립 지점(GameInitializer)이 필요한 쪽에 넘긴다(정적 조회 없음).
 public class PlayAreaBounds : MonoBehaviour
 {
-    public static PlayAreaBounds Instance;
-
     [SerializeField] private Camera targetCamera;
 
     [Tooltip("화면 하단 UI(BottomUIRoot)가 차지하는 비율. 0.35 = 화면 세로의 35%")]
@@ -22,7 +20,6 @@ public class PlayAreaBounds : MonoBehaviour
 
     private void Awake()
     {
-        Instance = this;
         if (targetCamera == null) targetCamera = Camera.main;
     }
 

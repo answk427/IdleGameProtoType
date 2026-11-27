@@ -16,12 +16,14 @@ public sealed class HitboxOverlay
 
     private readonly CombatWorld world;
     private readonly CombatantViews views;
+    private readonly PlayAreaBounds playArea;
     private GUIStyle labelStyle;
 
-    public HitboxOverlay(CombatWorld world, CombatantViews views)
+    public HitboxOverlay(CombatWorld world, CombatantViews views, PlayAreaBounds playArea)
     {
         this.world = world;
         this.views = views;
+        this.playArea = playArea;
     }
 
     public bool Enabled { get; set; }
@@ -38,7 +40,7 @@ public sealed class HitboxOverlay
             if (c.Phase == CombatantPhase.Inactive) continue;
 
             // 아래 변은 캐릭터가 서는 바닥(PlayAreaBounds.GroundY). 피벗은 발이 아닐 수 있다.
-            float baseY = PlayAreaBounds.Instance != null ? PlayAreaBounds.Instance.GroundY
+            float baseY = playArea != null ? playArea.GroundY
                 : views != null && views.TryGet(c, out CombatantHost host) ? host.transform.position.y : 0f;
             Color color = !c.IsAlive ? DeadColor : c.Team == Team.Ally ? AllyColor : EnemyColor;
 

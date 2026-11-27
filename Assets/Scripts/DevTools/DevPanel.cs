@@ -197,8 +197,7 @@ public sealed class DevPanel
 
     private void RefreshBackups() => backupList = commands.ListBackups();
 
-    private static bool StageExists(int stageNumber) =>
-        stageNumber >= 1 && GameDatabaseManager.Instance != null && GameDatabaseManager.Instance.GetStage(stageNumber)?.data != null;
+    private bool StageExists(int stageNumber) => commands.HasStage(stageNumber);
 
     // 노치·상태 표시줄을 피한 영역(GUI 좌표, 왼쪽 위 원점).
     private static Rect SafeRect()

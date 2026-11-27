@@ -18,4 +18,6 @@ MonoBehaviour:
       characterName: PlayerWarrior
       attackRange: 0.1
       moveSpeed: 3.4
+      halfWidth: 0.4
     prefab: {fileID: 6323719953710832613, guid: d4c1181b780fca5439df09eed8ef2520, type: 3}
+    timelines: {fileID: 11400000, guid: 44baef13b6d9b0c41ac60d8aba8dcc89, type: 2}

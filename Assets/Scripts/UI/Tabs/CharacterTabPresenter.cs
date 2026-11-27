@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using UnityEngine;
 
-// 캐릭터 탭의 로직. uGUI, GameManager를 모른다. 진행도의 상태를 구독해서 그리고, 버튼은 명령으로 바꾼다.
+// 캐릭터 탭의 로직. uGUI를 모른다. 진행도의 상태를 구독해서 그리고, 버튼은 명령으로 바꾼다.
 // - "현재 → 다음" 값은 진행도의 미리보기(PlayerStats.PreviewUpgrade)로 그린다. 실제 능력치와 같은 계산이라
 //   능력치 공식이 바뀌어도 화면이 따로 틀리지 않는다.
 // - 진행도를 통째로 바꿔도(GameSession.Apply) 구독한 상태가 바뀌므로 화면이 따라온다.

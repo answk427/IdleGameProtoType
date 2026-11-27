@@ -9,7 +9,7 @@ public static class CombatTestKit
     // 사건은 배달(world.DeliverEvents, StepOnce가 부른다) 때 온다. 단계 밖에서 직접 부른 명령(TakeDamage 등) 뒤에는 Deliver를 부른다.
     public sealed class FakeHost
     {
-        public int Joined, StatsChanged, Damaged, Healed, Died, DeathCompleted, Revived, BasicHits, SkillHits, ActionsStarted;
+        public int Joined, Left, StatsChanged, Damaged, Healed, Died, DeathCompleted, Revived, BasicHits, SkillHits, ActionsStarted;
         public GameNumber LastDamage;
         public CombatReward LastReward;
         public System.Action<Combatant, CombatEvent> OnDiedCallback;
@@ -19,6 +19,7 @@ public static class CombatTestKit
             switch (e.Type)
             {
                 case CombatEventType.Joined: Joined++; break;
+                case CombatEventType.Left: Left++; break;
                 case CombatEventType.StatsChanged: StatsChanged++; break;
                 case CombatEventType.Damaged: Damaged++; LastDamage = e.Amount; break;
                 case CombatEventType.Healed: Healed++; break;
@@ -79,19 +80,19 @@ public static class CombatTestKit
 
     public static SkillLoadout Loadout(params Skill[] skills)
     {
-        var byId = new Dictionary<int, SkillEntry>();
+        var byId = new Dictionary<int, SkillData>();
         var ids = new List<int>();
         foreach (Skill skill in skills)
         {
-            byId[skill.Data.Id] = skill.Entry;
+            byId[skill.Data.Id] = skill.Data;
             ids.Add(skill.Data.Id);
         }
-        var loadout = new SkillLoadout(ids.Count, id => byId.TryGetValue(id, out SkillEntry e) ? e : null);
+        var loadout = new SkillLoadout(ids.Count, id => byId.TryGetValue(id, out SkillData d) ? d : null);
         loadout.SetSlots(ids);
         return loadout;
     }
 
-    // 고정 단계 한 번(CombatSimulation의 국면 순서와 같다: ② → ③ → ⑤ → ⑥ 배달)
+    // 고정 단계 한 번(흐름 없이 SimulationLoop.Step의 국면 순서와 같다: ② → ③ → ⑤ → ⑥ 배달)
     public static void StepOnce(CombatWorld world)
     {
         world.RunEvents();

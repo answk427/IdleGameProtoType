@@ -164,15 +164,38 @@ public class ProgressReloadTests
         Assert.AreEqual(GameNumber.FromDouble(90 + 7 * 20), seen[0].MaxHp);
     }
 
-    // 세션은 넘겨받은 객체를 그대로 붙잡는다(값만 덮어쓰기). 그래서 GameManager.LoadSnapshot은 JSON으로 한 번 복사해서 넘긴다.
-    // 이 테스트는 그 전제(복사하지 않으면 공유된다)를 고정해, 전제가 바뀌면 LoadSnapshot의 복사도 다시 보게 한다.
+    // 세션은 경계에서 복사한다(docs/COMBAT_ARCHITECTURE.md 12절 D49). 넘긴 객체를 나중에 고쳐도 진행도가 바뀌지 않고,
+    // 저장용으로 받은 사본을 고쳐도(비동기 저장이 쓰는 동안 등) 진행도와 섞이지 않는다.
     [Test]
-    public void Apply_KeepsReferenceToGivenData_SoCallersMustCopy()
+    public void Apply_CopiesGivenData_LaterChangesDoNotLeakIn()
     {
         PlayerSaveData given = ProgressB();
         GameSession session = NewSession(ProgressA());
         session.Apply(given);
+        int level = session.Stats.Level.Value;
 
-        Assert.AreSame(given.stats, session.Stats.GetSaveData());
+        given.stats.level = 1;
+        given.stats.learnedSkillIds.Add(999);
+        given.stats.equippedSkillSlotIds[0] = 999;
+
+        Assert.AreNotSame(given.stats, session.Stats.GetSaveData());
+        Assert.AreEqual(level, session.ToSaveData().stats.level);
+        CollectionAssert.DoesNotContain(session.ToSaveData().stats.learnedSkillIds, 999);
+        Assert.AreNotEqual(999, session.ToSaveData().stats.equippedSkillSlotIds[0]);
+    }
+
+    [Test]
+    public void ToSaveData_ReturnsCopy_ChangingItDoesNotChangeProgress()
+    {
+        GameSession session = NewSession(ProgressB());
+        PlayerSaveData saved = session.ToSaveData();
+        int level = saved.stats.level;
+
+        saved.stats.level = level + 1;
+        saved.stats.learnedSkillIds.Add(999);
+
+        Assert.AreEqual(level, session.Stats.Level.Value);
+        Assert.AreEqual(level, session.ToSaveData().stats.level);
+        CollectionAssert.DoesNotContain(session.ToSaveData().stats.learnedSkillIds, 999);
     }
 }

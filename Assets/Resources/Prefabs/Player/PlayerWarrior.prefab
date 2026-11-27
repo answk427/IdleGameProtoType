@@ -131,9 +131,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
   view: {fileID: 9023516119955059861}
-  timelines: {fileID: 11400000, guid: 44baef13b6d9b0c41ac60d8aba8dcc89, type: 2}
-  hitboxProfile:
-    halfWidth: 0.4
+  bodyAnchor:
     bodyOffset: {x: 0, y: 0}
   groundOffset: 1.08
 --- !u!114 &7381849167385634018

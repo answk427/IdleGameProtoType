@@ -27,7 +27,7 @@
 
 ### T2. 연결: 조립 지점의 "조립 끝" 신호 하나
 
-- `GameInitializer`가 조립을 끝낸 뒤 신호(`Initialized`)를 한 번 내고, 세션과 GameManager 등 조립한 객체를 넘긴다.
+- `GameInitializer`가 조립을 끝낸 뒤 신호(`Initialized`)를 한 번 내고, 세션과 GameManager 등 조립한 객체를 넘긴다. **2026-11-27부터(COMBAT_ARCHITECTURE 12절):** 넘기는 것은 `Game`(진행도·흐름·명령), `BattleView`(판정 몸 표시용 뷰 표), `UIRoot`, `PlayArea`다. `GameManager`는 없어졌다.
 - DevTools는 `RuntimeInitializeOnLoadMethod(AfterSceneLoad)`로 자기 오브젝트를 만들고 그 신호를 구독한다.
 - 이렇게 하면 조립 지점은 도구를 모르고, 도구는 조립 순서 밖에서 싱글턴을 뒤지지 않는다.
 - `UIRoot`는 `InputBlocker`를 읽기 전용으로 내보낸다(T3에 필요).
@@ -51,6 +51,8 @@
 - **옮김(2026-11-25, 전투 4-A):** 입구는 `EncounterDirector.RestartAt(스테이지)`가 됐다. 결과(`Accepted`/`Busy`/`NoSuchStage`)를 바로 돌려주고 실행은 다음 고정 단계에서 한다. 전환은 시뮬레이션 시간이고, 사망·클리어도 디렉터 안에서 같은 전환을 쓴다([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 10절). `GameManager.RestartAt`과 `IsTransitioning`은 없어졌다. `LoadSnapshot`(T5)은 재시작을 먼저 받아 둔 뒤 `Apply`한다(받지 못하면 진행도를 바꾸지 않는다).
 
 ### T5. 진행도 교체: `GameManager.LoadSnapshot(PlayerSaveData)`
+
+- **2026-11-27부터:** `Game.LoadSnapshot`(게임 계층, COMBAT_ARCHITECTURE 12절). 규칙은 아래 그대로다.
 
 - 순서: 검사(`SaveDataValidator`, 저장할 때와 같은 검사) → `session.Apply` → `RestartAt(세션의 스테이지)`(저장 포함).
 - 새로 시작, 백업 복원, 레벨 지정이 모두 이 하나를 쓴다.

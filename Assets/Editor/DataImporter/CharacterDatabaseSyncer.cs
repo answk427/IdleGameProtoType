@@ -41,7 +41,8 @@ public class CharacterDatabaseSyncer : IDataSyncer
             }
             else log?.Invoke($"[SO 동기화 경고] '{data.CharacterName}' 프리팹을 {prefabPath} 에서 찾지 못했습니다.");
 
-            newEntries.Add(new CharacterEntry { data = data, prefab = prefab });
+            ActionTimelineSet timelines = DatabaseSyncUtility.ResolveTimelines(existing?.timelines, data.CharacterName, log);
+            newEntries.Add(new CharacterEntry { data = data, prefab = prefab, timelines = timelines });
         }
         newEntries.Sort((a, b) => a.data.Id.CompareTo(b.data.Id));
 

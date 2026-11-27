@@ -11,7 +11,7 @@ public class SkillLoadoutTests
     private const int Empty = SkillLoadout.EmptySlot;
 
     private static SkillLoadout NewLoadout() =>
-        new SkillLoadout(5, id => id == 99 ? null : TestSkills.CreateEntry(id: id, cooldown: 10f));
+        new SkillLoadout(5, id => id == 99 ? null : TestSkills.CreateData(id: id, cooldown: 10f));
 
     [Test]
     public void MovingSkillToAnotherSlot_KeepsCooldown()

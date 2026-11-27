@@ -63,7 +63,7 @@
 | ~~5~~ | ~~세이브 오류 창~~ | | **완료 2026-11-26** (위 "완료된 것", [UI_DESIGN.md](UI_DESIGN.md) 10-4) |
 | ~~6~~ | ~~탭 2개 이관(여기서 UI 1차 끝)~~ | | **완료 2026-11-26** (위 "완료된 것", [UI_DESIGN.md](UI_DESIGN.md) 10-5) |
 | ~~7~~ | ~~UI 2차(서비스)~~ | | **완료 2026-11-26** (위 "완료된 것", [UI_DESIGN.md](UI_DESIGN.md) 10-6) |
-| 8 | 전투 5단계 + UI 3차 어셈블리 분리 | 설계 승인 2026-11-26([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 11절) | **5-A 사건으로 잇기 완료 2026-11-26**(11-5). **5-B 순수 C# 드라이버(`SimulationLoop`)와 헤드리스 검증 완료 2026-11-27**(11-7. 배속은 승인안의 "루프 배율" 대신 `Time.timeScale` 유지로 바꿈, 사용자 승인 11-6). 남은 것: 5-C 어셈블리 분리, 그 뒤 S24 한 번 |
+| 8 | 전투 5단계 + UI 3차 어셈블리 분리 | 설계 승인 2026-11-26([COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 11절) | **5-A 사건으로 잇기 완료 2026-11-26**(11-5). **5-B 순수 C# 드라이버(`SimulationLoop`)와 헤드리스 검증 완료 2026-11-27**(11-7. 배속은 승인안의 "루프 배율" 대신 `Time.timeScale` 유지로 바꿈, 사용자 승인 11-6). **5-C 전 구조 정리(주인 바로잡기) 완료 2026-11-27**(12절: 게임 계층 `Game`, 전투원의 주인 = 시뮬레이션, 데이터 한 벌, 정적 조회 없음, 반너비는 엑셀). 남은 것: 5-C 어셈블리 분리, 그 뒤 S24 한 번 |
 | 9 | UI 4차(가챠, 서버) | UI_DESIGN 9장 | |
 
 5, 6번은 전투와 겹치지 않아서 급하면 전투 단계 사이에 끼워도 된다.
@@ -241,19 +241,19 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 2026-09 코드리뷰에서 미해결이던 항목 중 2026-11-22에 현재 코드에서 다시 확인한 것.
 
 - **개발용 로그가 상시 출력됨**
-  `PlayerStats`(레벨업, 업그레이드, 학습), `GameManager`(스테이지 입장)의 로그가 릴리스에 그대로 남는다. (`PlayerHud`가 경험치가 바뀔 때마다 찍던 2줄은 4-B에서 지웠다.)
+  `PlayerStats`(레벨업, 업그레이드, 학습), `GameRunner`(스테이지 입장)의 로그가 릴리스에 그대로 남는다. (`PlayerHud`가 경험치가 바뀔 때마다 찍던 2줄은 4-B에서 지웠다.)
 
 - **`CombatEffectManager` 책임 과다**
   데미지 텍스트, 파티클, 보상 드랍, VFX, 임시 스프라이트 생성을 한 클래스가 한다. 임시 스프라이트는 지금 실제로 쓰이는 경로라, 아트를 연결하기 전에는 지우면 안 된다.
 
-- **애니메이션 이름 처리 불일치**
-  `PlayerController`는 직렬화 필드, `Monster`/`BossMonster`는 문자열(`"Idle"`, `"Death"`, `"Attack"`)을 코드에 박아 둔다.
+- **(해결) 애니메이션 이름 처리 불일치**
+  예전에는 `PlayerController`는 직렬화 필드, `Monster`/`BossMonster`는 문자열을 코드에 박아 두었다. 전투 1단계부터 재생은 `CharacterAnimationView` 한 곳(상태 이름은 직렬화 필드, 행동 키는 `ActionKeys`)이다.
 
-- **null 처리와 이름 규칙 불일치**
-  `Monster.PlayIdleAnimation`, `MonsterSpawner.AllDie`, `GameManager`의 `FadeController.Instance` 사용에 null 검사가 없다.
-  `MonsterSpawner.SpawnMonster`는 컴포넌트가 없으면 `AddComponent`로 프리팹 오류를 가린다. `Monster.moveToPlayer`만 camelCase다.
+- **(해결, 2026-11-27) null 처리와 이름 규칙 불일치**
+  지적했던 코드(`Monster.PlayIdleAnimation`, `MonsterSpawner.AllDie`·`SpawnMonster`의 `AddComponent`, `GameManager`의 `FadeController.Instance`, `Monster.moveToPlayer`)는 전투 재설계와 5-C 전 구조 정리(COMBAT_ARCHITECTURE 12절)로 모두 없어졌다. 프리팹에 호스트가 없으면 `BattleView`가 에러를 내고 그리지 않는다(가리지 않는다).
 
-- **싱글턴 규칙 불일치**
+- **(해결, 2026-11-27) 싱글턴 규칙 불일치**
+  5-C 전 구조 정리(COMBAT_ARCHITECTURE 12절 5-R5)에서 `Instance` 싱글턴을 모두 없앴다. 필요한 쪽에는 조립 지점(`GameInitializer`)이 넘긴다. 아래는 그 전의 기록이다.
   중복 검사와 `DontDestroyOnLoad`가 매니저마다 다르고, 파괴될 때 `Instance`를 비우는 곳이 없다. 씬이 하나인 지금은 드러나지 않으므로 부트 씬을 나눌 때(UI_DESIGN 9장) 정한다.
   공통 베이스를 도입한다면 주의: `FadeController`는 HUD Canvas의 루트 오브젝트(`HudRoot`, 옛 `UIManager` 오브젝트)에 붙어 있어 씬 간 유지로 만들면 HUD 전체가 같이 유지된다.
 
@@ -263,8 +263,8 @@ UI 구조 정리 과정에서 의도적으로 범위 밖으로 둔 항목들. �
 - **`PlayerStats`의 방어 코드 불일치**
   `saveData`는 곳곳에서 null을 검사하지만 `statData`와 `upgradeConfig`는 검사 없이 쓰는 곳이 있다.
 
-- **쓰이지 않는 코드와 값**
-  `JsonDataLoader`는 씬과 코드 어디에서도 쓰이지 않는다. `Monster`의 직렬화 필드 `maxHp`/`expReward`는 `Initialize`가 덮어써서 인스펙터 값이 의미 없다.
+- **(해결, 2026-11-27) 쓰이지 않는 코드와 값**
+  `JsonDataLoader`, `PlayerSpawner.ReleasePlayer`(→ `SaveProgress` → `GameManager.Instance`)를 지웠다(12절). 그 전의 기록: `JsonDataLoader`는 씬과 코드 어디에서도 쓰이지 않는다. `Monster`의 직렬화 필드 `maxHp`/`expReward`는 `Initialize`가 덮어써서 인스펙터 값이 의미 없다.
 
 ## 게임 기능
 

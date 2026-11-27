@@ -60,19 +60,24 @@ https://answk427.itch.io/unityidlegame
 ```mermaid
 flowchart TB
     GI["GameInitializer.Start()<br/>생성 순서를 한 곳에서"] --> UIP["UIRoot.Prepare()<br/>창 시스템(항상)"]
+    GI --> DATA["GameDataAssets → GameData + Presentation<br/>데이터 한 벌(정적 조회 없음)"]
     GI --> LOAD["ISaveStorage.Load()<br/>+ SaveDataValidator"]
     LOAD -->|"읽을 수 없음"| ERR["세이브 오류 창<br/>시작 중단, 원본 보존"]
-    LOAD --> GS["GameSession<br/>진행도의 단일 소유자"]
-    GS --> SIM["CombatSimulation → SimulationLoop<br/>게임 시간을 고정 단계로(순수 C#)"]
-    SIM --> ED["EncounterDirector<br/>흐름(순수 C#)"]
-    SIM --> CW["CombatWorld<br/>전투원 전체와 규칙(순수 C#)"]
-    CW --> HOST["CombatantHost<br/>PlayerController · Monster<br/>(그리기와 Unity 연결만)"]
-    GS --> UIB["UIRoot.BindGame()<br/>HUD·탭바 Presenter, 창 Bind"]
-    ED --> UIB
+    DATA --> GAME
+    LOAD --> GAME["Game (순수 C#)<br/>진행도 + 전투 + 잇는 규칙"]
+    GAME --> GS["GameSession<br/>진행도의 단일 소유자"]
+    GAME --> SIM["SimulationLoop<br/>게임 시간을 고정 단계로"]
+    SIM --> ED["EncounterDirector<br/>흐름"]
+    SIM --> CW["CombatWorld<br/>전투원 전체와 규칙"]
+    ED --> ROS["EnemyRoster · PlayerCombat<br/>전투원의 주인"]
+    CW -->|"사건 Joined · Left · …"| BV["BattleView<br/>전투원에 그림을 붙이고 뗌(뷰 풀)"]
+    GI --> RUN["GameRunner<br/>프레임마다 진행 · 저장 실행"]
+    RUN --> GAME
+    GAME --> UIB["UIRoot.BindGame(game, presentation)<br/>HUD·탭바 Presenter, 창 Bind"]
 ```
-> 다른 객체에 의존하는 초기화는 각자의 `Awake`가 아니라 `GameInitializer`가 부르는 `Initialize`에서 합니다. 모든 구독을 연결한 뒤 흐름을 시작하므로 처음 값도 반응형으로 전달됩니다.
+> 게임 규칙은 전부 `Game`(순수 C#) 안에 있고, Unity 쪽은 조립(`GameInitializer`), 실행(`GameRunner`), 그림(`BattleView`, 이펙트, UI)만 합니다. 그래서 씬 없이 `Game` 하나를 돌린 기록이 에디터 플레이 기록과 비트 단위로 같습니다. 모든 구독을 연결한 뒤 흐름을 시작하므로 처음 값도 그대로 전달됩니다.
 
-([GameInitializer.cs](Assets/Scripts/Manager/GameInitializer.cs), [GameSession.cs](Assets/Scripts/Player/GameSession.cs))
+([GameInitializer.cs](Assets/Scripts/Manager/GameInitializer.cs), [Game.cs](Assets/Scripts/Game/Game.cs), [GameData.cs](Assets/Scripts/Game/GameData.cs), [BattleView.cs](Assets/Scripts/View/BattleView.cs), [GameRunner.cs](Assets/Scripts/Manager/GameRunner.cs))
 
 ---
 
@@ -122,7 +127,7 @@ flowchart LR
 - **공간**: 플레이어가 월드에서 실제로 전진하고 카메라가 따라갑니다. 시체·동전·이펙트처럼 가만히 있는 것은 아무 처리 없이 화면에서 지나갑니다. 이동은 sweep 하나(그 방향의 가장 가까운 살아 있는 몸까지만)라서 한 단계 이동량과 상관없이 몸을 통과하지 않습니다(이동 속도 1e6에서 테스트). 인카운터마다 원점을 재설정해 오래 달려도 좌표가 커지지 않습니다.
 - **전투 중 할당 0**: 범위·스킬 결과는 재사용 버퍼, 몬스터 전투원은 풀 객체마다 하나를 다시 씁니다(테스트로 확인).
 
-([Combatant.cs](Assets/Scripts/Combat/Combatant.cs), [CombatWorld.cs](Assets/Scripts/Combat/CombatWorld.cs), [CombatScheduler.cs](Assets/Scripts/Combat/CombatScheduler.cs), [SimClock.cs](Assets/Scripts/Combat/SimClock.cs), [CombatSimulation.cs](Assets/Scripts/Manager/CombatSimulation.cs))
+([Combatant.cs](Assets/Scripts/Combat/Combatant.cs), [CombatWorld.cs](Assets/Scripts/Combat/CombatWorld.cs), [CombatScheduler.cs](Assets/Scripts/Combat/CombatScheduler.cs), [SimClock.cs](Assets/Scripts/Combat/SimClock.cs), [SimulationLoop.cs](Assets/Scripts/Flow/SimulationLoop.cs), [GameRunner.cs](Assets/Scripts/Manager/GameRunner.cs))
 
 ---
 
@@ -173,10 +178,10 @@ flowchart LR
         PS["PlayerStats<br/>상태: Level, Exp, 업그레이드 단계, 배운 스킬, 장착 슬롯<br/>파생: RequiredExp, CanLevelUp, CombatStats<br/>사건: LevelReached, Upgraded, …"]
         GW["GoldWallet<br/>상태: Gold"]
     end
-    PS --> PC["PlayerController<br/>능력치 · 장착 스킬"]
+    PS --> PC["PlayerCombat<br/>플레이어 전투원의 능력치 · 장착 스킬"]
     PS --> UI["HUD · 캐릭터 탭 · 스킬 탭<br/>(Presenter)"]
     GW --> UI
-    PS -->|"사건"| GM["GameManager<br/>저장 계기"]
+    PS -->|"사건"| GM["Game<br/>저장 계기 → SaveRequested"]
     SNAP["세이브 / 스냅샷"] -->|"Apply: 값만 덮어씀"| Model
 ```
 
@@ -184,7 +189,7 @@ flowchart LR
 - **파생 상태(`DerivedProperty`)는 저장 데이터에서 계산**해서, 교체 도중의 조합(새 레벨 + 옛 업그레이드)이 바깥에 보이지 않습니다.
 - **`GameSession.Apply`는 객체를 새로 만들지 않고 값만 덮어씁니다.** 구독하는 쪽이 옛 객체를 붙잡지 않으므로 세이브 로드, 개발자 도구의 진행도 교체, (나중의) 서버 롤백이 같은 경로를 씁니다.
 - **재화와 전투 수치는 `GameNumber`**(내부 double)로 감쌌습니다. 방치형 경제는 상한 없이 커지므로, 표현을 바꿔야 할 때 구조체 내부만 바뀌게 했습니다. 세이브와 데이터 테이블에는 기본 타입을 둡니다(직렬화 모양을 바꾸지 않기 위해).
-- 전투 → 연출·보상 방향의 알림은 월드의 사건(`CombatEvent`, 구조체라 할당 없음)입니다. 시뮬레이션은 일어난 일을 버퍼에 쌓기만 하고, 드라이버가 고정 단계가 끝난 뒤 뷰·이펙트·보상에 배달합니다. 그래서 연출이 시뮬레이션 도중에 끼어들 수 없고, 연출을 바꾸거나 빼도 결과가 같습니다. 처치 보상은 스폰할 때 전투원에 넣고 사망 사건이 싣고 가서 `GameManager`가 지급합니다.
+- 전투 → 연출·보상 방향의 알림은 월드의 사건(`CombatEvent`, 구조체라 할당 없음)입니다. 시뮬레이션은 일어난 일을 버퍼에 쌓기만 하고, 드라이버가 고정 단계가 끝난 뒤 뷰·이펙트·보상에 배달합니다. 그래서 연출이 시뮬레이션 도중에 끼어들 수 없고, 연출을 바꾸거나 빼도 결과가 같습니다. 처치 보상은 스폰할 때 전투원에 넣고 사망 사건이 싣고 가서 `Game`이 지급합니다.
 
 ([GameSession.cs](Assets/Scripts/Player/GameSession.cs), [PlayerStats.cs](Assets/Scripts/Player/PlayerStats.cs), [ReactiveProperty.cs](Assets/Scripts/Reactive/ReactiveProperty.cs), [DerivedProperty.cs](Assets/Scripts/Reactive/DerivedProperty.cs), [GameNumber.cs](Assets/Scripts/Economy/GameNumber.cs), [CombatEvent.cs](Assets/Scripts/Combat/CombatEvent.cs))
 
@@ -219,7 +224,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    E["업그레이드 · 레벨업 · 스킬 학습/장착<br/>스테이지 입장 · 종료/일시정지"] --> SG["GameManager.SaveGame()<br/>session.ToSaveData()"]
+    E["업그레이드 · 레벨업 · 스킬 학습/장착<br/>스테이지 입장 · 종료/일시정지"] --> SG["Game.SaveRequested → GameRunner.SaveGame()<br/>session.ToSaveData() 사본"]
     SG --> V{"SaveDataValidator"}
     V -->|"통과"| ISS(("ISaveStorage"))
     V -->|"NaN 등"| KEEP["기존 파일 유지 + 에러 로그"]
@@ -232,15 +237,15 @@ flowchart LR
 - 주기적 자동저장은 없고 위 계기에서만 저장합니다. `Load()`는 결과가 즉시 필요해서 동기, `Save()`는 호출부가 기다리지 않아도 돼서 코루틴 모양입니다. 종료/일시정지처럼 다음 프레임을 보장받지 못하는 시점만 그 코루틴을 끝까지 직접 돌려 저장을 끝냅니다.
 - 백엔드 교체는 `ISaveStorage` 구현체 하나 + 진입점 한 줄입니다. 서버로 바꾸면 종료 직전 저장은 응답을 기다리지 못할 수 있어서 그때 따로 보장 전략이 필요합니다.
 
-([SaveDataValidator.cs](Assets/Scripts/Player/SaveDataValidator.cs), [ISaveStorage.cs](Assets/Scripts/Player/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/Player/LocalFileSaveStorage.cs), [GameManager.cs](Assets/Scripts/Manager/GameManager.cs))
+([SaveDataValidator.cs](Assets/Scripts/Player/SaveDataValidator.cs), [ISaveStorage.cs](Assets/Scripts/Player/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/Player/LocalFileSaveStorage.cs), [GameRunner.cs](Assets/Scripts/Manager/GameRunner.cs))
 
 ---
 
 ### 9. 오브젝트 풀링
 
-몬스터·보스, 데미지 숫자, 히트 파티클, 보상 드랍, 스킬 VFX를 `PoolManager`가 Unity 내장 `ObjectPool<GameObject>`로 프리팹별로 관리합니다. 다른 스테이지에 들어갈 때 이전 스테이지의 몬스터 풀만 비웁니다. 몬스터의 `Combatant`도 풀 객체마다 하나를 다시 씁니다.
+풀은 두 겹입니다. 시뮬레이션 쪽은 `EnemyRoster`가 몬스터 id별로 `Combatant`를 다시 쓰고(전투 중 할당 0), 그림 쪽은 `PoolManager`가 Unity 내장 `ObjectPool<GameObject>`로 몬스터·플레이어 그림, 데미지 숫자, 히트 파티클, 보상 드랍, 스킬 VFX를 프리팹별로 관리합니다. 그림은 전투원의 `Joined`·`Left` 사건으로 붙고 떨어지므로, 풀에서 다시 쓴 전투원에도 옛 그림이 남지 않습니다. 다른 스테이지에 들어가면 이전 스테이지의 몬스터 풀을 비웁니다.
 
-([PoolManager.cs](Assets/Scripts/Manager/PoolManager.cs), [MonsterSpawner.cs](Assets/Scripts/MonsterSpawner.cs))
+([EnemyRoster.cs](Assets/Scripts/Game/EnemyRoster.cs), [BattleView.cs](Assets/Scripts/View/BattleView.cs), [PoolManager.cs](Assets/Scripts/Manager/PoolManager.cs))
 
 ---
 
@@ -254,7 +259,7 @@ flowchart LR
 
 ## 테스트와 검증
 
-- **EditMode 테스트 310개**(`Assets/Tests/EditMode/`): 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 봅니다. 예: 기대 시각을 오차 0으로 비교, 단계보다 짧은 공격 간격, 이동 속도 1e6에서도 몸을 통과하지 않음, HP·데미지 1e30, 전투 중 할당 0, 흐름의 정확한 대기와 무작위 데이터 장시간 진행, 창 스택의 로드 순서 뒤바뀜, 진행도 교체 뒤 화면 일치.
+- **EditMode 테스트 318개**(`Assets/Tests/EditMode/`): 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 봅니다. 예: 기대 시각을 오차 0으로 비교, 단계보다 짧은 공격 간격, 이동 속도 1e6에서도 몸을 통과하지 않음, HP·데미지 1e30, 전투 중 할당 0, 흐름의 정확한 대기와 무작위 데이터 장시간 진행, 창 스택의 로드 순서 뒤바뀜, 진행도 교체 뒤 화면 일치.
 - **프레임률 무관**: 같은 세이브로 30fps, 120fps, 렉을 섞은 실행, 애니메이터를 끈 실행의 처치·타격 시각과 스테이지 입장 시각이 같습니다. 전투 루프(`SimulationLoop`)가 Unity를 모르는 순수 C#이라, 씬·뷰 없이 실제 게임 데이터로 같은 전투를 돌리는 헤드리스 실행이 이것을 테스트로 확인합니다(정지를 처음 재현한 세이브와 시드로 1500초 진행 포함). 헤드리스 기록은 에디터 플레이 기록과 비트 단위로 같습니다.
 - **실기기**: Android(Galaxy S24 Ultra) 개발 빌드에 adb로 설치해 화면 캡처, 실제 터치·뒤로가기 키, logcat으로 확인합니다.
 
@@ -313,14 +318,16 @@ ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래�
 DataTables/GameData.xlsx     # 게임 데이터 원본(엑셀)
 Assets/
 ├─ Scripts/
+│  ├─ Game/          # Game(게임 한 판), GameData(데이터 한 벌), EnemyRoster, PlayerCombat
 │  ├─ Combat/        # Combatant, CombatWorld, 전투 사건(CombatEvent), 시계·스케줄러, 행동 시간표, 전투원 호스트·뷰 표
-│  ├─ Flow/          # EncounterDirector(인카운터·보스·스테이지 흐름)
+│  ├─ Flow/          # EncounterDirector(인카운터·보스·스테이지 흐름), SimulationLoop
+│  ├─ View/          # BattleView(전투원 그림), Presentation(그림 자산 조회), BodyAnchor
 │  ├─ Player/        # GameSession, PlayerStats, 세이브(저장소·검사·프로필)
 │  ├─ Reactive/      # ReactiveProperty, Subject, DerivedProperty
 │  ├─ Economy/       # GameNumber
 │  ├─ Skill/         # Skill + 효과(ISkillBehavior)
 │  ├─ Data/          # IData 구현체, 데이터베이스 정의, 튜닝 덮어쓰기
-│  ├─ Manager/       # GameInitializer, CombatSimulation, GameManager, PoolManager, CombatEffectManager 등
+│  ├─ Manager/       # GameInitializer(조립), GameRunner(실행), PoolManager, CombatEffectManager, CameraRig
 │  ├─ UI/            # Core(UIRoot, WindowManager, 창 베이스), 탭·HUD·창별 View와 Presenter
 │  └─ DevTools/      # 개발자 도구(에디터·개발 빌드 전용 어셈블리)
 ├─ Editor/           # Excel → JSON → ScriptableObject 변환, 행동 시간표 굽기, 데이터 검사

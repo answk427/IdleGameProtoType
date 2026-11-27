@@ -54,7 +54,7 @@ public static class CombatDataValidator
             errors.Add($"[CombatData] BalanceConfig: {name}는 0 이상이어야 합니다(0 = 대기 없음): {seconds}");
     }
 
-    // 모든 전투원 프리팹: 판정 몸(반너비 > 0), 시간표, 애니메이션 뷰
+    // 모든 전투원 프리팹: 애니메이션 뷰. (반너비와 시간표는 데이터다, docs/COMBAT_ARCHITECTURE.md 12절 D50. 아래 몬스터·캐릭터 검사)
     private static void ValidateCombatantPrefabs(List<string> errors)
     {
         foreach (string guid in AssetDatabase.FindAssets("t:Prefab"))
@@ -65,11 +65,6 @@ public static class CombatDataValidator
             if (host == null) continue;
 
             var so = new SerializedObject(host);
-            float halfWidth = so.FindProperty("hitboxProfile.halfWidth").floatValue;
-            if (!(halfWidth > 0f) || float.IsInfinity(halfWidth))
-                errors.Add($"[CombatData] {path}: 판정 몸의 반너비(hitboxProfile.halfWidth)는 0보다 커야 합니다: {halfWidth}");
-            if (so.FindProperty("timelines").objectReferenceValue == null)
-                errors.Add($"[CombatData] {path}: 행동 시간표(ActionTimelineSet)가 연결되지 않았습니다.");
             if (so.FindProperty("view").objectReferenceValue == null)
                 errors.Add($"[CombatData] {path}: CharacterAnimationView가 연결되지 않았습니다.");
         }
@@ -92,6 +87,7 @@ public static class CombatDataValidator
             if (!(data.AttackRange >= 0f)) errors.Add($"{where}: attackRange는 0 이상이어야 합니다: {data.AttackRange}");
             if (data.MovePolicy != MovePolicy.Hold && data.MovePolicy != MovePolicy.Approach)
                 errors.Add($"{where}: movePolicy는 Hold 또는 Approach여야 합니다: {data.MovePolicy}");
+            RequireHalfWidth(data.HalfWidth, where, errors);
             if (!(data.MoveSpeed >= 0f) || float.IsInfinity(data.MoveSpeed))
                 errors.Add($"{where}: moveSpeed는 0 이상이어야 합니다: {data.MoveSpeed}");
             else if (data.MovePolicy == MovePolicy.Approach && !(data.MoveSpeed > 0f))
@@ -104,14 +100,19 @@ public static class CombatDataValidator
                 continue;
             }
 
-            ActionTimelineSet timelines = host.Timelines;
-            if (data.AttackInterval > 0f) RequireTimeline(timelines, ActionKeys.Attack, $"{where}: 공격 간격이 있는데(기본 공격) 프리팹 시간표에", errors);
+            ActionTimelineSet timelines = entry.timelines;
+            if (timelines == null)
+            {
+                errors.Add($"{where}: 행동 시간표(MonsterDatabase 항목의 timelines)가 연결되지 않았습니다.");
+                continue;
+            }
+            if (data.AttackInterval > 0f) RequireTimeline(timelines, ActionKeys.Attack, $"{where}: 공격 간격이 있는데(기본 공격) 시간표에", errors);
 
             if (data.SkillId > 0)
             {
                 SkillEntry skill = skills != null ? skills.GetById(data.SkillId) : null;
                 if (skill?.data == null) errors.Add($"{where}: 스킬 {data.SkillId}이 SkillDatabase에 없습니다.");
-                else RequireTimeline(timelines, skill.data.AnimationTrigger, $"{where}: 스킬 {skill.data.Id}({skill.data.SkillName})의 행동 키가 프리팹 시간표에", errors);
+                else RequireTimeline(timelines, skill.data.AnimationTrigger, $"{where}: 스킬 {skill.data.Id}({skill.data.SkillName})의 행동 키가 시간표에", errors);
             }
         }
     }
@@ -133,6 +134,7 @@ public static class CombatDataValidator
 
             if (!(data.AttackRange >= 0f)) errors.Add($"{where}: attackRange는 0 이상이어야 합니다: {data.AttackRange}");
             if (!(data.MoveSpeed > 0f) || float.IsInfinity(data.MoveSpeed)) errors.Add($"{where}: moveSpeed는 0보다 커야 합니다: {data.MoveSpeed}");
+            RequireHalfWidth(data.HalfWidth, where, errors);
 
             PlayerController host = entry.prefab != null ? entry.prefab.GetComponent<PlayerController>() : null;
             if (host == null)
@@ -141,15 +143,21 @@ public static class CombatDataValidator
                 continue;
             }
 
-            ActionTimelineSet timelines = host.Timelines;
-            RequireTimeline(timelines, ActionKeys.Attack, $"{where}: 프리팹 시간표에", errors);
-            RequireTimeline(timelines, ActionKeys.Death, $"{where}: 프리팹 시간표에", errors);
+            ActionTimelineSet timelines = entry.timelines;
+            if (timelines == null)
+            {
+                errors.Add($"{where}: 행동 시간표(CharacterDatabase 항목의 timelines)가 연결되지 않았습니다.");
+                continue;
+            }
+            RequireTimeline(timelines, ActionKeys.Attack, $"{where}: 시간표에", errors);
+            // 사망 동작이 없으면 사망 즉시 다시 시작한다(진행은 멈추지 않지만 사망을 보여 주지 못한다).
+            RequireTimeline(timelines, ActionKeys.Death, $"{where}: 시간표에", errors);
 
             if (skills == null) continue;
             foreach (SkillEntry skill in skills.entries)
             {
                 if (skill?.data == null) continue;
-                RequireTimeline(timelines, skill.data.AnimationTrigger, $"{where}: 스킬 {skill.data.Id}({skill.data.SkillName})의 행동 키가 프리팹 시간표에", errors);
+                RequireTimeline(timelines, skill.data.AnimationTrigger, $"{where}: 스킬 {skill.data.Id}({skill.data.SkillName})의 행동 키가 시간표에", errors);
             }
         }
     }
@@ -199,6 +207,13 @@ public static class CombatDataValidator
             if (ps.main.simulationSpace == ParticleSystemSimulationSpace.World)
                 errors.Add($"{context}({prefab.name}/{ps.name}): 파티클이 월드 시뮬레이션 공간입니다. 로컬(Local)로 바꾸세요.");
         }
+    }
+
+    // 판정 몸의 반너비(데이터, D50): 0보다 큰 유한한 값. 교전·대상·범위의 표면 거리가 이것으로 정해진다.
+    private static void RequireHalfWidth(float halfWidth, string where, List<string> errors)
+    {
+        if (!(halfWidth > 0f) || float.IsInfinity(halfWidth))
+            errors.Add($"{where}: halfWidth(판정 몸의 반너비)는 0보다 커야 합니다: {halfWidth}");
     }
 
     private static void RequireTimeline(ActionTimelineSet timelines, string key, string context, List<string> errors)

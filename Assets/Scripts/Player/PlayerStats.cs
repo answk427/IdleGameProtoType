@@ -70,8 +70,8 @@ public sealed class PlayerStats
     private PlayerStatsSaveData saveData = new PlayerStatsSaveData();
 
     // 배울 수 있는 스킬 전부(스킬 표). 학습 조건과 "배울 스킬 있음"이 이것을 본다.
-    private IReadOnlyList<SkillEntry> skills = Array.Empty<SkillEntry>();
-    private readonly Dictionary<int, SkillEntry> skillsById = new Dictionary<int, SkillEntry>();
+    private IReadOnlyList<SkillData> skills = Array.Empty<SkillData>();
+    private readonly Dictionary<int, SkillData> skillsById = new Dictionary<int, SkillData>();
 
     // 스탯 종류별 동작(IUpgradeStat)을 한 곳에 등록. 새 스탯은 IUpgradeStat 구현 클래스 하나를 만들어 여기에 등록한다.
     private Dictionary<UpgradeStatType, IUpgradeStat> upgradeStats;
@@ -125,17 +125,17 @@ public sealed class PlayerStats
     // ── 초기화 ──────────────────────────────────────────────
 
     // 이동속도처럼 저장되지 않는 캐릭터 속성은 여기(진행도)가 아니라 캐릭터가 갖는다.
-    // skills: 스킬 표(GameInitializer가 GameDatabaseManager에서 넘긴다). 없으면 배울 스킬이 없다.
-    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig, IReadOnlyList<SkillEntry> skills = null)
+    // skills: 스킬 표의 데이터 행(GameData가 넘긴다, 그림 자산은 모른다). 없으면 배울 스킬이 없다.
+    public void Initialize(PlayerStatDatabase statData, PlayerUpgradeConfig upgradeConfig, IReadOnlyList<SkillData> skills = null)
     {
         if (upgradeStats != null) throw new InvalidOperationException("PlayerStats는 한 번만 초기화한다.");
         this.statData = statData;
         this.upgradeConfig = upgradeConfig;
 
-        this.skills = skills ?? Array.Empty<SkillEntry>();
-        foreach (SkillEntry entry in this.skills)
+        this.skills = skills ?? Array.Empty<SkillData>();
+        foreach (SkillData skill in this.skills)
         {
-            if (entry?.data != null) skillsById[entry.data.Id] = entry;
+            if (skill != null) skillsById[skill.Id] = skill;
         }
 
         IUpgradeStat[] stats =
@@ -321,19 +321,19 @@ public sealed class PlayerStats
     private LearnSkillResult CheckLearnSkill(int skillId)
     {
         if (IsSkillLearned(skillId)) return LearnSkillResult.AlreadyLearned;
-        if (!skillsById.TryGetValue(skillId, out SkillEntry entry)) return LearnSkillResult.UnknownSkill;
+        if (!skillsById.TryGetValue(skillId, out SkillData skill)) return LearnSkillResult.UnknownSkill;
 
-        return saveData.level >= entry.data.RequiredLevel ? LearnSkillResult.Success : LearnSkillResult.LevelTooLow;
+        return saveData.level >= skill.RequiredLevel ? LearnSkillResult.Success : LearnSkillResult.LevelTooLow;
     }
 
     // 학습 조건(CheckLearnSkill)과 같은 규칙을 저장 데이터에서 계산한다(진행도 교체 도중의 조합이 보이지 않게).
     private bool ComputeHasLearnableSkill()
     {
         List<int> learned = saveData.learnedSkillIds; // LoadSave 전(기본값)에는 null일 수 있다
-        foreach (SkillEntry entry in skills)
+        foreach (SkillData skill in skills)
         {
-            if (entry?.data == null) continue;
-            if (saveData.level >= entry.data.RequiredLevel && (learned == null || !learned.Contains(entry.data.Id))) return true;
+            if (skill == null) continue;
+            if (saveData.level >= skill.RequiredLevel && (learned == null || !learned.Contains(skill.Id))) return true;
         }
         return false;
     }

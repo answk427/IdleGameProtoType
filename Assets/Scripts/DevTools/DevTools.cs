@@ -46,8 +46,8 @@ public sealed class DevTools : MonoBehaviour
     {
         target.Initialized -= HandleInitialized;
 
-        Commands = new DevCommands(target.Session, target.GameManager, target.CombatSimulation.Director, new DevBackupStore(SaveProfile.SaveDirectory));
-        overlay = new HitboxOverlay(target.CombatSimulation.World, target.CombatSimulation.Views);
+        Commands = new DevCommands(target.Game, new DevBackupStore(SaveProfile.SaveDirectory));
+        overlay = new HitboxOverlay(target.Game.World, target.BattleView.Views, target.PlayArea);
         uiOverlay = new UIStateOverlay(target.UIRoot);
         panel = new DevPanel(Commands, overlay, uiOverlay);
     }

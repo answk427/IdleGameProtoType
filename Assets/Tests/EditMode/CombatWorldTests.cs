@@ -366,4 +366,43 @@ public class CombatWorldTests
         Assert.IsNull(enemy.World);
         Assert.AreEqual(2, world.Combatants.Count);
     }
+
+    // 뺄 때 Joined의 짝인 Left가 온다. 같은 전투원을 다시 넣으면(풀에서 다시 쓴 적) 그 뒤에 Joined가 다시 온다.
+    // 뷰는 이 순서로 옛 그림을 떼고 새 그림을 붙인다(docs/COMBAT_ARCHITECTURE.md 12절 D44).
+    [Test]
+    public void Remove_SendsLeft_RejoinSendsJoinedAfterIt()
+    {
+        CombatWorld world = World();
+        var host = new FakeHost();
+        Combatant c = Spawn(world, Team.Enemy, 1f, 0.5f, Stats(), host: host);
+        var order = new System.Collections.Generic.List<CombatEventType>();
+        world.Events.Subscribe(e =>
+        {
+            if (e.Source == c && (e.Type == CombatEventType.Joined || e.Type == CombatEventType.Left)) order.Add(e.Type);
+        });
+
+        world.Remove(c);
+        c.Spawn(Stats(), 2f, 0.5f, Timelines(), null);
+        world.Add(c);
+        Deliver(world);
+
+        CollectionAssert.AreEqual(new[] { CombatEventType.Joined, CombatEventType.Left, CombatEventType.Joined }, order);
+        Assert.AreEqual(1, host.Left);
+        Assert.AreEqual(2, host.Joined);
+    }
+
+    // 월드에 없는 전투원을 빼면 아무 사건도 없다(Left가 Joined보다 많아지지 않는다).
+    [Test]
+    public void RemovingCombatantNotInWorld_SendsNothing()
+    {
+        CombatWorld world = World();
+        var host = new FakeHost();
+        Combatant c = Spawn(world, Team.Enemy, 1f, 0.5f, Stats(), host: host);
+        world.Remove(c);
+        world.Remove(c);
+        Deliver(world);
+
+        Assert.AreEqual(1, host.Joined);
+        Assert.AreEqual(1, host.Left);
+    }
 }

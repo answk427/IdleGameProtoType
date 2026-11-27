@@ -10,6 +10,7 @@ public class BackgroundScroller : MonoBehaviour
     [SerializeField] private float scrollScale = 0.25f;
 
     private Material mat;
+    private Presentation presentation;
     private System.IDisposable stageSubscription;
 
     private void Awake()
@@ -17,10 +18,11 @@ public class BackgroundScroller : MonoBehaviour
         mat = GetComponent<Renderer>().material;
     }
 
-    // 0은 아직 스테이지에 들어가지 않은 것이다(처음 값).
-    public void Bind(IReadOnlyReactiveProperty<int> stageNumber)
+    // 0은 아직 스테이지에 들어가지 않은 것이다(처음 값). 배경 텍스처는 Presentation(스테이지 표의 그림 자산)에서 찾는다.
+    public void Bind(IReadOnlyReactiveProperty<int> stageNumber, Presentation presentationAssets)
     {
         stageSubscription?.Dispose();
+        presentation = presentationAssets;
         stageSubscription = stageNumber.Subscribe(HandleStageChanged);
     }
 
@@ -32,7 +34,7 @@ public class BackgroundScroller : MonoBehaviour
     private void HandleStageChanged(int stageNumber)
     {
         if (stageNumber <= 0) return;
-        StageEntry entry = GameDatabaseManager.Instance != null ? GameDatabaseManager.Instance.GetStage(stageNumber) : null;
+        StageEntry entry = presentation?.Stage(stageNumber);
         if (entry != null) SetBackground(entry.backgroundTexture);
     }
 

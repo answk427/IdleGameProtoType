@@ -52,7 +52,8 @@ public class MonsterDatabaseSyncer : IDataSyncer
                 preserved++;
             }
 
-            newEntries.Add(new MonsterEntry { data = data, prefab = prefab, groundOffset = groundOffset });
+            ActionTimelineSet timelines = DatabaseSyncUtility.ResolveTimelines(existing?.timelines, data.MonsterName, log);
+            newEntries.Add(new MonsterEntry { data = data, prefab = prefab, groundOffset = groundOffset, timelines = timelines });
         }
 
         db.entries = newEntries;

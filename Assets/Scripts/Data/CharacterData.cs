@@ -12,6 +12,7 @@ public class CharacterData : IData
     [UnityEngine.SerializeField] private string characterName; // 프리팹 이름(Assets/Resources/Prefabs/Player/<이름>.prefab)
     [UnityEngine.SerializeField] private float attackRange;    // 표면 거리 기준
     [UnityEngine.SerializeField] private float moveSpeed;      // 월드 유닛/초. 3단계 전까지는 스크롤 속도
+    [UnityEngine.SerializeField] private float halfWidth;      // 판정 몸의 반너비(> 0). 교전 거리를 바꾸는 밸런스 값이라 데이터다(12절 D50)
 
     [JsonProperty("id")]
     public int Id { get => id; private set => id = value; }
@@ -21,4 +22,6 @@ public class CharacterData : IData
     public float AttackRange { get => attackRange; private set => attackRange = value; }
     [JsonProperty("moveSpeed")]
     public float MoveSpeed { get => moveSpeed; private set => moveSpeed = value; }
+    [JsonProperty("halfWidth")]
+    public float HalfWidth { get => halfWidth; private set => halfWidth = value; }
 }

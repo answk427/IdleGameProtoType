@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-// 스킬 관리 창의 로직. uGUI, GameManager, GameDatabaseManager를 모른다.
+// 스킬 관리 창의 로직. uGUI를 모른다(데이터는 주입받은 스킬 표만 안다).
 // - 배운 스킬을 탭(선택) → 슬롯을 탭하면 배치. 선택 없이 슬롯을 탭하면 비움.
 // - 미학습 스킬은 더블탭으로 학습 (조건은 모델이 판정).
 // 슬롯은 캐릭터가 아니라 EquippedSlots 상태로 그린다. 캐릭터가 먼저 갱신돼야 한다는 순서 의존이 없다.

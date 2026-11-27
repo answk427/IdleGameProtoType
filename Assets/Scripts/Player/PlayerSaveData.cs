@@ -8,4 +8,13 @@ public class PlayerSaveData
     // 이전 형식(int)으로 저장된 정수 값도 그대로 읽힌다.
     public double gold = 0;
     public int currentStageNumber = 1;
+
+    // 깊은 복사. 진행도(GameSession)는 경계에서 복사해 받고 복사해 준다(docs/COMBAT_ARCHITECTURE.md 12절 D49):
+    // 넘긴 쪽이 나중에 고쳐도, 비동기 저장이 쓰는 도중에 진행도가 바뀌어도 서로 섞이지 않는다.
+    public PlayerSaveData Clone() => new PlayerSaveData
+    {
+        stats = stats != null ? stats.Clone() : null,
+        gold = gold,
+        currentStageNumber = currentStageNumber,
+    };
 }

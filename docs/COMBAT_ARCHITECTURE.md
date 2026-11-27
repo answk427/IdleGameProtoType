@@ -1488,3 +1488,107 @@ CombatSimulation.Update ──Time.deltaTime(배속 포함)──▶ SimulationL
 | 기준선 | 5-B 뒤 사본 플레이의 30fps / 120fps / 렉 섞기 150초 기록이 5-A와 같다(150초 미만 267줄, 지문 `d3b148eb2e3d2a4d`). 드라이버가 `FixedUpdate`에서 `Update` + 루프로 바뀌어 프레임당 단계 수의 계산이 달라졌지만 결과는 그대로다. 콘솔 에러 0 |
 | 헤드리스 = 플레이(R3, R7) | 같은 세이브와 플레이어 시작 x(씬의 스폰 지점 0.07)로 헤드리스 실행을 150초 돌린 기록이 사본 플레이 기록 267줄과 비트 단위로 같다(헤드리스에는 시작 입장 줄 `S 0 1 Start`가 하나 더 있다. 플레이 기록기가 시작 뒤에 구독해서다). 뷰, 애니메이터, 이펙트, 씬이 하나도 없어도 같은 전투다. 이 비교는 지금 밸런스에 묶여 있어 테스트로 두지 않았다(테스트는 프레임 길이 무관이라는 불변식만 본다) |
 | 한계 | 헤드리스 실행은 테스트 어셈블리에 있다(게임 코드가 아니다). 오프라인 보상 같은 게임 기능으로 쓰려면 같은 조립을 게임 쪽으로 옮겨야 한다(5-C 뒤, D42) |
+
+## 12. 5-C 전 구조 정리: 주인 바로잡기 (2026-11-27, 사용자 "구조 정리 먼저, 검토해보고 문제없으면 진행". 결과 12-7)
+
+5-B까지 끝낸 뒤 코드 전체(약 1만 1천 줄)를 다시 점검했다. 전투 규칙(전투원, 월드, 시간 순서 처리, sweep, 사건 배달), 흐름(`EncounterDirector`), 진행도(`GameSession`, 반응형 모델), UI(창 시스템, Presenter), 데이터 변환·검사는 단단하다. 불안한 곳은 그 사이의 **주인**이다. 5-C(어셈블리 분리)는 지금 모양을 컴파일러로 굳히므로, 그 전에 주인을 바로잡는다(D43). 5-C는 이 정리 위에서 한다.
+
+### 12-1. 점검 결과 (구조 결함)
+
+| | 결함 | 근거(코드) | 결과 |
+|---|---|---|---|
+| F1 | **전투원의 주인이 뷰다** | `CombatantHost.Awake`가 `Combatant`를 만든다. `Monster.OnDisable`이 `World.Remove`를 부른다(화면 객체가 꺼지면 시뮬레이션이 바뀐다). 흐름의 스폰 접점 `IEncounterHost`를 MonoBehaviour(`MonsterSpawner`)가 구현한다. 판정 몸·시간표는 프리팹 컴포넌트, 플레이어 시작 x는 씬 transform이다 | 씬 없는 실행이 같은 전투를 만들려고 스포너 규칙과 플레이어 조립을 손으로 복제했다(`HeadlessGame.Spawner`, 시작 x 0.07). 조립 규칙이 두 벌이다 |
+| F2 | **게임 계층이 객체로 없다** | 전투와 진행도를 잇는 규칙이 MonoBehaviour에 흩어져 있다: `GameManager`(처치 보상, 저장 계기, 진행도 교체), `PlayerController`(진행도 능력치 → 전투원, 장착 → 로드아웃, UI 명령 입구, HP 상태) | 헤드리스에는 보상·레벨·저장이 없다(전투만 돈다). 오프라인 보상(D42)에 필요한 것이 이 규칙이다. UI가 게임 명령을 뷰 객체로 보낸다. D40대로 나누면 Game 어셈블리에는 진행도만 들어가고 잇는 규칙은 World/App에 남아 굳는다 |
+| F3 | **데이터·조립 경로가 여러 개** | `GameDatabaseManager.Instance`(지연 `FindAnyObjectByType`)를 `Monster.Awake`, `PlayerController.Awake`, 스포너, 이펙트, 배경, `PlayerSpawner`가 깊은 곳에서 찾는다. `PlayerStatDatabase`·`PlayerUpgradeConfig`는 `GameInitializer` 필드, 튜닝 사본은 두 곳에서 따로, 테스트는 `AssetDatabase`. 싱글턴 7개 중 일부는 죽은 코드(`JsonDataLoader`, `PlayerSpawner.ReleasePlayer` → `SaveProgress` → `GameManager.Instance`). `Skill`·`PlayerStats`가 그림 자산(`SkillEntry`: 아이콘, VFX, 소리)을 쥔다 | "게임이 쓰는 데이터 한 벌"이 없다. 새 코드가 아무 곳에서나 전역을 찾을 수 있다 |
+| F4 | **바깥 알림 시점이 두 가지** | 전투 사건은 ⑥(처리 밖). 흐름의 상태·사건(`StageEntered`, `Phase` …)은 ①의 동작 도중(`EnterStage` 한가운데)에 바로 알린다. 구독자 = 저장(파일 쓰기), 배경, UI | 지금 버그는 아니다(명령은 다음 ①, D23). 하지만 "처리 도중에 바깥 코드가 돌지 않는다"가 규칙이 아니라 우연이다 |
+| F5 | 경계의 별칭 | `GameSession.ToSaveData`가 진행도 내부의 저장 객체를 그대로 넘기고, `Apply`는 받은 객체를 그대로 쥔다 | 저장이 비동기(서버)가 되면 저장 도중에 값이 바뀔 수 있다 |
+
+### 12-2. 목표 구조
+
+```
+App(Unity)    GameInitializer: GameDataAssets → GameData, 세이브 → Game.TryCreate, 뷰·UI를 Game에 붙임
+              GameRunner: 매 프레임 game.Advance(Time.deltaTime) → BattleView.Render(비율), 저장 실행, 일시정지·종료 저장
+UI            Presenter ← Game의 상태와 명령(진행도, 흐름, 플레이어 전투 상태, 스킬 요청, 보스 도전)
+View(Unity)   BattleView: Joined·Left 사건으로 전투원에 GameObject를 붙이고 뗀다(뷰 풀), 보간
+              CombatEffectManager, CameraRig, 배경 — 그림 자산은 Presentation에서
+Game(C#)      Game: GameSession + 전투(월드, 흐름, 루프, EnemyRoster) + 잇는 규칙
+              (처치 보상, 능력치·장착 반영 = PlayerCombat, 저장 계기, 진행도 교체, 명령), GameData
+Simulation    Combatant, CombatWorld, 스케줄러, EncounterDirector, SimulationLoop
+Core          GameNumber, 반응형
+```
+
+- **씬 없는 실행 = 게임:** `Game.TryCreate(데이터, 세이브)` + `Advance`. 테스트, 기준선 비교, 나중의 오프라인 보상이 같은 코드를 쓴다. `HeadlessGame`의 복제(스포너, 플레이어 조립)는 없어지고 기록만 남는다.
+- **씬의 컴포넌트:** `GameInitializer`(조립), `GameRunner`(옛 `CombatSimulation`, 파일과 GUID를 그대로 옮긴다), `BattleView`(옛 `MonsterSpawner`, 같은 방식), 이펙트·카메라·배경·풀·바닥 높이, UI. 없어지는 것: `GameManager`, `PlayerSpawner`, `GameDatabaseManager`(→ `GameDataAssets` 에셋), `JsonDataLoader`(씬에도 없다).
+- **5-C와의 관계:** D40의 6개 어셈블리가 실제 주인과 맞게 된다. Game이 데이터 행을 시뮬레이션 입력(D37의 `SkillSpec` 등)으로 바꾸는 곳도 `GameData` 한 곳이다.
+
+### 12-3. 단계
+
+각 단계가 끝날 때마다: EditMode 테스트 전부, 그리고 **기준선**(강한 세이브 150초, 사본 플레이 30fps / 120fps / 렉 섞기 + 헤드리스, 150초 미만 267줄, 지문 `d3b148eb2e3d2a4d`)이 비트 단위로 같아야 한다. 5-R6만 동작을 일부러 바꾸고 새 기준선을 만든다(그때도 플레이 = 헤드리스, 프레임 길이 무관).
+
+| 단계 | 내용 | 끝 |
+|---|---|---|
+| **5-R1 데이터 한 벌** | `GameDataAssets`(SO 하나가 모든 표를 참조) → `GameData`(시작 때 한 번, 에디터 플레이는 튜닝 사본. 데이터 행 조회 + 전투원 몸 `CombatantBody`) + `Presentation`(프리팹, 바닥 보정, 스킬 아이콘·VFX·소리, 배경). `Skill`·`SkillLoadout`·`PlayerStats`는 `SkillData`만(D47). 게임 코드의 `GameDatabaseManager.Instance`를 없앤다 | **완료 2026-11-27**(12-7) |
+| **5-R2 전투원의 주인 = 시뮬레이션** | `EnemyRoster`(순수 C#, `IEncounterHost`, 몬스터 id별 전투원 풀). 전투원은 종류(`CombatantArchetype`: 캐릭터/몬스터, id, 보스)를 갖는다. 새 사건 `Left`(월드에서 빠짐). `BattleView`가 Joined에 프리팹을 붙이고 Left에 뗀다(플레이어도 같은 길). 호스트는 `Bind(전투원)`/`Unbind`만, 전투원을 만들거나 월드를 바꾸지 않는다 | **완료 2026-11-27**(12-7) |
+| **5-R3 Game 객체** | `Game`(진행도 + 전투 + 잇는 규칙), `PlayerCombat`(플레이어 전투원, 로드아웃, HP 상태, 쿨다운 비율, 스킬 요청). 저장은 요청만 내고(`SaveRequested`) 앱의 `GameRunner`가 저장소로. `GameManager` 삭제, UI·개발자 도구·카메라는 `Game`과 `BattleView`만 본다. `HeadlessGame`은 `Game` 위의 기록기로 | **완료 2026-11-27**(12-7) |
+| **5-R4 알림은 처리 밖에서만** | 흐름은 ① 동안의 상태 변화와 사건을 모았다가 ①이 끝난 뒤 순서대로 낸다(같은 단계 안, 구독자가 보는 순서와 값은 그대로). 처리 밖에서 부른 명령(`Begin`, 보스 도전, 재시작)의 변화는 바로 낸다(지금처럼 버튼이 그 자리에서 꺼진다). 흐름 안의 판단은 반응형 값이 아니라 자기 필드를 읽는다. 전투 사건은 그대로 ⑥ | **완료 2026-11-27**(12-7) |
+| **5-R5 정리** | 죽은 코드(`JsonDataLoader`, `PlayerSpawner`), 싱글턴(`CombatEffectManager`·`PoolManager`·`PlayAreaBounds`는 조립 지점이 넘긴다), 저장 데이터 복사(D49), `GameSession`의 `Mathf` | **완료 2026-11-27**(12-7) |
+| **5-R6 데이터 원천 바로잡기 (동작이 바뀜)** | 반너비 → 엑셀(몬스터·캐릭터 표 `halfWidth`), 시간표 참조 → 데이터 항목(`MonsterEntry`/`CharacterEntry.timelines`, 변환이 보존). 프리팹의 판정 몸은 그림 정렬(`bodyOffset`)만. 스폰 위치와 플레이어 시작은 몸 중심 기준(플레이어 시작 = 0). 새 기준선 | **완료 2026-11-27**(12-7) |
+
+### 12-4. 결정 (2026-11-27, 사용자 위임: "검토해보고 문제없으면 진행" → 아래 추천대로)
+
+| | 질문 | 결정 | 이유 |
+|---|---|---|---|
+| D43 | 5-C 전에 구조 정리 | 한다(5-R1~5-R6 뒤 5-C) | 어셈블리는 지금의 주인을 굳힌다. 굳히기 전에 바로잡는 편이 싸다 |
+| D44 | 전투원의 주인 | 시뮬레이션(게임 계층)이 만들고 풀링한다. 뷰는 Joined·Left로 붙고 뗀다. 전투원은 자기 종류(`CombatantArchetype`)를 갖는다 | 화면 객체의 수명(풀, 비활성)이 전투를 바꾸지 않는다. 헤드리스가 같은 코드를 쓴다. 풀에서 다시 쓴 전투원은 Left → Joined 순서로 배달돼 뷰 표가 바르게 바뀐다(같은 단계 안이어도) |
+| D45 | 게임 계층 | `Game`(순수 C#)이 진행도·전투·잇는 규칙을 갖고, 저장은 요청만 낸다. `GameManager` 삭제, `CombatSimulation` → `GameRunner`(앱 쪽 실행기) | 규칙이 그림 객체를 지나지 않는다. 저장소(I/O, 코루틴)는 앱의 일이다 |
+| D46 | 데이터 | `GameDataAssets` 한 에셋 → `GameData`(게임·시뮬레이션) + `Presentation`(뷰·UI). 시작 때 한 번 만들고 넘긴다. 정적 조회 없음 | 데이터 한 벌, 경로 하나. 테스트도 같은 에셋·같은 빌더 |
+| D47 | 그림 자산 | 시뮬레이션·진행도는 `SkillData`(행)만, 아이콘·VFX·소리는 `Presentation` | 5-C의 Simulation(엔진 없음) 준비. 로직이 그림 자산 때문에 바뀌지 않는다 |
+| D48 | 알림 시점 | 바깥 코드는 처리 밖에서만 돈다: 흐름은 ① 끝, 전투는 ⑥ | 우연이 아니라 규칙. 흐름 구독자가 보는 순서·값·단계 번호는 그대로라 기준선과 테스트가 바뀌지 않는다 |
+| D49 | 저장 데이터 경계 | `ToSaveData`는 사본을 주고 `Apply`는 받은 것을 복사해 쥔다 | 비동기 저장, 진행도 교체(서버 롤백)에서 별칭이 없다 |
+| D50 | 판정 몸·시간표의 원천 | 반너비는 엑셀(게임 데이터), 몸 오프셋은 프리팹(그림 정렬), 시간표 참조는 데이터 항목. 스폰·시작은 몸 중심 기준 | 반너비는 교전 거리를 바꾸는 밸런스 값이라 데이터만 고쳐 바꿀 수 있어야 한다. 몸 오프셋은 그림을 피벗에 맞추는 일이라 전투에 들어가면 안 된다. 시뮬레이션은 프리팹을 읽지 않는다. D18의 "첫 몬스터 **피벗** x"는 "첫 몬스터 **몸 중심** x"로, 8-4의 "판정 몸은 프리팹의 `HitboxProfile`"은 "반너비는 데이터, 몸 오프셋은 프리팹"으로 바뀐다 |
+
+### 12-5. 바뀌지 않는 것
+
+- 전투 규칙과 시간 모델(7~9절), 흐름의 규칙(10절), 사건 형식(11-4, `Left` 하나가 더해진다), 진행도 모델과 저장 형식(세이브 파일은 그대로), UI 창 시스템(UI_DESIGN), 데이터 변환(5-R6에서 열 하나씩만 더해진다).
+- 배속은 `Time.timeScale`(11-6), 단계 길이·한 프레임 상한은 그대로.
+
+### 12-6. 위험과 대응
+
+| 위험 | 대응 |
+|---|---|
+| 뷰가 붙는 시점이 늦어진다(플레이어 GameObject가 시작 직후가 아니라 첫 배달 때 생긴다) | 첫 화면 프레임의 배달이 같은 프레임 안이다. 카메라·HUD는 대상이 없으면 그리지 않는다(지금과 같다). 사본 플레이에서 확인 |
+| 씬 편집(컴포넌트 삭제·이름 바꾸기·참조 연결) | 스크립트 파일은 `.meta`와 함께 옮겨 GUID를 지킨다. 편집은 사용자 에디터에서 MainScene을 추가로 열어 `SerializedObject`로 하고 저장 후 닫는다(사용자가 연 씬은 그대로). 저장 뒤 배경 `m_LocalScale` 등 부작용을 되돌린다 |
+| 넓은 변경 | 단계마다 기준선(플레이 = 헤드리스 = 5-A 지문)과 테스트. 커밋은 사용자 지시가 있을 때만이라, 단계마다 결과를 이 절에 적어 둔다 |
+
+### 12-7. 결과 (2026-11-27)
+
+| 항목 | 결과 |
+|---|---|
+| 진행 방식 | 5-R1~5-R3은 같은 파일(조립 지점, 드라이버, 스포너, 호스트, `GameManager`, UI 연결)을 다시 쓰는 일이라 **한 번에 구현하고 한 번에 검증**했다. 5-R4와 5-R5도 씬 참조를 같이 바꿔서 함께 검증했다. 5-R6만 따로 했다(동작이 바뀌는 단계) |
+| 바뀐 구조 | 새 파일: `Game/`(`GameDataAssets`, `GameTables`, `GameData`, `EnemyRoster`, `PlayerCombat`, `Game`), `View/`(`Presentation`, `BattleView` = 옛 `MonsterSpawner`의 GUID, `BodyAnchor` = 옛 `HitboxProfile`), `Manager/GameRunner`(옛 `CombatSimulation`의 GUID), 에셋 `Assets/Data/GameDataAssets.asset`. 지운 것: `GameManager`, `PlayerSpawner`, `GameDatabaseManager`, `JsonDataLoader`, `SkillPresentation`(정적), 모든 `Instance` 싱글턴(`CombatEffectManager`, `PoolManager`, `PlayAreaBounds` 포함). 사건 `Left`, `Combatant.Archetype`, `CombatantHost.Bind/Unbind`, 흐름의 outbox(D48), 저장 데이터 `Clone`(D49), `PoolManager.Despawn`은 비워진 풀의 객체를 파괴 |
+| 씬·에셋 | 씬: `GameInitializer`에 데이터 에셋·이펙트·풀·바닥 높이 연결, `GameManager`·`PlayerSpawner`·`GameDatabaseManager`·`PlayerSpawnPoint` 오브젝트 삭제(사용자 에디터에서 MainScene을 추가로 열어 고치고 닫음, 배경 `m_LocalScale` 부작용은 되돌림). 전투원 프리팹 5개를 다시 저장해 읽지 않는 옛 값(`timelines`, `hitboxProfile.halfWidth`)을 지웠다. 데이터: 몬스터·캐릭터 표에 `halfWidth` 열(엑셀 → JSON → `.asset`, 값은 프리팹에 있던 그대로), 데이터 항목에 시간표 연결(변환이 보존) |
+| 테스트 | 311개 모두 통과(5-R5에서 별칭을 고정하던 테스트 1개를 복사 테스트 2개로 바꿈). `HeadlessGameTests`(프레임 길이 무관, 정지 재현 시드 1~3 1500초)는 새 데이터 원천에서도 통과 |
+| 기준선 (5-R1~5-R5) | 단계마다 사본 플레이의 30fps / 120fps / 렉 섞기 150초 기록이 5-A와 비트 단위로 같다(267줄, `d3b148eb2e3d2a4d`). 씬 없는 실행(`Game` + 기록기)의 기록도 같다. 이제 씬 없는 실행에도 처치 보상이 들어간다(150초 뒤 골드 138,653, 경험치 1,200) |
+| 기준선 (5-R6, 새 기준) | 의도한 동작 변화: 플레이어 시작이 씬의 시작 지점(피벗 0.07)에서 몸 중심 0으로, 스폰이 피벗 기준에서 몸 중심 기준으로(몸 오프셋이 있는 몬스터는 BossUndead 1.1뿐). 새 기록: 150초 미만 268줄, 지문 `cb06dd14e3a4ad7f`, 30fps = 120fps = 렉 섞기. **씬 없는 실행 = 플레이(손으로 맞추는 값 없이)**: 5-B 때는 플레이어 시작 x 0.07을 손으로 넣어야 같았다. 씬이 전투에 주는 값이 하나도 없다는 뜻이다 |
+| 데이터 검사 | `ActionTimelineTools.ValidateCombatData` 에러 0. 반너비(데이터, > 0)와 시간표 연결(데이터 항목)을 본다. 프리팹은 뷰가 있는지만 본다 |
+| 한계 | 연출의 모양(그림이 붙는 위치, 보스 부모, 풀 비우기)은 창 없는 사본에서 볼 수 없다. 5-C 뒤 S24에서 한 번 본다(D41). `CombatEffectManager`의 책임 과다(TODO "코드 품질")는 그대로다 |
+
+### 12-8. 커밋 전 총점검 (2026-11-27, 사용자 "최선의 구조인지, 주먹구구식이 아닌지 총체적 검토")
+
+구현한 구조를 처음부터 다시 읽고 "같은 규칙이 두 곳에 있는가, 어긋날 수 있는 입력이 있는가, 이름이 사실과 맞는가, 새 불변식에 테스트가 있는가"로 봤다. 고친 것:
+
+| | 찾은 것 | 고친 것 |
+|---|---|---|
+| 1 | "HP가 바뀌는 사건" 목록이 뷰(`CombatantHost`)와 `PlayerCombat`에 따로 적혀 있었다(하나를 고치면 머리 위 바와 HUD가 어긋난다) | 사건 쪽 한 곳 `CombatEvent.ChangesHp` |
+| 2 | `SimulationLoop`가 시계와 월드를 따로 받았다(시계는 늘 `world.Clock`이라, 다른 시계를 넘기면 조용히 어긋난다) | 월드만 받는다 |
+| 3 | 흐름의 스폰 접점 이름 `IEncounterHost`가 "뷰 쪽 호스트"라는 옛 뜻 그대로였다(구현은 이제 순수 C# 적 풀) | `IEnemyRoster`, 디렉터 필드 `roster`, 시험용 `FakeEnemyRoster` |
+| 4 | 주석에 없어진 이름(`CombatSimulation`, `GameManager`, "드라이버")이 남아 있었다 | 지금 구조로 고침(역사 설명은 "예전"으로 남김) |
+| 5 | 새 구조의 불변식에 테스트가 없었다 | 테스트 7개: `Left`가 `Joined`의 짝으로 오고 다시 넣으면 `Joined`가 뒤따름, 월드에 없는 전투원을 빼면 사건 없음(`CombatWorldTests`) / 뷰가 Joined에 붙고 Left에 떨어짐, 같은 배달 안에서 다시 쓴 전투원의 뷰 교체, 풀의 뷰를 다른 전투원이 다시 써도 옛 전투원의 사건이 가지 않음(`CombatantViewsTests`, 시험용 뷰 `TestCombatantHost`) / 흐름 알림이 ① 뒤에 순서대로 옴(`EncounterDirectorTests`) / 적 풀의 장부가 실제 데이터 300초 동안 늘 월드의 적 수와 같음(`HeadlessGameTests`) |
+
+일부러 남긴 것(5-C에서 어셈블리 경계와 같이 정한다):
+
+- **`Game`이 월드와 흐름 객체를 그대로 내보낸다.** 뷰·UI가 쓰는 것은 사건·읽기 값·명령뿐이지만, 형식상 `World.Add`나 `Flow.Tick`도 부를 수 있다. 읽기 전용 접점은 어셈블리 경계(D40)를 그을 때 같이 만든다. 지금 그런 호출은 없다.
+- **파일 위치.** 뷰 쪽 파일 일부(`CombatantHost`, `CombatantViews`, `CharacterAnimationView`)가 `Combat/`에, 데이터 행을 읽는 `CombatantSetup`이 `Combat/`에 있다. 5-C가 "파일을 한 번만 옮긴다"(11-2)라 그때 어셈블리별 폴더로 옮긴다.
+- **`Combatant.Spawn`의 인자가 7개다**(능력치, 위치, 반너비, 시간표, 스킬, 보상, 종류). 5-C의 입력 구조(D37)를 정할 때 함께 묶는다.
+
+**결과:** 동작은 바뀌지 않았다. 테스트 318개 모두 통과(새 7개 포함), 사본 플레이 기준선이 5-R6과 비트 단위로 같다(30fps = 120fps = 렉 섞기, `cb06dd14e3a4ad7f`), 씬 없는 실행 = 플레이.

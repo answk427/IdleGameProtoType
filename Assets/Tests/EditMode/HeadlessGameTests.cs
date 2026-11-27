@@ -79,4 +79,26 @@ public class HeadlessGameTests
         }
         Assert.That(seconds - previous, Is.LessThanOrEqualTo(maxGap), "끝까지 진행했다");
     }
+
+    // 적 풀의 장부(꺼낸 전투원 수)가 늘 월드의 적 수와 같다: 정리할 때 빠짐없이 돌려놓고, 다시 쓴 전투원을 두 번 세지 않는다
+    // (docs/COMBAT_ARCHITECTURE.md 12절 D44). 보스와 스테이지 전환(풀 비우기)이 들어가도록 강한 세이브로 렉 섞기 300초.
+    [Test]
+    public void EnemyRoster_AlwaysMatchesTheWorld()
+    {
+        var game = new HeadlessGame(Strong(), challengeBosses: true, record: false);
+        Func<int, double> frames = LagFrames(2);
+        var stages = new HashSet<int>();
+        game.Game.Flow.StageEntered.Subscribe(e => stages.Add(e.StageNumber));
+
+        for (int i = 0; game.Clock.Now < 300.0; i++)
+        {
+            game.Game.Advance(frames(i));
+            int enemies = 0;
+            foreach (Combatant c in game.Game.World.Combatants) if (c.Team == Team.Enemy) enemies++;
+            Assert.AreEqual(enemies, game.Game.Roster.ActiveCount, $"{game.Clock.Now:0.00}초");
+        }
+
+        Assert.Greater(game.Kills, 10);
+        Assert.Greater(stages.Count, 1, "스테이지를 넘어가 이전 스테이지 풀을 비우는 일까지 들어갔다");
+    }
 }

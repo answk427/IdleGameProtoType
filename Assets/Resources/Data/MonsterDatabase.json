@@ -11,7 +11,8 @@
     "attackRange": 0.0,
     "skillId": 0,
     "movePolicy": 0,
-    "moveSpeed": 0.0
+    "moveSpeed": 0.0,
+    "halfWidth": 0.4
   },
   {
     "Key": 1002,
@@ -25,7 +26,8 @@
     "attackRange": 0.0,
     "skillId": 0,
     "movePolicy": 0,
-    "moveSpeed": 0.0
+    "moveSpeed": 0.0,
+    "halfWidth": 0.4
   },
   {
     "Key": 2001,
@@ -39,7 +41,8 @@
     "attackRange": 0.1,
     "skillId": 1,
     "movePolicy": 1,
-    "moveSpeed": 1.0
+    "moveSpeed": 1.0,
+    "halfWidth": 1.5
   },
   {
     "Key": 2002,
@@ -53,6 +56,7 @@
     "attackRange": 0.1,
     "skillId": 6,
     "movePolicy": 1,
-    "moveSpeed": 1.0
+    "moveSpeed": 1.0,
+    "halfWidth": 0.1
   }
 ]

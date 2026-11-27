@@ -40,3 +40,44 @@ public interface IActionTimelineSource
 {
     bool TryGet(string key, out ActionTimeline timeline);
 }
+
+// 전투원이 무엇인지(12절 D44). 뷰는 이것으로 그릴 프리팹을 고른다. 시뮬레이션 규칙은 이것을 읽지 않는다.
+public enum CombatantKind : byte
+{
+    None,
+    Character, // 플레이어 캐릭터(캐릭터 표의 id)
+    Monster,   // 몬스터(몬스터 표의 id)
+}
+
+public readonly struct CombatantArchetype
+{
+    public readonly CombatantKind Kind;
+    public readonly int Id;
+    public readonly bool IsBoss; // 보스는 스폰할 때 정하는 역할이다(같은 몬스터가 일반으로도 나올 수 있다)
+
+    public CombatantArchetype(CombatantKind kind, int id, bool isBoss)
+    {
+        Kind = kind;
+        Id = id;
+        IsBoss = isBoss;
+    }
+
+    public static CombatantArchetype Character(int id) => new CombatantArchetype(CombatantKind.Character, id, false);
+    public static CombatantArchetype Monster(int id, bool isBoss) => new CombatantArchetype(CombatantKind.Monster, id, isBoss);
+
+    public override string ToString() => IsBoss ? $"{Kind} {Id} (보스)" : $"{Kind} {Id}";
+}
+
+// 전투원의 몸과 행동 시간표(전투가 쓰는 값만, docs/COMBAT_ARCHITECTURE.md 12절 D50). 게임 데이터(GameData)가 데이터 행과 항목에서 만든다.
+// 위치는 몸 중심이라 그림의 기준점(피벗 오프셋)은 여기 없다(뷰의 BodyAnchor).
+public readonly struct CombatantBody
+{
+    public readonly float HalfWidth;
+    public readonly IActionTimelineSource Timelines;
+
+    public CombatantBody(float halfWidth, IActionTimelineSource timelines)
+    {
+        HalfWidth = halfWidth;
+        Timelines = timelines;
+    }
+}

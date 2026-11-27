@@ -10,7 +10,7 @@ public class SimulationLoopTests
     private static (SimulationLoop loop, CombatWorld world) NewLoop(double max = SimulationLoop.DefaultMaxFrameSeconds)
     {
         CombatWorld world = World();
-        return (new SimulationLoop(world.Clock, world, null, max), world);
+        return (new SimulationLoop(world, null, max), world);
     }
 
     [Test]
@@ -82,8 +82,8 @@ public class SimulationLoopTests
     public void InvalidFrameCap_IsRejected()
     {
         CombatWorld world = World();
-        Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationLoop(world.Clock, world, null, 0.0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationLoop(world.Clock, world, null, double.PositiveInfinity));
-        Assert.Throws<ArgumentNullException>(() => new SimulationLoop(null, world, null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationLoop(world, null, 0.0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SimulationLoop(world, null, double.PositiveInfinity));
+        Assert.Throws<ArgumentNullException>(() => new SimulationLoop(null, null));
     }
 }

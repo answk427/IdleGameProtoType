@@ -7,22 +7,22 @@ using UnityEngine;
 //
 // 원칙(2장): 개발 도구 전용 게임 API를 만들지 않는다.
 //   - 더하는 명령은 게임의 보상 경로(Wallet.AddGold, PlayerStats.AddExp)를 그대로 쓴다.
-//   - 값을 통째로 바꾸는 명령(새로 시작, 복원, 레벨 지정)은 모두 GameManager.LoadSnapshot 하나를 지난다.
+//   - 값을 통째로 바꾸는 명령(새로 시작, 복원, 레벨 지정)은 모두 Game.LoadSnapshot 하나를 지난다.
 //   - 덮어쓰기 전에는 지금 진행도를 백업한다. 백업이 실패하면 덮어쓰지 않는다.
 public sealed class DevCommands
 {
     public static readonly float[] TimeScales = { 1f, 2f, 5f, 10f };
 
+    private readonly Game game;
     private readonly GameSession session;
-    private readonly GameManager game;
     private readonly EncounterDirector flow;
     private readonly DevBackupStore backups;
 
-    public DevCommands(GameSession session, GameManager game, EncounterDirector flow, DevBackupStore backups)
+    public DevCommands(Game game, DevBackupStore backups)
     {
-        this.session = session ?? throw new ArgumentNullException(nameof(session));
-        this.game = game != null ? game : throw new ArgumentNullException(nameof(game));
-        this.flow = flow ?? throw new ArgumentNullException(nameof(flow));
+        this.game = game ?? throw new ArgumentNullException(nameof(game));
+        session = game.Session;
+        flow = game.Flow;
         this.backups = backups ?? throw new ArgumentNullException(nameof(backups));
     }
 
@@ -38,6 +38,9 @@ public sealed class DevCommands
 
     // 지금 플레이 중인 스테이지(흐름 기준). 진행도 교체 직후 전환 가운데까지는 세션의 스테이지 번호와 다를 수 있다.
     public int CurrentStage => flow.CurrentStageNumber.Value;
+
+    // 스테이지 표에 있는 스테이지인가(이동 입력 검사).
+    public bool HasStage(int stageNumber) => stageNumber >= 1 && game.Data.Stage(stageNumber) != null;
 
     public bool GoToStage(int stageNumber)
     {

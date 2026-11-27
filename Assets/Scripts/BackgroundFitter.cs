@@ -35,7 +35,7 @@ public class BackgroundFitter : MonoBehaviour
     public void Fit()
     {
         if (targetCamera == null) targetCamera = Camera.main;
-        if (playArea == null) playArea = PlayAreaBounds.Instance ?? FindAnyObjectByType<PlayAreaBounds>();
+        if (playArea == null) playArea = FindAnyObjectByType<PlayAreaBounds>(); // 에디터에서도 도는 그림 맞춤이라 씬에서 찾는다
         if (targetCamera == null || playArea == null) return;
 
         float halfHeight = targetCamera.orthographicSize;

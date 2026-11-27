@@ -131,9 +131,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Monster
   view: {fileID: 1403092447647989472}
-  timelines: {fileID: 11400000, guid: 9bdb788fceae10048ac18505b653f311, type: 2}
-  hitboxProfile:
-    halfWidth: 0.4
+  bodyAnchor:
     bodyOffset: {x: 0, y: 0}
   hpBar: {fileID: 0}
 --- !u!114 &3184703108519338795

@@ -5,10 +5,14 @@ public static class TestSkills
 {
     public static Skill Create(int id = 1, float cooldown = 5f, string actionKey = "Skill", SkillEffectType effectType = SkillEffectType.Damage, float castTime = 0.5f)
     {
-        return new Skill(CreateEntry(id, cooldown, actionKey, effectType, castTime));
+        return new Skill(CreateData(id, cooldown, actionKey, effectType, castTime));
     }
 
-    public static SkillEntry CreateEntry(int id = 1, float cooldown = 5f, string actionKey = "Skill", SkillEffectType effectType = SkillEffectType.Damage, float castTime = 0.5f, int requiredLevel = 1)
+    // UI(아이콘을 쓰는 쪽)용 표 항목. 시뮬레이션·진행도는 데이터 행(CreateData)만 쓴다.
+    public static SkillEntry CreateEntry(int id = 1, float cooldown = 5f, string actionKey = "Skill", SkillEffectType effectType = SkillEffectType.Damage, float castTime = 0.5f, int requiredLevel = 1) =>
+        new SkillEntry { data = CreateData(id, cooldown, actionKey, effectType, castTime, requiredLevel) };
+
+    public static SkillData CreateData(int id = 1, float cooldown = 5f, string actionKey = "Skill", SkillEffectType effectType = SkillEffectType.Damage, float castTime = 0.5f, int requiredLevel = 1)
     {
         string json = "{" +
             $"\"id\":{id}," +
@@ -21,7 +25,6 @@ public static class TestSkills
             "\"value2\":0.0," +
             $"\"requiredLevel\":{requiredLevel}" +
             "}";
-        SkillData data = JsonConvert.DeserializeObject<SkillData>(json);
-        return new SkillEntry { data = data };
+        return JsonConvert.DeserializeObject<SkillData>(json);
     }
 }

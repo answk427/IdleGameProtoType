@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 // 전투원 전체와 그 사이의 규칙(거리, 대상, 처리 순서)을 갖는다(docs/COMBAT_ARCHITECTURE.md 8-3, 8-4). 순수 C#.
-// CombatSimulation(드라이버)이 고정 단계마다 국면 순서로 부른다:
+// 루프(SimulationLoop)가 고정 단계마다 국면 순서로 부른다:
 //   (① 흐름) → ② RunEvents → ③ StepPhases → ⑤ CaptureStep → ⑥ DeliverEvents.
 // 위치는 월드 x다(3단계). 좌표가 커지지 않게 인카운터를 스폰할 때마다 원점을 재설정한다(ShiftOrigin).
 //
@@ -10,7 +10,7 @@ using System.Collections.Generic;
 // 처리 도중의 등록·해제는 그 국면이 끝난 뒤에 반영한다.
 // 흐름(스폰, 정리, 원점 재설정)은 처리 밖인 국면 ①(EncounterDirector)에서 한다.
 //
-// 바깥(뷰, 이펙트, 보상)에는 사건(CombatEvent)으로만 알린다(5-A, P7). 사건은 일어날 때 버퍼에 쌓이고, 드라이버가 단계가 끝난 뒤
+// 바깥(뷰, 이펙트, 보상)에는 사건(CombatEvent)으로만 알린다(5-A, P7). 사건은 일어날 때 버퍼에 쌓이고, 루프가 단계가 끝난 뒤
 // DeliverEvents로 배달한다. 배달 중에 생긴 사건(구독자가 전투원을 스폰하는 등)은 다음 배달로 간다.
 // 단계마다 배달하는 이유: 풀에서 다시 꺼낸 전투원은 같은 객체라, 지난 사건이 다음 단계의 재스폰 뒤에 도착하면 새 몬스터에 잘못 간다.
 public sealed class CombatWorld
@@ -38,7 +38,7 @@ public sealed class CombatWorld
     // 원점 재설정으로 뺀 거리의 합. 월드가 처음부터 실제로 이동한 거리 = 지금 좌표 + 이 값(배경의 연속성).
     public double TotalShift { get; private set; }
 
-    // 전투 사건. 드라이버가 DeliverEvents를 부를 때 일어난 순서대로 온다.
+    // 전투 사건. 루프가 DeliverEvents를 부를 때 일어난 순서대로 온다.
     public Observable<CombatEvent> Events => events;
 
     // 아직 배달하지 않은 사건 수(테스트·진단용).
@@ -46,7 +46,7 @@ public sealed class CombatWorld
 
     internal void Emit(in CombatEvent e) => pendingEvents.Add(e);
 
-    // ⑥ 사건 배달. 처리 밖에서만 부른다(드라이버의 단계 끝, 단계 밖의 명령 뒤). 버퍼를 바꿔 끼우므로
+    // ⑥ 사건 배달. 처리 밖에서만 부른다(루프의 단계 끝, 프레임 끝). 버퍼를 바꿔 끼우므로
     // 배달 중에 생긴 사건은 이번 순회에 섞이지 않고 다음 배달로 간다.
     public void DeliverEvents()
     {
@@ -142,12 +142,14 @@ public sealed class CombatWorld
         RemoveNow(combatant);
     }
 
+    // 뺄 때 Left를 낸다(Joined의 짝). 뷰가 떨어지고, 같은 전투원이 다시 들어오면 그 뒤의 Joined에 새로 붙는다(12절 D44).
     private void RemoveNow(Combatant combatant)
     {
         combatants.Remove(combatant);
         pendingAdd.Remove(combatant);
         combatant.Combat.Disengage();
         combatant.World = null;
+        Emit(CombatEvent.Left(Clock.Now, combatant));
     }
 
     private void Flush()
