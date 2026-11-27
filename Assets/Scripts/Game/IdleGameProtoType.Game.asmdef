@@ -1,10 +1,9 @@
 {
-    "name": "IdleGameProtoType.Runtime",
+    "name": "IdleGameProtoType.Game",
     "rootNamespace": "",
     "references": [
-        "Unity.InputSystem",
-        "Unity.TextMeshPro",
-        "UnityEngine.UI"
+        "IdleGameProtoType.Core",
+        "IdleGameProtoType.Simulation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

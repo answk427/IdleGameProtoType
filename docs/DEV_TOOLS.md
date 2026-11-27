@@ -20,6 +20,7 @@
 ### T1. 포함 범위: 에디터와 개발 빌드, 별도 어셈블리
 
 - `Assets/Scripts/DevTools/`에 어셈블리 `IdleGameProtoType.DevTools`를 둔다. define constraint는 `UNITY_EDITOR || DEVELOPMENT_BUILD`다.
+  - 5-C(2026-11-27, [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 13절) 뒤로는 게임 어셈블리 여섯(Core, Simulation, Game, View, UI, App)의 맨 위에 있다. 도구가 여섯을 참조하고, 어느 게임 어셈블리도 도구를 참조하지 않는다. 도구는 게임에서 읽기 전용 접점(`Game.World`, `Game.Flow`)과 명령만 받는다.
   - 릴리스 빌드에서는 어셈블리가 통째로 컴파일되지 않는다. 파일마다 `#if`를 거는 방식은 하나를 빠뜨리면 새는데, 이 방식은 그럴 수가 없다.
 - 의존 방향은 DevTools → Runtime 한쪽이다. 게임 코드는 도구를 모른다.
 - 기기에서 확인하는 빌드는 개발 빌드로 만든다. 성능 측정은 릴리스 빌드로 한다.

@@ -255,7 +255,7 @@ public class SkillManageWindow : UIWindow<SkillManageArgs>
   - 기각: 요청 즉시 닫기(그때는 옵션을 모른다), 탭바가 먼저 닫고 열기(Exclusive가 창의 성격이 아니라 부르는 쪽의 습관이 된다).
   - 로드 중인 창은 구분을 모르므로 그 자리에서 닫지 않는다. 열기 요청 뒤에 받은 가장 높은 닫기 기준을 기억해 두었다가, 로드가 끝날 때 구분이 그보다 낮으면 바로 닫는다(`Dismissed`, Presenter를 만들지 않음). 결과가 "구분을 처음부터 알았던 것"과 같다.
   - 기각: 로드 중인 창도 바로 닫기(로드 중인 System 창이 사라진다), 그대로 남기기(탭 전환 전에 연 팝업이 새 탭 위에 뜬다).
-- **뒤로가기:** Input System 액션 하나로 받아 `WindowManager`에 보낸다. 맨 위 창이 먼저 처리할 기회를 받고(`OnBack()`이 `true`면 처리 완료), 아니면 닫힌다. 입력 차단 중에는 무시한다. (구현 시 런타임 asmdef에 `Unity.InputSystem` 참조 추가 필요 — 현재 없음.)
+- **뒤로가기:** Input System 액션 하나로 받아 `WindowManager`에 보낸다. 맨 위 창이 먼저 처리할 기회를 받고(`OnBack()`이 `true`면 처리 완료), 아니면 닫힌다. 입력 차단 중에는 무시한다. (UI 어셈블리 `IdleGameProtoType.UI`가 `Unity.InputSystem`을 참조한다.)
 - **스택이 비었을 때:** 종료 확인창(DialogService). 뒤로가기 한 번의 처리는 `BackNavigator` 하나다: 입력 차단 중 무시 → 맨 위 창 → 창이 없으면 종료 확인창(10-6).
 
 ### 6-5. 시간 규칙
@@ -304,7 +304,7 @@ using (inputBlocker.Acquire("StageTransition"))   // 스코프를 벗어나면 �
 - **현지화:** 지금은 `"Stage {n}"`, `"Lv."` 같은 문자열이 코드에 박혀 있다. 표시 문자열은 Presenter의 포맷팅에서만 만든다는 규칙을 1차부터 지키면, 나중에 Unity Localization을 그 한 곳에 연결하면 된다.
 - **부트 씬:** 지금은 씬이 하나라 GameInitializer가 씬 수명이어도 된다. 타이틀/로그인 씬이 생기면 앱 수명(세이브 저장소, 설정)과 게임 수명(세션, UI)으로 나눈다.
 - **4차 가챠를 따로 두는 이유:** 가짜 서버만 먼저 만들면 부르는 코드가 없어 검증할 수 없는 죽은 코드가 된다. 서버가 판정하는 기능 하나와 함께 만들어야 비동기 명령, 입력 차단, 요청 ID, 실패와 재시도가 실제로 돌아간다. 4차 시작 시 정할 것: 가챠 결과물(스킬, 동료, 장비 중 무엇), 가챠에 쓸 서버 소유 재화(예: 보석 — 골드로 돌리면 판정 주체가 섞임, SERVER_DESIGN 1장 규칙 2)와 그 재화의 지급 경로.
-- **어셈블리 분리:** 지금은 런타임 코드 전체가 `IdleGameProtoType.Runtime` 하나다. "모델은 UI를 모른다"는 방향을 컴파일 단계에서 강제하려면 반응형 코어 / 게임 / UI asmdef로 나눈다. 1차 이관으로 UI → 게임 단방향이 된 뒤에 한다.
+- **어셈블리 분리:** 끝났다(2026-11-27, 전투 5-C, [COMBAT_ARCHITECTURE.md](COMBAT_ARCHITECTURE.md) 13절). `Core ← Simulation ← Game ← View ← UI ← App` 한 방향이라 "모델은 UI를 모른다"를 컴파일러가 강제한다. 반응형은 Core에 있다.
 
 ## 10. 게임 쪽 선행 결정
 

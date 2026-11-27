@@ -1,0 +1,20 @@
+{
+    "name": "IdleGameProtoType.App",
+    "rootNamespace": "",
+    "references": [
+        "IdleGameProtoType.Core",
+        "IdleGameProtoType.Simulation",
+        "IdleGameProtoType.Game",
+        "IdleGameProtoType.View",
+        "IdleGameProtoType.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

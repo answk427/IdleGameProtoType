@@ -77,7 +77,21 @@ flowchart TB
 ```
 > 게임 규칙은 전부 `Game`(순수 C#) 안에 있고, Unity 쪽은 조립(`GameInitializer`), 실행(`GameRunner`), 그림(`BattleView`, 이펙트, UI)만 합니다. 그래서 씬 없이 `Game` 하나를 돌린 기록이 에디터 플레이 기록과 비트 단위로 같습니다. 모든 구독을 연결한 뒤 흐름을 시작하므로 처음 값도 그대로 전달됩니다.
 
-([GameInitializer.cs](Assets/Scripts/Manager/GameInitializer.cs), [Game.cs](Assets/Scripts/Game/Game.cs), [GameData.cs](Assets/Scripts/Game/GameData.cs), [BattleView.cs](Assets/Scripts/View/BattleView.cs), [GameRunner.cs](Assets/Scripts/Manager/GameRunner.cs))
+([GameInitializer.cs](Assets/Scripts/App/GameInitializer.cs), [Game.cs](Assets/Scripts/Game/Game.cs), [GameData.cs](Assets/Scripts/Game/GameData.cs), [BattleView.cs](Assets/Scripts/View/BattleView.cs), [GameRunner.cs](Assets/Scripts/App/GameRunner.cs))
+
+**어셈블리는 한 방향입니다.** 폴더 하나가 어셈블리 하나이고, 위 규칙들을 컴파일러가 강제합니다.
+
+```mermaid
+flowchart LR
+    CORE["Core<br/>GameNumber, 반응형, GameLog<br/>(엔진 없음)"] --> SIMA["Simulation<br/>전투, 스킬, 흐름, 입력 구조<br/>(엔진 없음)"]
+    SIMA --> GAMEA["Game<br/>게임 규칙, 진행도, 저장 형식, 데이터"]
+    GAMEA --> VIEWA["View<br/>전투원 그림, 이펙트, 카메라, 배경"]
+    VIEWA --> UIA["UI<br/>창, Presenter, HUD"]
+    UIA --> APPA["App<br/>조립, 실행, 저장소"]
+```
+> 화살표 방향으로만 참조합니다(오른쪽이 왼쪽을 안다). Core와 Simulation은 Unity를 참조하지 않아서 `Debug`·`Mathf`·`Time`이나 데이터 행·에셋을 쓰면 컴파일되지 않습니다. 시뮬레이션은 값만 받고(`SkillSpec`, `StageSpec`, `ActionTiming`, `CombatantSpec`, 만드는 곳은 `GameData` 한 곳), 바깥(뷰, UI, 앱)은 `Game`에서 읽기 전용 접점(`IReadOnlyCombatWorld`, `IEncounterFlow`)만 받습니다. 컴파일된 참조 방향과 "바깥이 전투를 진행하는 형식을 쥐지 않는다"는 테스트(`ArchitectureTests`)가 다시 확인합니다. 개발자 도구는 그 위의 별도 어셈블리이고 릴리스 빌드에는 없습니다.
+
+([ArchitectureTests.cs](Assets/Tests/EditMode/ArchitectureTests.cs), [ReadOnlyCombat.cs](Assets/Scripts/Simulation/Combat/ReadOnlyCombat.cs), [IEncounterFlow.cs](Assets/Scripts/Simulation/Flow/IEncounterFlow.cs))
 
 ---
 
@@ -105,7 +119,7 @@ GameDatabaseManager → 런타임
 - **에디터에서 값만 바꿔 보기**는 튜닝 덮어쓰기(메뉴 `IdleGame/Data/Tuning Overrides`)로 합니다. 플레이 중 데이터베이스 사본에만 적용되고 엑셀과 에셋은 그대로이며, 빌드에는 이 코드가 없습니다.
 - 데이터와 프리팹의 짝(공격 간격이 있으면 공격 시간표, 스킬 행동 키, 판정 몸 등)은 에디터와 빌드가 검사합니다.
 
-([ExcelToJsonConverter.cs](Assets/Editor/DataImporter/ExcelToJsonConverter.cs), [IDataSyncer.cs](Assets/Editor/DataImporter/IDataSyncer.cs), [DataTuning.cs](Assets/Scripts/Data/DataTuning.cs))
+([ExcelToJsonConverter.cs](Assets/Editor/DataImporter/ExcelToJsonConverter.cs), [IDataSyncer.cs](Assets/Editor/DataImporter/IDataSyncer.cs), [DataTuning.cs](Assets/Scripts/Game/Data/DataTuning.cs))
 
 ---
 
@@ -127,7 +141,7 @@ flowchart LR
 - **공간**: 플레이어가 월드에서 실제로 전진하고 카메라가 따라갑니다. 시체·동전·이펙트처럼 가만히 있는 것은 아무 처리 없이 화면에서 지나갑니다. 이동은 sweep 하나(그 방향의 가장 가까운 살아 있는 몸까지만)라서 한 단계 이동량과 상관없이 몸을 통과하지 않습니다(이동 속도 1e6에서 테스트). 인카운터마다 원점을 재설정해 오래 달려도 좌표가 커지지 않습니다.
 - **전투 중 할당 0**: 범위·스킬 결과는 재사용 버퍼, 몬스터 전투원은 풀 객체마다 하나를 다시 씁니다(테스트로 확인).
 
-([Combatant.cs](Assets/Scripts/Combat/Combatant.cs), [CombatWorld.cs](Assets/Scripts/Combat/CombatWorld.cs), [CombatScheduler.cs](Assets/Scripts/Combat/CombatScheduler.cs), [SimClock.cs](Assets/Scripts/Combat/SimClock.cs), [SimulationLoop.cs](Assets/Scripts/Flow/SimulationLoop.cs), [GameRunner.cs](Assets/Scripts/Manager/GameRunner.cs))
+([Combatant.cs](Assets/Scripts/Simulation/Combat/Combatant.cs), [CombatWorld.cs](Assets/Scripts/Simulation/Combat/CombatWorld.cs), [CombatScheduler.cs](Assets/Scripts/Simulation/Combat/CombatScheduler.cs), [SimClock.cs](Assets/Scripts/Simulation/Combat/SimClock.cs), [SimulationLoop.cs](Assets/Scripts/Simulation/Flow/SimulationLoop.cs), [GameRunner.cs](Assets/Scripts/App/GameRunner.cs))
 
 ---
 
@@ -140,7 +154,7 @@ flowchart LR
 - **취소 없음**: 모든 행동은 끝까지 하고, 다음 행동은 지금 행동이 완료된 시각에 정합니다(수동 요청 → 슬롯 순서 → 기본 공격). 행동을 끊는 것은 사망과 교전 종료뿐입니다. 타격 순간에 대상을 다시 확인하고, 없으면 헛칩니다.
 - **스킬 효과는 Strategy**: `Skill`이 수치(`SkillData`)와 효과(`ISkillBehavior`: 피해 / 광역 피해 / 회복)를 묶고, 효과는 데이터의 `effectType`으로 고릅니다. 같은 효과의 새 스킬은 데이터만 추가합니다. 쿨다운은 슬롯이 아니라 스킬 id에 붙어서 슬롯을 옮기거나 풀었다 껴도 유지됩니다.
 
-([ActionRunner.cs](Assets/Scripts/Combat/ActionRunner.cs), [ActionTimeline.cs](Assets/Scripts/Combat/ActionTimeline.cs), [CombatActions.cs](Assets/Scripts/Combat/CombatActions.cs), [Skill.cs](Assets/Scripts/Skill/Skill.cs), [SkillLoadout.cs](Assets/Scripts/Combat/SkillLoadout.cs))
+([ActionRunner.cs](Assets/Scripts/Simulation/Combat/ActionRunner.cs), [ActionTimeline.cs](Assets/Scripts/Game/Data/ActionTimeline.cs), [CombatActions.cs](Assets/Scripts/Simulation/Combat/CombatActions.cs), [Skill.cs](Assets/Scripts/Simulation/Skill/Skill.cs), [SkillLoadout.cs](Assets/Scripts/Simulation/Combat/SkillLoadout.cs))
 
 ---
 
@@ -166,7 +180,7 @@ stateDiagram-v2
 - 대기 시간(정리, 보스 등장, 전환)과 보스전 제한 시간은 데이터이고, 시뮬레이션 시간이라 배속과 프레임률에 상관없이 같은 시각에 일어납니다. 화면 페이드는 그 시간을 그리기만 합니다.
 - 개발 빌드에서는 게임 시간 30초 동안 피해·사망·이동·흐름 변화가 없으면 경고합니다(진전 감시).
 
-([EncounterDirector.cs](Assets/Scripts/Flow/EncounterDirector.cs), [FlowTypes.cs](Assets/Scripts/Flow/FlowTypes.cs))
+([EncounterDirector.cs](Assets/Scripts/Simulation/Flow/EncounterDirector.cs), [FlowTypes.cs](Assets/Scripts/Simulation/Flow/FlowTypes.cs))
 
 ---
 
@@ -191,7 +205,7 @@ flowchart LR
 - **재화와 전투 수치는 `GameNumber`**(내부 double)로 감쌌습니다. 방치형 경제는 상한 없이 커지므로, 표현을 바꿔야 할 때 구조체 내부만 바뀌게 했습니다. 세이브와 데이터 테이블에는 기본 타입을 둡니다(직렬화 모양을 바꾸지 않기 위해).
 - 전투 → 연출·보상 방향의 알림은 월드의 사건(`CombatEvent`, 구조체라 할당 없음)입니다. 시뮬레이션은 일어난 일을 버퍼에 쌓기만 하고, 드라이버가 고정 단계가 끝난 뒤 뷰·이펙트·보상에 배달합니다. 그래서 연출이 시뮬레이션 도중에 끼어들 수 없고, 연출을 바꾸거나 빼도 결과가 같습니다. 처치 보상은 스폰할 때 전투원에 넣고 사망 사건이 싣고 가서 `Game`이 지급합니다.
 
-([GameSession.cs](Assets/Scripts/Player/GameSession.cs), [PlayerStats.cs](Assets/Scripts/Player/PlayerStats.cs), [ReactiveProperty.cs](Assets/Scripts/Reactive/ReactiveProperty.cs), [DerivedProperty.cs](Assets/Scripts/Reactive/DerivedProperty.cs), [GameNumber.cs](Assets/Scripts/Economy/GameNumber.cs), [CombatEvent.cs](Assets/Scripts/Combat/CombatEvent.cs))
+([GameSession.cs](Assets/Scripts/Game/Progress/GameSession.cs), [PlayerStats.cs](Assets/Scripts/Game/Progress/PlayerStats.cs), [ReactiveProperty.cs](Assets/Scripts/Core/Reactive/ReactiveProperty.cs), [DerivedProperty.cs](Assets/Scripts/Core/Reactive/DerivedProperty.cs), [GameNumber.cs](Assets/Scripts/Core/Economy/GameNumber.cs), [CombatEvent.cs](Assets/Scripts/Simulation/Combat/CombatEvent.cs))
 
 ---
 
@@ -216,7 +230,7 @@ flowchart LR
 - **해금과 레드닷은 게임 규칙이라 게임 쪽 파생 상태입니다.** 탭은 "창이 연결되고 게임 쪽에서 해금된 탭만" 열립니다(조건은 엑셀 `ContentUnlockDatabase` 시트). 해금은 저장하지 않고 레벨·스테이지에서 계산해서 세이브 형식이 바뀌지 않습니다. 레드닷 조건(레벨업 가능, 살 수 있는 업그레이드, 배울 스킬)도 진행도의 파생 상태이고, 어느 버튼에 묶을지만 UI가 정합니다.
 - 입력 차단(`InputBlocker`)은 참조 카운트와 스코프 해제로, 창을 여는 동안과 화면 전환 중에 걸립니다. 모달이 떠 있으면 키보드 이동도 막습니다. 차단막이 켜진 그 프레임의 틈(새 그래픽은 그려지기 전 레이캐스트에 안 잡힘)은 "UI 버튼 클릭은 한 프레임에 하나"(`UIButton`) 규칙이 막습니다. 창이 하나도 없을 때 뒤로가기는 종료 확인창입니다.
 
-([UIRoot.cs](Assets/Scripts/UI/Core/UIRoot.cs), [WindowManager.cs](Assets/Scripts/UI/Core/WindowManager.cs), [WindowOptions.cs](Assets/Scripts/UI/Core/WindowOptions.cs), [UIButton.cs](Assets/Scripts/UI/Core/UIButton.cs), [ToastService.cs](Assets/Scripts/UI/Toast/ToastService.cs), [DialogService.cs](Assets/Scripts/UI/Dialog/DialogService.cs), [TabBarPresenter.cs](Assets/Scripts/UI/Tabs/TabBarPresenter.cs), [ContentUnlocks.cs](Assets/Scripts/Player/ContentUnlocks.cs))
+([UIRoot.cs](Assets/Scripts/UI/Core/UIRoot.cs), [WindowManager.cs](Assets/Scripts/UI/Core/WindowManager.cs), [WindowOptions.cs](Assets/Scripts/UI/Core/WindowOptions.cs), [UIButton.cs](Assets/Scripts/UI/Core/UIButton.cs), [ToastService.cs](Assets/Scripts/UI/Toast/ToastService.cs), [DialogService.cs](Assets/Scripts/UI/Dialog/DialogService.cs), [TabBarPresenter.cs](Assets/Scripts/UI/Tabs/TabBarPresenter.cs), [ContentUnlocks.cs](Assets/Scripts/Game/Progress/ContentUnlocks.cs))
 
 ---
 
@@ -237,7 +251,7 @@ flowchart LR
 - 주기적 자동저장은 없고 위 계기에서만 저장합니다. `Load()`는 결과가 즉시 필요해서 동기, `Save()`는 호출부가 기다리지 않아도 돼서 코루틴 모양입니다. 종료/일시정지처럼 다음 프레임을 보장받지 못하는 시점만 그 코루틴을 끝까지 직접 돌려 저장을 끝냅니다.
 - 백엔드 교체는 `ISaveStorage` 구현체 하나 + 진입점 한 줄입니다. 서버로 바꾸면 종료 직전 저장은 응답을 기다리지 못할 수 있어서 그때 따로 보장 전략이 필요합니다.
 
-([SaveDataValidator.cs](Assets/Scripts/Player/SaveDataValidator.cs), [ISaveStorage.cs](Assets/Scripts/Player/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/Player/LocalFileSaveStorage.cs), [GameRunner.cs](Assets/Scripts/Manager/GameRunner.cs))
+([SaveDataValidator.cs](Assets/Scripts/Game/Save/SaveDataValidator.cs), [ISaveStorage.cs](Assets/Scripts/App/Save/ISaveStorage.cs), [LocalFileSaveStorage.cs](Assets/Scripts/App/Save/LocalFileSaveStorage.cs), [GameRunner.cs](Assets/Scripts/App/GameRunner.cs))
 
 ---
 
@@ -245,7 +259,7 @@ flowchart LR
 
 풀은 두 겹입니다. 시뮬레이션 쪽은 `EnemyRoster`가 몬스터 id별로 `Combatant`를 다시 쓰고(전투 중 할당 0), 그림 쪽은 `PoolManager`가 Unity 내장 `ObjectPool<GameObject>`로 몬스터·플레이어 그림, 데미지 숫자, 히트 파티클, 보상 드랍, 스킬 VFX를 프리팹별로 관리합니다. 그림은 전투원의 `Joined`·`Left` 사건으로 붙고 떨어지므로, 풀에서 다시 쓴 전투원에도 옛 그림이 남지 않습니다. 다른 스테이지에 들어가면 이전 스테이지의 몬스터 풀을 비웁니다.
 
-([EnemyRoster.cs](Assets/Scripts/Game/EnemyRoster.cs), [BattleView.cs](Assets/Scripts/View/BattleView.cs), [PoolManager.cs](Assets/Scripts/Manager/PoolManager.cs))
+([EnemyRoster.cs](Assets/Scripts/Game/EnemyRoster.cs), [BattleView.cs](Assets/Scripts/View/BattleView.cs), [PoolManager.cs](Assets/Scripts/View/PoolManager.cs))
 
 ---
 
@@ -259,7 +273,7 @@ flowchart LR
 
 ## 테스트와 검증
 
-- **EditMode 테스트 318개**(`Assets/Tests/EditMode/`): 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 봅니다. 예: 기대 시각을 오차 0으로 비교, 단계보다 짧은 공격 간격, 이동 속도 1e6에서도 몸을 통과하지 않음, HP·데미지 1e30, 전투 중 할당 0, 흐름의 정확한 대기와 무작위 데이터 장시간 진행, 창 스택의 로드 순서 뒤바뀜, 진행도 교체 뒤 화면 일치.
+- **EditMode 테스트 323개**(`Assets/Tests/EditMode/`): 지금 수치에서 통과하는지가 아니라 불변식과 극단값을 봅니다. 예: 기대 시각을 오차 0으로 비교, 단계보다 짧은 공격 간격, 이동 속도 1e6에서도 몸을 통과하지 않음, HP·데미지 1e30, 전투 중 할당 0, 흐름의 정확한 대기와 무작위 데이터 장시간 진행, 창 스택의 로드 순서 뒤바뀜, 진행도 교체 뒤 화면 일치.
 - **프레임률 무관**: 같은 세이브로 30fps, 120fps, 렉을 섞은 실행, 애니메이터를 끈 실행의 처치·타격 시각과 스테이지 입장 시각이 같습니다. 전투 루프(`SimulationLoop`)가 Unity를 모르는 순수 C#이라, 씬·뷰 없이 실제 게임 데이터로 같은 전투를 돌리는 헤드리스 실행이 이것을 테스트로 확인합니다(정지를 처음 재현한 세이브와 시드로 1500초 진행 포함). 헤드리스 기록은 에디터 플레이 기록과 비트 단위로 같습니다.
 - **실기기**: Android(Galaxy S24 Ultra) 개발 빌드에 adb로 설치해 화면 캡처, 실제 터치·뒤로가기 키, logcat으로 확인합니다.
 
@@ -288,9 +302,9 @@ ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래�
 ### 판정 몸 위치 보정
 <img width="1024" height="618" alt="Image" src="https://github.com/user-attachments/assets/e99a215c-97a8-446f-aa05-3ed365a8e1bb" />
 
-> 피벗 중심 거리만으로 사거리를 재면 덩치가 다른 캐릭터의 판정이 부정확합니다. 스프라이트 바운드로 몸의 중심과 폭을 자동 계산하려 했지만 바운드가 실루엣보다 크게 잡히거나 애니메이션 프레임마다 달라져서 판정이 흔들렸습니다. 그래서 자동 계산을 지우고 프리팹의 `HitboxProfile`(반너비 필수, 몸 중심 오프셋)에 값을 넣게 했고, 판정과 이펙트 위치가 같은 몸을 씁니다. 반너비가 0 이하이면 에디터·빌드 검사가 에러를 냅니다.
+> 피벗 중심 거리만으로 사거리를 재면 덩치가 다른 캐릭터의 판정이 부정확합니다. 스프라이트 바운드로 몸의 중심과 폭을 자동 계산하려 했지만 바운드가 실루엣보다 크게 잡히거나 애니메이션 프레임마다 달라져서 판정이 흔들렸습니다. 그래서 자동 계산을 지우고 값을 직접 넣게 했고, 판정과 이펙트 위치가 같은 몸을 씁니다. 그 뒤 반너비는 교전 거리를 바꾸는 밸런스 값이라 데이터(엑셀 `halfWidth`)로 옮겼고, 프리팹에는 그림을 몸 중심에 맞추는 오프셋(`BodyAnchor`)만 남았습니다. 반너비가 0 이하이면 에디터·빌드 검사가 에러를 냅니다.
 
-([HitboxProfile.cs](Assets/Scripts/HitboxProfile.cs))
+([BodyAnchor.cs](Assets/Scripts/View/BodyAnchor.cs), [GameData.cs](Assets/Scripts/Game/GameData.cs))
 
 ## 알려진 한계
 
@@ -298,7 +312,7 @@ ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래�
 
 - **저장**: 손상을 막기만 하고 복구 수단(백업으로 되돌리기, 확인 후 새로 시작)이 아직 없습니다. 저장이 원자적이지 않고(쓰는 도중 종료되면 파일이 잘릴 수 있음) 세이브 버전·마이그레이션이 없습니다. WebGL 데모는 새로고침하면 세이브가 사라집니다(템플릿 설정).
 - **게임 기능**: 오프라인 보상이 없습니다. 스킬 쿨다운은 저장하지 않습니다.
-- **구조**: 전투 시뮬레이션 어셈블리가 아직 분리되지 않아 "시뮬레이션은 Unity를 모른다"를 컴파일러가 강제하지 않습니다(전투 5단계의 남은 일). 게임 런타임 코드가 어셈블리 하나라 "모델은 UI를 모른다"를 컴파일러가 강제하지는 않습니다(개발자 도구만 따로 나뉘어 있습니다). 하단 UI 비율 값이 세 곳에 있습니다.
+- **구조**: Game 어셈블리는 데이터 행·표 에셋 때문에 Unity를 참조합니다(그래서 "게임 규칙에 MonoBehaviour 없음"은 컴파일러가 아니라 테스트가 봅니다). 바깥이 전투를 진행하는 구체 형식을 쥐지 않는지는 필드·인자·반환형만 보고, 메서드 안의 형 변환은 보지 못합니다. 하단 UI 비율 값이 세 곳에 있습니다.
 - **밸런스 수치는 기준이 아닙니다.** 구조를 먼저 만들고 있어서 지금 값(예: 슬라임 처치 보상)은 시험용입니다.
 
 ## 문서
@@ -318,17 +332,12 @@ ScriptableObject는 C# 필드 이름을 YAML 키로 씁니다. 데이터 클래�
 DataTables/GameData.xlsx     # 게임 데이터 원본(엑셀)
 Assets/
 ├─ Scripts/
-│  ├─ Game/          # Game(게임 한 판), GameData(데이터 한 벌), EnemyRoster, PlayerCombat
-│  ├─ Combat/        # Combatant, CombatWorld, 전투 사건(CombatEvent), 시계·스케줄러, 행동 시간표, 전투원 호스트·뷰 표
-│  ├─ Flow/          # EncounterDirector(인카운터·보스·스테이지 흐름), SimulationLoop
-│  ├─ View/          # BattleView(전투원 그림), Presentation(그림 자산 조회), BodyAnchor
-│  ├─ Player/        # GameSession, PlayerStats, 세이브(저장소·검사·프로필)
-│  ├─ Reactive/      # ReactiveProperty, Subject, DerivedProperty
-│  ├─ Economy/       # GameNumber
-│  ├─ Skill/         # Skill + 효과(ISkillBehavior)
-│  ├─ Data/          # IData 구현체, 데이터베이스 정의, 튜닝 덮어쓰기
-│  ├─ Manager/       # GameInitializer(조립), GameRunner(실행), PoolManager, CombatEffectManager, CameraRig
+│  ├─ Core/          # GameNumber, 반응형(ReactiveProperty, Subject, DerivedProperty), GameLog — 엔진 없음
+│  ├─ Simulation/    # 엔진 없음: Combat(Combatant, CombatWorld, 사건, 시계·스케줄러, 행동, 입력 구조, 읽기 접점), Skill, Flow(EncounterDirector, SimulationLoop)
+│  ├─ Game/          # Game(게임 한 판), GameData(데이터 → 시뮬레이션 입력), EnemyRoster, PlayerCombat, Data/(데이터 행·표·튜닝), Progress/(진행도), Save/(저장 형식·검사)
+│  ├─ View/          # BattleView, Presentation(그림 자산), Combatants/(호스트·애니메이션·HP 바), Effects/, Stage/(카메라·배경), 풀, 바닥 높이
 │  ├─ UI/            # Core(UIRoot, WindowManager, 창 베이스), 탭·HUD·창별 View와 Presenter
+│  ├─ App/           # GameInitializer(조립), GameRunner(실행), UnityLogSink, Save/(저장소·프로필)
 │  └─ DevTools/      # 개발자 도구(에디터·개발 빌드 전용 어셈블리)
 ├─ Editor/           # Excel → JSON → ScriptableObject 변환, 행동 시간표 굽기, 데이터 검사
 ├─ Data/             # 데이터베이스·시간표·창 레지스트리 에셋

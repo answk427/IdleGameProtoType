@@ -2,7 +2,11 @@
     "name": "IdleGameProtoType.TestSupport",
     "rootNamespace": "",
     "references": [
-        "IdleGameProtoType.Runtime"
+        "IdleGameProtoType.Core",
+        "IdleGameProtoType.Simulation",
+        "IdleGameProtoType.Game",
+        "IdleGameProtoType.View",
+        "IdleGameProtoType.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

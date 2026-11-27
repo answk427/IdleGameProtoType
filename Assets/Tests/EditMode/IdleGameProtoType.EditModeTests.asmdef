@@ -4,7 +4,12 @@
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "IdleGameProtoType.Runtime",
+        "IdleGameProtoType.Core",
+        "IdleGameProtoType.Simulation",
+        "IdleGameProtoType.Game",
+        "IdleGameProtoType.View",
+        "IdleGameProtoType.UI",
+        "IdleGameProtoType.App",
         "IdleGameProtoType.DevTools",
         "IdleGameProtoType.TestSupport"
     ],
