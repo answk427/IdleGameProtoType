@@ -295,7 +295,7 @@ using (inputBlocker.Acquire("StageTransition"))   // 스코프를 벗어나면 �
 | **1차 (뼈대)** | 반응형 타입과 모델 전환, UIRoot와 `UISortBand`, WindowManager(옵션 기반 창, 스택, 정렬, 뒤로가기, Tick), 창 수명 주기와 타입 있는 인자, WindowRegistry, InputBlocker, View/Presenter와 구독 자동 해제, 기존 패널 이관 |
 | **2차 (서비스)** — 구현 2026-11-26(10-6) | DialogService, ToastService, 공용 버튼(`UIButton`: 사운드, 연타 방지, 차단 인지 → 구현에서 "한 프레임에 클릭 하나"로 정리, 11장), RedDot, 해금(탭 잠금 이관), 디버그 도구(창 스택·입력 차단 이유 오버레이. 치트 메뉴는 개발자 도구로 앞당겨 만들었다, [DEV_TOOLS.md](DEV_TOOLS.md)) |
 | **3차 (품질)** | 전환 애니메이션, SafeArea, 하단 UI 영역을 `PlayAreaBounds`에 전달, 재사용 스크롤, 서브 Canvas, Addressables 로더, 현지화, 어셈블리 분리 |
-| **4차 (서버 판정 기능: 가챠)** | 서버가 판정하는 첫 기능으로 가챠를 붙이고, 그 기능과 함께 서버 대비 부품을 만든다: `FakeGameServer`(지연·실패율·타임아웃 조절), `ServerCommandService`(요청 ID, 재시도, 타임아웃), `ServerOwnedState`와 전용 저장 DTO, 비동기 명령 + InputBlocker + 지연 스피너, 실패/재시도 안내, 오프라인 시 버튼 비활성화. 상세는 [SERVER_DESIGN.md](SERVER_DESIGN.md) 3·5장 |
+| **4차 (서버 판정 기능: 가챠)** | 서버가 판정하는 첫 기능으로 가챠를 붙이고, 그 기능과 함께 서버 대비 부품을 만든다: `FakeGameServer`(지연·실패율·타임아웃 조절), `ServerCommandService`(요청 ID, 재시도, 타임아웃), `ServerOwnedState`와 전용 저장 DTO, 비동기 명령 + InputBlocker + 지연 스피너, 실패/재시도 안내, 오프라인 안내(버튼은 비활성화 대신 모양만 불가로 바뀜, SERVER_DESIGN 8-9). 상세는 [SERVER_DESIGN.md](SERVER_DESIGN.md) 3·5장, **상세 설계는 SERVER_DESIGN 8장**(2026-11-27, UI는 8-9) |
 
 **1차 진행 방식은 수직 슬라이스.** `SkillManagePopup` 하나를 Registry 로드 → WindowManager → Presenter → 반응형 구독/자동 해제 → InputBlocker까지 처음부터 끝까지 새 구조로 통과시켜 인터페이스를 확정한 뒤, 나머지 창을 옮긴다.
 
